@@ -1,7 +1,7 @@
-"""Export the official TorchScript policy with explicit recurrent state; check parity.
+"""Export the official TorchScript policy with explicit recurrent state and test parity.
 
-Requires torch==2.6.0, onnx==1.17.0, numpy, and onnxruntime. This is an offline
-build tool; running the website does not require Python or a model service.
+Use torch==2.6.0, onnx==1.17.0, numpy, and onnxruntime.
+The exporter runs offline. The website runs without Python or a model service.
 """
 
 import hashlib

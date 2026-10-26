@@ -1,34 +1,37 @@
 # RoboPlay
 
-A React webpage where you drive a Unitree G1 around a three-room indoor sandbox.
-The official pretrained recurrent walking policy controls the leg joints in MuJoCo
-physics. WASD supplies velocity commands to that policy. The robot's position is
-never translated by the keyboard handler and there is no canned walking animation.
+RoboPlay is a React application for manual control of a Unitree G1 in a three-room
+indoor scene. A pretrained policy controls the robot's leg joints in MuJoCo physics.
+The policy keeps memory between control steps.
+
+WASD keys send velocity commands to the policy.
+The keyboard handler does not translate the robot or play a walking animation.
 
 ## Run locally
 
-Requires Node.js 18.19+ and npm. A recent desktop browser with WebGL 2 and
-WebAssembly SIMD support is recommended (Chrome/Edge/Firefox).
+Use Node.js 18.19+ and npm. Use a recent desktop browser with WebGL 2 and
+WebAssembly SIMD support, such as Chrome, Edge, or Firefox.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the Local URL printed by Vite, normally `http://127.0.0.1:5173`.
-The robot, policy, fonts, and WASM engines are served locally. No Python server,
-API key, GPU, external inference endpoint, or cross-origin isolation headers are
-required. The first page load transfers approximately 50 MB of uncompressed
-assets; subsequent loads can use the browser cache.
+Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
+The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
+the local server. The application runs without a Python server, API key, GPU,
+external inference endpoint, or cross-origin isolation headers.
+The first page load transfers approximately 50 MB of uncompressed assets.
+The browser can cache these assets for later loads.
 
 ```bash
 npm run build
 npm run preview
 ```
 
-The production build is a static website in `dist/`. Serve it over HTTP(S) with
-JavaScript module and WASM MIME types (`application/wasm` for `.wasm`). Enable
-compression on the host when deploying. The current build assumes hosting at `/`.
+Vite writes the static website to `dist/`. Serve `dist/` over HTTP(S).
+Set the JavaScript module and WASM MIME types (`application/wasm` for `.wasm`).
+Enable compression on the host. The current build assumes hosting at `/`.
 
 ## Controls
 
@@ -43,47 +46,52 @@ compression on the host when deploying. The current build assumes hosting at `/`
 | Mouse drag / right-drag / scroll | Orbit / pan / zoom |
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
-The speed slider sets forward/backward speed from 0.2 to 0.8 m/s; lateral commands
-are capped at 0.35 m/s and turning at 0.7 rad/s. Releasing movement inputs requests
-zero velocity. The learned controller continues balancing and may step/drift a
-little. Losing window focus clears held inputs; hiding the page pauses physics.
-Opening the explanation dialog also pauses physics. Use Resume to continue.
+The speed slider sets forward and backward speed from 0.2 to 0.8 m/s.
+The controller limits lateral commands to 0.35 m/s and turning commands to 0.7 rad/s.
+When you release a movement input, the controller requests zero velocity.
+The policy continues to balance the robot, which can still take small steps or drift.
+
+When the window loses focus, the application clears held inputs.
+When you hide the page or open the explanation dialog, the application pauses physics.
+Select Resume to continue.
 
 ## Scene and robot
 
 - A 14 × 12 m apartment with living room, kitchen, study, two doorways, and gray-box furniture.
-- Walls and furniture share their positions/dimensions between rendering and physics.
-  Walls are rendered as a cutaway but retain their full 2.7 m collision height.
+- Rendering and physics use the same positions and dimensions for walls and furniture.
+  The renderer shortens visible walls for a cutaway view. Physics retains their full 2.7 m collision height.
 - Official Unitree G1 meshes, inertias, joints, contacts, and actuator limits.
 - The walking checkpoint uses the **12-DoF G1 model**, with fixed arms and waist.
 - Live robot-frame commands, actual speed, world position, heading, base height,
   simulation time, distance, rendering FPS, and real-time factor.
 - The learned policy handles flat-ground locomotion. It does not plan paths, avoid
-  obstacles, or recover from a fall. Falls stop the simulation and expose Reset.
+  obstacles, or recover from a fall. Falls stop the simulation and leave Reset available.
 
-This first implementation is manual exploration. Click-to-go navigation, challenge
-scoring/history, richer apartment assets, and the Hugging Face metadata explorer
-remain subsequent milestones from the proposal.
+This implementation supports manual exploration. The proposal includes later work
+for click-to-go navigation, challenge scores and history, detailed apartment assets,
+and a Hugging Face metadata explorer.
 
 ## Performance
 
-The page defaults to **Graphics → Fast**. It uses a 25,142-triangle render-only
-G1 mesh (95% fewer triangles), one merged room mesh, simpler lighting, a contact
-shadow, and a render resolution capped at 1× device pixel ratio. **Quality** adds
-a static room shadow and allows up to 1.5× resolution (capped at one megapixel).
-The original robot collision geometry, inertias, timestep, and learned policy are
-preserved in both modes.
+The page defaults to **Graphics → Fast**. Fast mode uses a 25,142-triangle G1 mesh
+for rendering, with 95% fewer triangles than the original visual model.
+Fast mode uses one merged room mesh, simple lighting, a contact shadow, and at most
+1× device pixel ratio. **Quality** adds a static room shadow and permits up to
+1.5× resolution, with a one-megapixel limit. Both modes use the original robot
+collision geometry, inertias, timestep, and policy.
 
-Poses are sent at most 50 times per second with one outstanding message and a
-recycled transfer buffer. React telemetry updates at 4 Hz. A lightweight kinematics
-refresh replaces repeated full forward-dynamics calls for drawing. Hidden tabs
-pause simulation and stop rendering; paused views redraw only for camera changes.
+The worker sends poses at most 50 times per second. It permits one outstanding
+message and reuses the transfer buffer. React updates telemetry at 4 Hz.
+The worker updates kinematics for rendering instead of repeating full forward dynamics.
+Hidden tabs pause simulation and stop rendering. Paused views redraw for camera
+changes, a new pose, or a graphics setting change.
 
-In representative local browser samples, rendering changed from 1,007,784 to
-25,990 triangles per frame, 179 to 40 draw calls, and about 1.19 to 0.49 ms of CPU
-render submission time. The optimized page rendered at 60 FPS while the physics
-maintained a real-time factor near 1.0. These are measurements from this machine,
-not frame-rate guarantees for every device.
+Local browser samples show 25,990 triangles per frame, compared with 1,007,784 before
+the performance changes. Draw calls decreased from 179 to 40.
+CPU render submission time decreased from approximately 1.19 to 0.49 ms.
+The optimized page rendered at 60 frames per second (FPS).
+Physics maintained a real-time factor near 1.0. These measurements describe this
+test machine and do not guarantee the same frame rate on every device.
 
 Add `?profile=1` to the URL for live render diagnostics.
 See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the profiling method and the
@@ -91,8 +99,11 @@ MicroDuck/mjswan source references used for this optimization.
 
 ## Policy and simulation
 
-The model and checkpoint are pinned to
+The application pins the model and checkpoint to
 [`unitreerobotics/unitree_rl_gym`, commit `276801e46c5d433564f24658bac64f254b7d2d4b`](https://github.com/unitreerobotics/unitree_rl_gym/tree/276801e46c5d433564f24658bac64f254b7d2d4b).
+
+The policy uses a long short-term memory (LSTM) network.
+A proportional-derivative (PD) controller applies its joint targets.
 
 ```text
 Keyboard: [forward m/s, lateral m/s, yaw rad/s]
@@ -109,13 +120,15 @@ PD torques at 500 Hz → MuJoCo contacts and rigid-body dynamics
 Physics state → Three.js rendering + next observation
 ```
 
-The official `motion.pt` weights are unchanged. The ONNX export exposes the LSTM
-hidden/cell state explicitly as `[1, 1, 64]` inputs and outputs. Both are cleared
-on Reset. The deployment observation ordering, scaling, joint order, PD gains,
-0.8 s gait phase, and 2 ms timestep follow the bundled official reference files.
-The simulation runs in a dedicated Web Worker; Three.js and React run on the main
-thread. If a device cannot keep up, simulation time advances slower than wall time
-instead of skipping physics steps. The RTF readout shows that ratio.
+The export preserves the official `motion.pt` weights. The ONNX export exposes the
+LSTM hidden and cell states as `[1, 1, 64]` inputs and outputs. Reset clears both states.
+Observation order, scaling, joint order, PD gains, the 0.8 s gait phase, and the 2 ms
+timestep follow the bundled official reference files.
+
+The simulation runs in a dedicated Web Worker. Three.js and React run on the main
+thread. If a device cannot process every step in real time, simulation time advances
+more slowly than wall time. The simulation does not skip physics steps.
+The RTF readout shows the ratio of simulation time to wall time.
 
 ## Verification
 
@@ -125,13 +138,16 @@ npm run test:simulation  # Real bundled MuJoCo WASM + ONNX runtime; no Python ne
 npm run build
 ```
 
-The simulation regression covers 20 s idle balance, 9 s forward walking, backward
-walking, turning, strafing, crossing the living-room doorway, and collision with a
-solid partition. The free-walking cases maintain a base height above 0.7 m. A wall
-contact must occur and the robot must remain on its original side of that wall.
+The simulation regression uses the same controller as the browser worker.
+It covers 20 s idle balance, 9 s forward walking, backward walking, turning,
+strafing, doorway crossing, and collision with a solid partition.
+The free-walking cases maintain a base height above 0.7 m.
+The collision case must produce a wall contact. The robot must remain on its
+original side of that wall. Further checks cover pause, reset, fall detection,
+and rejection of invalid policy output.
 
-The ONNX exporter also compares 200 stateful random steps against the original
-TorchScript checkpoint. Maximum absolute action error was **6.8e-6** (limit 1e-4).
+The ONNX exporter compares 200 stateful random steps with the original
+TorchScript checkpoint. The maximum absolute action error was **6.8e-6** (limit 1e-4).
 The exact hash and export contract are in `public/assets/g1/contract.json`.
 Browser checks verified loading, W movement, turning/strafe commands, pause/reset,
 camera switching, and the production bundle.
@@ -144,7 +160,9 @@ src/style.css               Responsive interface
 src/scene_view.js           Three.js scene and camera
 src/scene_layout.js         Shared apartment geometry and MJCF generation
 src/locomotion.js           Official observation/PD contract and keyboard mapping
-src/simulation.worker.js    MuJoCo, ONNX inference, fixed-timestep loop
+src/simulation.worker.js    MuJoCo/ONNX loading, clock, and worker messages
+src/simulation.js           Shared controller, policy state, and physics steps
+src/robot_assets.js         Shared model loading, model checks, and render geometry
 public/assets/g1/           Pinned meshes, source checkpoint, ONNX export, licenses
 scripts/fetch_assets.py     Re-fetch original upstream assets and record SHA-256s
 scripts/export_policy.py    Reproduce the ONNX export and verify stateful parity
@@ -155,8 +173,9 @@ tests/visual_assets.test.js Optimized asset integrity and size budget
 ```
 
 The bundled assets are ready to use. To reproduce the export, use a temporary
-Python 3.12 virtual environment with `torch==2.6.0` (CPU is sufficient),
-`onnx==1.17.0`, `onnxruntime==1.26.0`, and `numpy`, then run:
+Python 3.12 virtual environment. Install `torch==2.6.0`, `onnx==1.17.0`,
+`onnxruntime==1.26.0`, and `numpy`. The CPU version of PyTorch is sufficient.
+Run these commands:
 
 ```bash
 python scripts/fetch_assets.py
