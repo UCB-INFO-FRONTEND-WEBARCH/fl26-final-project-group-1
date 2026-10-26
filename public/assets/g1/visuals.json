@@ -1,0 +1,281 @@
+{
+  "source_commit": "276801e46c5d433564f24658bac64f254b7d2d4b",
+  "mujoco_version": "3.17.0",
+  "simplifier": "meshoptimizer 1.3.0",
+  "max_error_m": 0.004,
+  "original_triangles": 503229,
+  "optimized_triangles": 25142,
+  "sha256": "8212d84e0c70a08a9fa5afa3ac440306005a9904db2516374f1cd9e5f8ec9178",
+  "meshes": [
+    {
+      "mesh_id": 0,
+      "vertex_count": 532,
+      "index_count": 3177,
+      "position_offset": 0,
+      "normal_offset": 6384,
+      "index_offset": 12768,
+      "original_triangles": 21216,
+      "max_error_m": 0.0007575912168249488
+    },
+    {
+      "mesh_id": 1,
+      "vertex_count": 906,
+      "index_count": 5412,
+      "position_offset": 25476,
+      "normal_offset": 36348,
+      "index_offset": 47220,
+      "original_triangles": 36102,
+      "max_error_m": 0.0003621455398388207
+    },
+    {
+      "mesh_id": 2,
+      "vertex_count": 94,
+      "index_count": 540,
+      "position_offset": 68868,
+      "normal_offset": 69996,
+      "index_offset": 71124,
+      "original_triangles": 3632,
+      "max_error_m": 0.003505040192976594
+    },
+    {
+      "mesh_id": 3,
+      "vertex_count": 100,
+      "index_count": 576,
+      "position_offset": 73284,
+      "normal_offset": 74484,
+      "index_offset": 75684,
+      "original_triangles": 3842,
+      "max_error_m": 0.003213434247300029
+    },
+    {
+      "mesh_id": 4,
+      "vertex_count": 154,
+      "index_count": 888,
+      "position_offset": 77988,
+      "normal_offset": 79836,
+      "index_offset": 81684,
+      "original_triangles": 5924,
+      "max_error_m": 0.0038844002410769463
+    },
+    {
+      "mesh_id": 5,
+      "vertex_count": 437,
+      "index_count": 2562,
+      "position_offset": 85236,
+      "normal_offset": 90480,
+      "index_offset": 95724,
+      "original_triangles": 17096,
+      "max_error_m": 0.0023586067836731672
+    },
+    {
+      "mesh_id": 6,
+      "vertex_count": 40,
+      "index_count": 240,
+      "position_offset": 105972,
+      "normal_offset": 106452,
+      "index_offset": 106932,
+      "original_triangles": 1422,
+      "max_error_m": 0.002489746082574129
+    },
+    {
+      "mesh_id": 7,
+      "vertex_count": 333,
+      "index_count": 1956,
+      "position_offset": 107892,
+      "normal_offset": 111888,
+      "index_offset": 115884,
+      "original_triangles": 13066,
+      "max_error_m": 0.001076158368960023
+    },
+    {
+      "mesh_id": 8,
+      "vertex_count": 93,
+      "index_count": 540,
+      "position_offset": 123708,
+      "normal_offset": 124824,
+      "index_offset": 125940,
+      "original_triangles": 3624,
+      "max_error_m": 0.003568157320842147
+    },
+    {
+      "mesh_id": 9,
+      "vertex_count": 100,
+      "index_count": 576,
+      "position_offset": 128100,
+      "normal_offset": 129300,
+      "index_offset": 130500,
+      "original_triangles": 3852,
+      "max_error_m": 0.003074606880545616
+    },
+    {
+      "mesh_id": 10,
+      "vertex_count": 154,
+      "index_count": 885,
+      "position_offset": 132804,
+      "normal_offset": 134652,
+      "index_offset": 136500,
+      "original_triangles": 5924,
+      "max_error_m": 0.003998484928160906
+    },
+    {
+      "mesh_id": 11,
+      "vertex_count": 436,
+      "index_count": 2556,
+      "position_offset": 140040,
+      "normal_offset": 145272,
+      "index_offset": 150504,
+      "original_triangles": 17044,
+      "max_error_m": 0.0023047744762152433
+    },
+    {
+      "mesh_id": 12,
+      "vertex_count": 40,
+      "index_count": 240,
+      "position_offset": 160728,
+      "normal_offset": 161208,
+      "index_offset": 161688,
+      "original_triangles": 1422,
+      "max_error_m": 0.0026813021395355463
+    },
+    {
+      "mesh_id": 13,
+      "vertex_count": 333,
+      "index_count": 1956,
+      "position_offset": 162648,
+      "normal_offset": 166644,
+      "index_offset": 170640,
+      "original_triangles": 13074,
+      "max_error_m": 0.0010721636936068535
+    },
+    {
+      "mesh_id": 14,
+      "vertex_count": 3821,
+      "index_count": 23448,
+      "position_offset": 178464,
+      "normal_offset": 224316,
+      "index_offset": 270168,
+      "original_triangles": 156507,
+      "max_error_m": 0.0008858005749061704
+    },
+    {
+      "mesh_id": 15,
+      "vertex_count": 149,
+      "index_count": 726,
+      "position_offset": 363960,
+      "normal_offset": 365748,
+      "index_offset": 367536,
+      "original_triangles": 4866,
+      "max_error_m": 0.00279967300593853
+    },
+    {
+      "mesh_id": 16,
+      "vertex_count": 466,
+      "index_count": 2796,
+      "position_offset": 370440,
+      "normal_offset": 376032,
+      "index_offset": 381624,
+      "original_triangles": 18654,
+      "max_error_m": 0.0010897492757067084
+    },
+    {
+      "mesh_id": 17,
+      "vertex_count": 90,
+      "index_count": 528,
+      "position_offset": 392808,
+      "normal_offset": 393888,
+      "index_offset": 394968,
+      "original_triangles": 3534,
+      "max_error_m": 0.0016417531296610832
+    },
+    {
+      "mesh_id": 18,
+      "vertex_count": 202,
+      "index_count": 1200,
+      "position_offset": 397080,
+      "normal_offset": 399504,
+      "index_offset": 401928,
+      "original_triangles": 8004,
+      "max_error_m": 0.001603750977665186
+    },
+    {
+      "mesh_id": 19,
+      "vertex_count": 123,
+      "index_count": 738,
+      "position_offset": 406728,
+      "normal_offset": 408204,
+      "index_offset": 409680,
+      "original_triangles": 4982,
+      "max_error_m": 0.002753904554992914
+    },
+    {
+      "mesh_id": 20,
+      "vertex_count": 48,
+      "index_count": 264,
+      "position_offset": 412632,
+      "normal_offset": 413208,
+      "index_offset": 413784,
+      "original_triangles": 1774,
+      "max_error_m": 0.0039788889698684216
+    },
+    {
+      "mesh_id": 21,
+      "vertex_count": 1744,
+      "index_count": 10452,
+      "position_offset": 414840,
+      "normal_offset": 435768,
+      "index_offset": 456696,
+      "original_triangles": 69696,
+      "max_error_m": 0.00022469667601399124
+    },
+    {
+      "mesh_id": 22,
+      "vertex_count": 90,
+      "index_count": 528,
+      "position_offset": 498504,
+      "normal_offset": 499584,
+      "index_offset": 500664,
+      "original_triangles": 3534,
+      "max_error_m": 0.0015437062829732895
+    },
+    {
+      "mesh_id": 23,
+      "vertex_count": 202,
+      "index_count": 1200,
+      "position_offset": 502776,
+      "normal_offset": 505200,
+      "index_offset": 507624,
+      "original_triangles": 8036,
+      "max_error_m": 0.0015708405990153551
+    },
+    {
+      "mesh_id": 24,
+      "vertex_count": 123,
+      "index_count": 738,
+      "position_offset": 512424,
+      "normal_offset": 513900,
+      "index_offset": 515376,
+      "original_triangles": 4998,
+      "max_error_m": 0.0028213185723870993
+    },
+    {
+      "mesh_id": 25,
+      "vertex_count": 46,
+      "index_count": 264,
+      "position_offset": 518328,
+      "normal_offset": 518880,
+      "index_offset": 519432,
+      "original_triangles": 1774,
+      "max_error_m": 0.003923535812646151
+    },
+    {
+      "mesh_id": 26,
+      "vertex_count": 1742,
+      "index_count": 10440,
+      "position_offset": 520488,
+      "normal_offset": 541392,
+      "index_offset": 562296,
+      "original_triangles": 69630,
+      "max_error_m": 0.0002275400620419532
+    }
+  ]
+}
