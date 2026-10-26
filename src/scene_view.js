@@ -24,7 +24,7 @@ function floor_label(text, width, color = '#85858d') {
 }
 
 export class SceneView {
-  constructor(container, on_fps, on_metrics = () => {}) {
+  constructor(container, on_fps, on_metrics) {
     this.container = container;
     this.on_fps = on_fps;
     this.on_metrics = on_metrics;
@@ -187,7 +187,7 @@ export class SceneView {
     arrow.position.x = 0.53;
     this.robot_marker.add(arrow);
     this.scene.add(this.robot_marker);
-    // A cheap contact shadow keeps the feet grounded without a second robot draw pass.
+    // The contact shadow avoids a second render pass for the robot.
     const shadow_canvas = document.createElement('canvas');
     shadow_canvas.width = shadow_canvas.height = 64;
     const context = shadow_canvas.getContext('2d');
@@ -284,7 +284,7 @@ export class SceneView {
   set_quality(quality) {
     this.quality = quality;
     this.renderer.shadowMap.enabled = quality === 'quality';
-    // The room is static; bake its shadow once. The robot uses the contact shadow.
+    // The room is static. Compute its shadow once. The robot uses the contact shadow.
     this.renderer.shadowMap.needsUpdate = quality === 'quality';
     this.resize();
   }
