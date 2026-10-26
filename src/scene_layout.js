@@ -1,6 +1,5 @@
 // Metres, MuJoCo coordinates: +X forward, +Y left, +Z up.
 export const SPAWN = [-4.7, -3.4, 0.793];
-export const ROOM_BOUNDS = [-7, -6, 7, 6];
 
 export const SCENE_BOXES = [
   { name: 'north_wall', center: [0, 6, 1.35], size: [14.3, 0.18, 2.7], kind: 'wall' },
