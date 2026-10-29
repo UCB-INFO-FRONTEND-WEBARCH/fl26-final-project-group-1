@@ -69,16 +69,27 @@ the Three.js render call. It does not measure GPU execution time.
 The p95 value is the 95th percentile of the recorded CPU times.
 Browser scheduling and other open applications can change frames per second (FPS).
 
-| Measurement | Original | Optimized Fast |
-| --- | ---: | ---: |
-| G1 visual triangles | 503,229 | 25,142 |
-| Triangles submitted per frame | 1,007,784 | 25,990 |
-| Draw calls per frame | 179 | 40 |
-| Pixel ratio in measured viewport | 1.75 | 1.0 |
-| CPU render submission, representative mean | 1.19 ms | 0.49 ms |
-| CPU render submission, representative p95 | 1.70 ms | 0.70 ms |
-| FPS in warmed-up sample | 53 | 60 |
-| Physics real-time factor | ~1.0 | ~1.0 |
+| Measurement | Original | Optimized gray-box scene | Furnished Fast |
+| --- | ---: | ---: | ---: |
+| G1 visual triangles | 503,229 | 25,142 | 25,142 |
+| Triangles submitted per frame | 1,007,784 | 25,990 | 112,674 |
+| Draw calls per frame | 179 | 40 | 58 |
+| Pixel ratio in measured viewport | 1.75 | 1.0 | 1.0 |
+| CPU render submission, representative mean | 1.19 ms | 0.49 ms | 0.81 ms |
+| CPU render submission, representative p95 | 1.70 ms | 0.70 ms | 1.30 ms |
+| FPS in warmed-up sample | 53 | 60 | 60 |
+| Physics real-time factor | ~1.0 | ~1.0 | ~1.0 |
+
+The furnished scene uses twelve local IKEA GLBs, totaling 1.93 MB, in fourteen
+placements. Repeated models share geometry and materials. Fast mode adds one
+merged contact-shadow mesh. Quality mode includes the furniture in its static
+shadow bake. The robot still uses its contact shadow.
+
+CoACD generates collision meshes offline. The application loads 367 unique convex
+hulls and reuses them for repeated placements. It does not decompose meshes during
+page startup or physics stepping. The physics worker remains paused until the
+furniture visuals and robot are ready. Add `?collisions=1` to inspect the hulls;
+this diagnostic overlay adds draw calls and is excluded from the measurements.
 
 To measure the page:
 
@@ -90,6 +101,8 @@ To measure the page:
 
 The diagnostic panel reports counts and timings. It does not change the engine.
 
-The controller contract tests, indexed-geometry checks, and seven WASM/ONNX physics
+The controller contract tests, indexed-geometry checks, and eight WASM/ONNX physics
 regressions pass. The physics scenarios cover balance, forward and backward walking,
-turning, strafing, doorway crossing, and wall collisions.
+turning, strafing, doorway crossing, wall collisions, and IKEA furniture contact.
+Further probes check openings, table legs, tabletop height, and a physical drop
+onto the coffee table.

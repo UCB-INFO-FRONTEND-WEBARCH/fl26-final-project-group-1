@@ -121,6 +121,7 @@ async function initialize() {
     graphOptimizationLevel: 'all',
   });
   simulation = new Simulation(mujoco, model, session);
+  simulation.paused = true;
 
   report_loading('Preparing optimized G1 visuals');
   const [visual_json, visual_bytes] = await Promise.all([

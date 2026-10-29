@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SCENE_BOXES, ROOM_LABELS, SPAWN } from './scene_layout.js';
-
-const COLORS = { wall: '#c7c9ce', sofa: '#92969f', table: '#c6c4c0', cabinet: '#aeb3bc' };
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
+import { create_model_loader, dispose_model } from './model_assets.js';
+import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 
 function floor_label(text, width, color = '#85858d') {
   const canvas = document.createElement('canvas');
@@ -18,22 +19,19 @@ function floor_label(text, width, color = '#85858d') {
   context.fillText(text, 512, 64);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const label = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 8),
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, width / 8),
     new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
-  return label;
 }
 
 export class SceneView {
-  constructor(container, on_fps, on_metrics) {
+  constructor(container, on_metrics) {
     this.container = container;
-    this.on_fps = on_fps;
     this.on_metrics = on_metrics;
     this.render_samples = [];
     this.needs_render = true;
     this.paused = false;
     this.quality = 'performance';
-    this.static_geometries = [];
-    this.edge_geometries = [];
+    this.furniture_abort = new AbortController();
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#f5f5f7');
     this.scene.fog = new THREE.Fog('#f5f5f7', 23, 48);
@@ -44,7 +42,7 @@ export class SceneView {
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D apartment with Unitree G1 robot');
     this.renderer.domElement.setAttribute('tabindex', '0');
     container.appendChild(this.renderer.domElement);
@@ -71,54 +69,37 @@ export class SceneView {
     this.trail.frustumCulled = false;
     this.scene.add(this.trail);
     this.build_room();
-    this.finish_static_geometry();
     this.set_camera('follow');
     this.resize_observer = new ResizeObserver(() => this.resize());
     this.resize_observer.observe(container);
     this.resize();
     this.last_fps_time = performance.now();
-    this.frame_count = 0;
     this.renderer.setAnimationLoop(time => this.render(time));
     this.visibility_handler = () => {
       this.renderer.setAnimationLoop(document.hidden ? null : time => this.render(time));
       this.needs_render = true;
       this.last_fps_time = performance.now();
-      this.frame_count = 0;
+      this.render_samples = [];
     };
     document.addEventListener('visibilitychange', this.visibility_handler);
   }
 
-  box(center, size, color, edges = true) {
-    const geometry = new THREE.BoxGeometry(...size);
-    geometry.translate(...center);
-    const vertex_color = new THREE.Color(color);
-    const colors = new Float32Array(geometry.getAttribute('position').count * 3);
-    for (let offset = 0; offset < colors.length; offset += 3) vertex_color.toArray(colors, offset);
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    this.static_geometries.push(geometry);
-    if (edges) {
-      this.edge_geometries.push(new THREE.EdgesGeometry(geometry));
-    }
-  }
-
-  finish_static_geometry() {
-    const room = new THREE.Mesh(mergeGeometries(this.static_geometries),
-      new THREE.MeshLambertMaterial({ vertexColors: true }));
-    room.castShadow = true;
-    room.receiveShadow = true;
-    room.matrixAutoUpdate = false;
-    const edges = new THREE.LineSegments(mergeGeometries(this.edge_geometries),
-      new THREE.LineBasicMaterial({ color: '#777c87', transparent: true, opacity: 0.16 }));
-    edges.matrixAutoUpdate = false;
-    this.scene.add(room, edges);
-    for (const geometry of [...this.static_geometries, ...this.edge_geometries]) geometry.dispose();
-    this.static_geometries = [];
-    this.edge_geometries = [];
-  }
-
   build_room() {
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#b0b3bb', 2.8));
-    const sunlight = new THREE.DirectionalLight('#ffffff', 2.5);
+    const static_geometries = [];
+    const edge_geometries = [];
+    function add_box(center, size, color, edges = true) {
+      const geometry = new THREE.BoxGeometry(...size);
+      geometry.translate(...center);
+      const vertex_color = new THREE.Color(color);
+      const colors = new Float32Array(geometry.getAttribute('position').count * 3);
+      for (let offset = 0; offset < colors.length; offset += 3) vertex_color.toArray(colors, offset);
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      static_geometries.push(geometry);
+      if (edges) edge_geometries.push(new THREE.EdgesGeometry(geometry));
+    }
+
+    this.scene.add(new THREE.HemisphereLight('#ffffff', '#b0b3bb', 2));
+    const sunlight = new THREE.DirectionalLight('#ffffff', 2);
     this.sunlight = sunlight;
     sunlight.position.set(-3, -6, 14);
     sunlight.castShadow = true;
@@ -127,10 +108,10 @@ export class SceneView {
     sunlight.shadow.normalBias = 0.025;
     sunlight.shadow.bias = -0.0001;
     this.scene.add(sunlight);
-    this.box([0, 0, -0.16], [14.25, 12.25, 0.28], '#c9cbd0');
-    this.box([-2.8, 0, -0.015], [8.4, 12, 0.03], '#eeeff1', false);
-    this.box([4.2, -2.1, -0.012], [5.6, 7.8, 0.03], '#e2e6ec', false);
-    this.box([4.2, 3.9, -0.012], [5.6, 4.2, 0.03], '#eae9e7', false);
+    add_box([0, 0, -0.16], [14.25, 12.25, 0.28], '#c9cbd0');
+    add_box([-2.8, 0, -0.015], [8.4, 12, 0.03], '#eeeff1', false);
+    add_box([4.2, -2.1, -0.012], [5.6, 7.8, 0.03], '#e2e6ec', false);
+    add_box([4.2, 3.9, -0.012], [5.6, 4.2, 0.03], '#eae9e7', false);
 
     const grid_positions = [];
     for (let x = -7; x <= 7; x++) grid_positions.push(x, -6, 0.008, x, 6, 0.008);
@@ -140,28 +121,14 @@ export class SceneView {
     this.scene.add(new THREE.LineSegments(grid_geometry,
       new THREE.LineBasicMaterial({ color: '#9a9da7', transparent: true, opacity: 0.14 })));
 
-    for (const box of SCENE_BOXES) {
+    for (const box of SCENE_WALLS) {
       const center = [...box.center];
       const size = [...box.size];
-      if (box.kind === 'wall') {
-        // Cutaway walls expose the interior; the physics keeps their full 2.7 m height.
-        size[2] = ['south_wall', 'west_wall'].includes(box.name) ? 0.26 : 0.85;
-        center[2] = size[2] / 2;
-      }
-      this.box(center, size, COLORS[box.kind]);
-      if (box.kind === 'cabinet') {
-        this.box([center[0], center[1], size[2] + 0.015], [size[0] + 0.025, size[1] + 0.025, 0.03], '#e1e2e5');
-      }
+      // Cutaway walls expose the interior; physics keeps their full 2.7 m height.
+      size[2] = ['south_wall', 'west_wall'].includes(box.name) ? 0.26 : 0.85;
+      center[2] = size[2] / 2;
+      add_box(center, size, '#c7c9ce');
     }
-
-    // Small gray-box details keep the room legible without extra environment assets.
-    for (let index = 0; index < 3; index++) {
-      this.box([-5.28 + index * 0.88, 3.42, 0.59], [0.83, 0.8, 0.1], '#a8adb6');
-    }
-    this.box([4.2, 5.38, 1.06], [0.9, 0.09, 0.52], '#626875');
-    this.box([4.2, 5.38, 0.82], [0.12, 0.1, 0.2], '#626875');
-    this.box([4.2, 5.26, 0.8], [0.5, 0.3, 0.025], '#999eaa');
-    this.box([3.1, -5.44, 0.94], [0.65, 0.58, 0.025], '#7b8391');
 
     for (const room of ROOM_LABELS) {
       const label = floor_label(`${room.number}  /  ${room.name}`, 2.6);
@@ -176,8 +143,8 @@ export class SceneView {
       new THREE.MeshBasicMaterial({ color: '#8eb3df', transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
     spawn_ring.position.set(SPAWN[0], SPAWN[1], 0.018);
     this.scene.add(spawn_ring);
-    this.box([1.4, 0, 0.013], [0.24, 1.8, 0.025], '#a4bedc', false);
-    this.box([5.05, 1.8, 0.013], [1.9, 0.24, 0.025], '#a4bedc', false);
+    add_box([1.4, 0, 0.013], [0.24, 1.8, 0.025], '#a4bedc', false);
+    add_box([5.05, 1.8, 0.013], [1.9, 0.24, 0.025], '#a4bedc', false);
 
     this.robot_marker = new THREE.Group();
     const marker_material = new THREE.MeshBasicMaterial({ color: '#0071e3', transparent: true, opacity: 0.7 });
@@ -199,6 +166,98 @@ export class SceneView {
     this.robot_shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9),
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadow_canvas), transparent: true, depthWrite: false }));
     this.scene.add(this.robot_shadow);
+    const contact_geometries = SCENE_FURNITURE.map((item) => {
+      const [width, depth] = FURNITURE_ASSETS[item.article].size;
+      const geometry = new THREE.PlaneGeometry(width * 1.1, depth * 1.1);
+      geometry.rotateZ(item.yaw);
+      geometry.translate(item.position[0], item.position[1], item.position[2] + 0.007);
+      return geometry;
+    });
+    this.furniture_shadow = new THREE.Mesh(mergeGeometries(contact_geometries),
+      new THREE.MeshBasicMaterial({ map: this.robot_shadow.material.map, transparent: true, opacity: 0.65, depthWrite: false }));
+    this.scene.add(this.furniture_shadow);
+    for (const geometry of contact_geometries) geometry.dispose();
+
+    const room = new THREE.Mesh(mergeGeometries(static_geometries),
+      new THREE.MeshLambertMaterial({ vertexColors: true }));
+    room.castShadow = true;
+    room.receiveShadow = true;
+    room.matrixAutoUpdate = false;
+    const edges = new THREE.LineSegments(mergeGeometries(edge_geometries),
+      new THREE.LineBasicMaterial({ color: '#777c87', transparent: true, opacity: 0.16 }));
+    edges.matrixAutoUpdate = false;
+    this.scene.add(room, edges);
+    for (const geometry of [...static_geometries, ...edge_geometries]) geometry.dispose();
+  }
+
+  async load_furniture() {
+    const { loader, draco } = create_model_loader();
+    const signal = this.furniture_abort.signal;
+    const results = await Promise.allSettled(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
+      const response = await fetch(`/assets/ikea/raw/${article}/model.glb`, { signal });
+      if (!response.ok) throw new Error(`Could not load IKEA article ${article}. Import the IKEA collection first.`);
+      const bytes = await response.arrayBuffer();
+      signal.throwIfAborted();
+      const gltf = await loader.parseAsync(bytes, '');
+      if (signal.aborted) {
+        dispose_model(gltf.scene);
+        return;
+      }
+      const bounds = new THREE.Box3().setFromObject(gltf.scene);
+      const actual = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      const origin = [center.x, bounds.min.y, center.z];
+      const expected = [asset.size[0], asset.size[2], asset.size[1]];
+      if (actual.toArray().some((size, axis) => Math.abs(size - expected[axis]) > 0.002) ||
+          origin.some((value, axis) => Math.abs(value - asset.origin[axis]) > 0.002)) {
+        dispose_model(gltf.scene);
+        throw new Error(`The visual and collision geometry differ for IKEA article ${article}. Regenerate its colliders.`);
+      }
+      gltf.scene.position.sub(new THREE.Vector3(...asset.origin));
+      const upright = new THREE.Group();
+      upright.rotation.x = Math.PI / 2;
+      upright.add(gltf.scene);
+      for (const item of SCENE_FURNITURE.filter((item) => item.article === article)) {
+        const group = new THREE.Group();
+        group.name = item.name;
+        group.position.set(...item.position);
+        group.rotation.z = item.yaw;
+        group.add(upright.clone(true));
+        group.updateMatrixWorld(true);
+        group.traverse((object) => {
+          object.matrixAutoUpdate = false;
+          if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
+        });
+        this.scene.add(group);
+      }
+    }));
+    // Let every active decode finish before releasing its shared worker.
+    draco.dispose();
+    if (signal.aborted) return;
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+    const room = new RoomEnvironment();
+    const generator = new THREE.PMREMGenerator(this.renderer);
+    this.environment = generator.fromScene(room, 0.04);
+    this.scene.environment = this.environment.texture;
+    this.scene.environmentIntensity = 0.55;
+    room.dispose();
+    generator.dispose();
+    if (new URLSearchParams(location.search).has('collisions')) {
+      const material = new THREE.MeshBasicMaterial({ color: '#0071e3', wireframe: true, transparent: true, opacity: 0.4, depthTest: false });
+      for (const item of SCENE_FURNITURE) {
+        const group = new THREE.Group();
+        group.position.set(...item.position);
+        group.rotation.z = item.yaw;
+        for (const hull of FURNITURE_ASSETS[item.article].hulls) {
+          const geometry = new ConvexGeometry(hull.map((point) => new THREE.Vector3(...point)));
+          group.add(new THREE.Mesh(geometry, material));
+        }
+        this.scene.add(group);
+      }
+    }
+    this.renderer.shadowMap.needsUpdate = this.renderer.shadowMap.enabled;
+    this.needs_render = true;
   }
 
   load_robot(geometries) {
@@ -264,7 +323,7 @@ export class SceneView {
       this.camera.position.set(0, -0.01, 20);
       this.controls.target.set(0, 0, 0);
     } else {
-      this.camera.position.set(-11.8, -14.8, 13.2);
+      this.camera.position.set(-9.5, -12, 10.4);
       this.controls.target.set(0, 0, 0.1);
     }
     this.last_follow_position.copy(this.robot_position);
@@ -283,6 +342,7 @@ export class SceneView {
 
   set_quality(quality) {
     this.quality = quality;
+    this.furniture_shadow.visible = quality === 'performance';
     this.renderer.shadowMap.enabled = quality === 'quality';
     // The room is static. Compute its shadow once. The robot uses the contact shadow.
     this.renderer.shadowMap.needsUpdate = quality === 'quality';
@@ -303,11 +363,10 @@ export class SceneView {
     this.renderer.render(this.scene, this.camera);
     this.needs_render = false;
     this.render_samples.push(performance.now() - started);
-    this.frame_count++;
     if (time - this.last_fps_time > 700) {
-      this.on_fps(Math.round(this.frame_count * 1000 / (time - this.last_fps_time)));
       const samples = this.render_samples.sort((a, b) => a - b);
       this.on_metrics({
+        fps: Math.round(samples.length * 1000 / (time - this.last_fps_time)),
         render_ms: samples.reduce((sum, value) => sum + value, 0) / samples.length,
         p95_ms: samples[Math.floor(samples.length * 0.95)],
         triangles: this.renderer.info.render.triangles,
@@ -315,28 +374,19 @@ export class SceneView {
         pixel_ratio: this.renderer.getPixelRatio(),
       });
       this.render_samples = [];
-      this.frame_count = 0;
       this.last_fps_time = time;
     }
   }
 
   dispose() {
+    this.furniture_abort.abort();
     document.removeEventListener('visibilitychange', this.visibility_handler);
     this.resize_observer.disconnect();
     this.renderer.setAnimationLoop(null);
     this.controls.dispose();
     this.sunlight.shadow.map?.dispose();
-    const geometries = new Set();
-    const materials = new Set();
-    this.scene.traverse(object => {
-      if (object.geometry) geometries.add(object.geometry);
-      if (object.material) materials.add(object.material);
-    });
-    for (const geometry of geometries) geometry.dispose();
-    for (const material of materials) {
-      material.map?.dispose();
-      material.dispose();
-    }
+    dispose_model(this.scene);
+    this.environment?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
