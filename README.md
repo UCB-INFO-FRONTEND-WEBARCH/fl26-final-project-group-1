@@ -52,10 +52,12 @@ checksums, local paths, and product dimensions. Models use metres and Y up.
 Exporting a selection does not insert it into the playground. Its apartment uses
 the fixed IKEA placements in `src/furniture_layout.js`.
 
-The furnished playground requires the imported collection. For static hosting,
-serve `local_assets/ikea/` at `assets/ikea/` under the site base path, or use Vite preview.
-The collection is local data and is excluded from the Git repository and build.
-Set `VITE_IKEA_BASE_URL` at build time to use a separate HTTPS asset host.
+The furnished playground uses the imported collection in local development.
+For static hosting, run `python3 scripts/prepare_huggingface.py` and serve the
+prepared collection from `local_assets/huggingface/` at `assets/ikea/` under the
+site base path, or use the public Hugging Face dataset described in the deployment guide.
+Set `VITE_IKEA_BASE_URL` at build time to its pinned HTTPS base URL.
+The collection and upload staging folder are excluded from Git and the app build.
 
 ```bash
 npm run build

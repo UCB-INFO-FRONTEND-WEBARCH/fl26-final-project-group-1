@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { FURNITURE_ASSETS } from '../src/furniture_assets.js';
+import { model_path, image_path } from '../src/asset_paths.js';
 
 const [base, site] = process.argv.slice(2);
 if (!base || !site) throw new Error('Usage: node scripts/verify_asset_host.js ASSET_BASE_URL SITE_ORIGIN');
@@ -27,12 +28,12 @@ const articles = new Map(rows.map((row) => [row[id_column], row]));
 await Promise.all(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
   const row = articles.get(article);
   assert.ok(row, `Playground article ${article} is missing from the catalog`);
-  const response = await read(`raw/${article}/model.glb`);
+  const response = await read(model_path(article));
   const bytes = new Uint8Array(await response.arrayBuffer());
   assert.equal(createHash('sha256').update(bytes).digest('hex'), asset.sha256,
     `${article}: hosted model differs from its collision geometry source`);
   if (row[image_column]) {
-    const image = await read(row[image_column].replace(/^\//, ''));
+    const image = await read(image_path(row[image_column]));
     assert.match(image.headers.get('content-type') || '', /^image\//, `${article}: invalid product photo`);
     await image.body?.cancel();
   }

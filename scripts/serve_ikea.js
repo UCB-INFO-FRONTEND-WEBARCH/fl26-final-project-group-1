@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const LIBRARY = new URL('../local_assets/ikea/', import.meta.url);
-const FILES = /^(data\/(manifest|catalog-\d+)\.json|raw\/\d{8}\/model\.glb|thumbnails\/[a-f0-9]{24}\.jpg)$/;
+const FILES = /^(data\/(manifest|catalog-\d+)\.json|raw\/\d{2}\/\d{8}\/model\.glb|thumbnails\/[a-f0-9]{2}\/[a-f0-9]{24}\.jpg)$/;
 const MIME_TYPES = { json: 'application/json', glb: 'model/gltf-binary', jpg: 'image/jpeg' };
 
 async function serve_ikea(request, response, next) {
@@ -13,7 +13,9 @@ async function serve_ikea(request, response, next) {
     response.writeHead(404).end();
     return;
   }
-  const path = fileURLToPath(new URL(relative, LIBRARY));
+  // The imported archive stays flat for offline asset tools; public URLs use shards.
+  const local = relative.replace(/^(raw|thumbnails)\/[^/]+\//, '$1/');
+  const path = fileURLToPath(new URL(local, LIBRARY));
   let size;
   try {
     size = (await stat(path)).size;

@@ -19,8 +19,8 @@ const assets = prepare_catalog([
 test('catalog search handles accents and dotted article numbers and keeps model requests local', () => {
   assert.equal(filter_catalog(assets, { ...DEFAULT_FILTERS, query: 'poang white' }, new Set())[0].id, '00000001');
   assert.equal(filter_catalog(assets, { ...DEFAULT_FILTERS, query: '000.000.02' }, new Set())[0].id, '00000002');
-  assert.equal(assets[0].model_url, '/assets/ikea/raw/00000001/model.glb');
-  assert.equal(assets[0].image, '/assets/ikea/thumbnails/example.jpg');
+  assert.equal(assets[0].model_url, '/assets/ikea/raw/00/00000001/model.glb');
+  assert.equal(assets[0].image, '/assets/ikea/thumbnails/ex/example.jpg');
   assert.equal(format_article(assets[0].id), '000.000.01');
 });
 

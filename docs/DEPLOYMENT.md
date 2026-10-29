@@ -10,23 +10,23 @@ Deployment starts only through **Run workflow**, after the PR is merged.
 
 ## Asset storage
 
-The built application is about 55 MB. The full IKEA collection is about 9.7 GB.
+The built application is about 55 MB. The full IKEA collection is about 10.1 GB.
 [GitHub Pages limits published sites to 1 GB](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits).
 The deployment target is the full catalog on a separate HTTPS static host or object store.
 The Pages artifact contains the application, robot, policy, and decoders.
 
-Copy these directories from `local_assets/ikea/` to the asset host:
+The prepared dataset has this layout:
 
 ```text
 data/manifest.json
 data/catalog-0.json ... catalog-7.json
-raw/<article>/model.glb
-thumbnails/<hash>.jpg
+raw/<first-two-digits>/<article>/model.glb
+thumbnails/<first-two-characters>/<hash>.jpg
 ```
 
-Keep their paths unchanged. The base URL must resolve the collection root.
-For example, a base URL of `https://assets.example.org/ikea/` must serve
-`https://assets.example.org/ikea/data/manifest.json`.
+The public layout differs from the flat imported archive. Use the preparation
+script below. The base URL must resolve the collection root, where
+`data/manifest.json` is located.
 The local collision cache and ZIP archive are not needed by the website.
 
 Configure the host as follows:
@@ -36,91 +36,70 @@ Configure the host as follows:
 | Public access | Read access to the listed files |
 | CORS allowed origin | `https://ucb-info-frontend-webarch.github.io` |
 | CORS allowed methods | `GET`, `HEAD` |
-| JSON content type | `application/json` |
+| Catalog responses | Valid JSON (`application/json` or Hugging Face's `text/plain`) |
 | GLB content type | `model/gltf-binary` or `application/octet-stream` |
 | Photo content type | `image/jpeg` |
 
 The asset URLs are public and are included in the built JavaScript.
 Use an HTTPS URL without credentials or expiring query parameters.
 
-## Upload with Cloudflare R2
+## Upload to Hugging Face
 
-R2 is a recommended host because it has no bandwidth egress charges.
-Storage and request charges depend on usage; see [R2 pricing](https://developers.cloudflare.com/r2/pricing/).
-An existing S3-compatible host can use the same directory layout and upload commands
-with its endpoint, credentials, and region.
+The public dataset is [T-K-233/ikea-furniture](https://huggingface.co/datasets/T-K-233/ikea-furniture).
+It contains the full collection. The app reads individual files through public
+`/resolve/<commit>/` URLs, without a token in the browser.
 
-1. In the Cloudflare dashboard, create a dedicated Standard storage bucket, such as `roboplay-assets`.
-2. Create an [R2 Object Read & Write token](https://developers.cloudflare.com/r2/api/tokens/)
-   scoped to that bucket. Configure public access and CORS through the dashboard.
-3. Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-   Configure a named profile locally:
+The verified initial revision is `a6dea1bba516ec9ce963a56fbe21f8a5741da17d`.
+All 55,072 published files match their staged sizes and content hashes.
+The repository's `IKEA_ASSET_BASE_URL` variable is configured to this revision:
 
-   ```bash
-   aws configure --profile roboplay-assets
-   ```
+```text
+https://huggingface.co/datasets/T-K-233/ikea-furniture/resolve/a6dea1bba516ec9ce963a56fbe21f8a5741da17d/
+```
 
-   Enter the R2 Access Key ID and Secret Access Key, region `auto`, and output `json`.
-   Credentials are needed for upload only. GitHub Pages does not need them.
-
-Run the following from the repository root. Replace the endpoint with the
-**S3 API endpoint** shown for your bucket, including its jurisdiction if applicable.
-Replace the bucket name if you chose a different one.
+The uploaded layout uses two-character shards to stay within
+[Hugging Face's folder limits](https://huggingface.co/docs/hub/storage-limits).
+Prepare it from the imported archive:
 
 ```bash
-ikea_storage_endpoint='https://ACCOUNT_ID.r2.cloudflarestorage.com'
-ikea_storage_bucket='roboplay-assets'
-
-aws --profile roboplay-assets --endpoint-url "$ikea_storage_endpoint" s3 sync \
-  local_assets/ikea/raw/ "s3://$ikea_storage_bucket/ikea/raw/" \
-  --exclude '*' --include '*/model.glb' --no-follow-symlinks \
-  --content-type model/gltf-binary --cache-control 'public,max-age=86400'
-
-aws --profile roboplay-assets --endpoint-url "$ikea_storage_endpoint" s3 sync \
-  local_assets/ikea/thumbnails/ "s3://$ikea_storage_bucket/ikea/thumbnails/" \
-  --exclude '*' --include '*.jpg' --no-follow-symlinks \
-  --content-type image/jpeg --cache-control 'public,max-age=86400'
-
-aws --profile roboplay-assets --endpoint-url "$ikea_storage_endpoint" s3 sync \
-  local_assets/ikea/data/ "s3://$ikea_storage_bucket/ikea/data/" \
-  --exclude '*' --include 'catalog-*.json' --include 'manifest.json' --no-follow-symlinks \
-  --content-type application/json --cache-control 'public,max-age=300'
+python3 scripts/prepare_huggingface.py
 ```
 
-All three commands must complete successfully. They upload only models, photos,
-and catalog JSON. Rerun interrupted commands to copy missing or updated files;
-[`sync`](https://docs.aws.amazon.com/cli/latest/reference/s3/sync.html) skips unchanged files.
-It does not update metadata on unchanged objects. For a new collection release,
-use a new prefix such as `ikea-v2/`, verify it, and change the app's base URL.
+This creates `local_assets/huggingface/`. Models and photos are hard links to the
+imported files, so staging does not duplicate their bytes. Do not edit these
+staged assets. The catalog image paths are rewritten for the hosted layout;
+original source URLs, model hashes, and geometry are preserved.
+The script also creates a dataset card and GLB/JPEG LFS rules.
 
-In the bucket's **Settings → CORS Policy**, paste this JSON and save:
+For future uploads, use an authenticated Hugging Face CLI. The initial upload
+used `huggingface_hub==1.14.0` and its resumable large-folder uploader:
 
-```json
-[
-  {
-    "AllowedOrigins": ["https://ucb-info-frontend-webarch.github.io"],
-    "AllowedMethods": ["GET", "HEAD"],
-    "MaxAgeSeconds": 3600
-  }
-]
+```bash
+hf upload-large-folder T-K-233/ikea-furniture local_assets/huggingface --repo-type dataset --num-workers 8
 ```
 
-Connect a public custom domain, such as `assets.example.org`, in the bucket's
-**Settings → Custom Domains**. The domain must belong to the same Cloudflare account.
-The collection base URL is then `https://assets.example.org/ikea/`.
-Cloudflare's `r2.dev` public URL can be used for an initial check, but it is
-rate-limited and intended for development. See [public bucket access](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+Rerun an interrupted upload with the same staging folder. Its progress cache is
+inside the ignored staging directory. The upload must finish before publishing
+a website that depends on it. For a replacement archive, prepare a fresh staging
+directory with `--output local_assets/huggingface-v2`.
 
-Configure CORS before serving traffic. If objects were cached before a CORS change,
-purge the asset hostname's cache so the new headers take effect.
-See [R2 CORS configuration](https://developers.cloudflare.com/r2/buckets/cors/).
-The authenticated S3 API endpoint is for upload; use the public domain for the app.
+After an upload, obtain its complete commit SHA from the dataset's commit history.
+Use that SHA in `IKEA_ASSET_BASE_URL`, rather than the mutable `main` branch:
+
+```text
+https://huggingface.co/datasets/T-K-233/ikea-furniture/resolve/<commit>/
+```
+
+Hugging Face handles CORS on public file downloads. The deployment validator
+checks the actual responses, including CDN redirects. Keep the dataset public
+and ungated; do not place a Hugging Face token in a Vite variable.
+Download traffic is subject to [Hub rate limits](https://huggingface.co/docs/hub/rate-limits).
 
 ## Deploy
 
-1. Upload the collection to the selected asset host.
+1. Finish the dataset upload and obtain its commit SHA.
 2. In the repository, open **Settings → Secrets and variables → Actions → Variables**.
-3. Set `IKEA_ASSET_BASE_URL` to the collection's HTTPS base URL.
+3. Set `IKEA_ASSET_BASE_URL` to the pinned Hugging Face `/resolve/<commit>/` URL.
 4. Merge the reviewed PR into `main`.
 5. Open **Actions → Build and deploy Pages → Run workflow**. Select `main`.
 6. Open the URL in the completed `github-pages` deployment.
@@ -148,8 +127,9 @@ The local preview serves the imported collection under that path.
 To check an external host before deploying:
 
 ```bash
-node scripts/verify_asset_host.js https://assets.example.org/ikea/ https://ucb-info-frontend-webarch.github.io
-VITE_IKEA_BASE_URL=https://assets.example.org/ikea/ npm run build -- --base /fl26-final-project-group-1/
+ikea_asset_base='https://huggingface.co/datasets/T-K-233/ikea-furniture/resolve/a6dea1bba516ec9ce963a56fbe21f8a5741da17d/'
+node scripts/verify_asset_host.js "$ikea_asset_base" https://ucb-info-frontend-webarch.github.io
+VITE_IKEA_BASE_URL="$ikea_asset_base" npm run build -- --base /fl26-final-project-group-1/
 ```
 
 Without `VITE_IKEA_BASE_URL`, the application uses `assets/ikea/` under its site

@@ -211,7 +211,7 @@ function Catalog() {
           </div>
           <div className="catalog-result-heading">
             <div><h2>{filters.saved ? 'Your collection.' : category?.name || 'A world of possibilities.'}</h2>
-              <p role="status">{library ? `${results.length.toLocaleString()} ${results.length === 1 ? 'asset' : 'assets'}${filters.query ? ` matching “${filters.query}”` : ' to explore'}` : 'Preparing the local collection…'}</p>
+              <p role="status">{library ? `${results.length.toLocaleString()} ${results.length === 1 ? 'asset' : 'assets'}${filters.query ? ` matching “${filters.query}”` : ' to explore'}` : 'Preparing the collection…'}</p>
             </div>
             <label className="catalog-sort">Sort by
               <select value={filters.sort} onChange={(event) => update_filter('sort', event.target.value)}>
