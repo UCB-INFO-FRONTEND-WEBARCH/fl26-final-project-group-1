@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { create_model_loader, dispose_model } from './model_assets.js';
+import { IKEA_BASE } from './asset_paths.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 
 function floor_label(text, width, color = '#85858d') {
@@ -194,8 +195,8 @@ export class SceneView {
     const { loader, draco } = create_model_loader();
     const signal = this.furniture_abort.signal;
     const results = await Promise.allSettled(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
-      const response = await fetch(`/assets/ikea/raw/${article}/model.glb`, { signal });
-      if (!response.ok) throw new Error(`Could not load IKEA article ${article}. Import the IKEA collection first.`);
+      const response = await fetch(`${IKEA_BASE}raw/${article}/model.glb`, { signal });
+      if (!response.ok) throw new Error(`Could not load IKEA article ${article}. Check the asset collection connection.`);
       const bytes = await response.arrayBuffer();
       signal.throwIfAborted();
       const gltf = await loader.parseAsync(bytes, '');

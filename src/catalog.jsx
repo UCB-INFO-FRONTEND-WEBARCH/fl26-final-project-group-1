@@ -2,6 +2,7 @@ import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'r
 import { createRoot } from 'react-dom/client';
 import { SiteHeader } from './site_header.jsx';
 import { Icon } from './icons.jsx';
+import { SITE_BASE } from './asset_paths.js';
 import {
   ASSET_BASE, DEFAULT_FILTERS, prepare_catalog, filter_catalog,
   format_article, format_bytes, selection_manifest,
@@ -15,7 +16,7 @@ const DEPARTMENTS = ['700640', 'st001', 'fu002', 'fu004', 'bm001', 'li001', 'ka0
 
 async function read_catalog(path, signal) {
   const response = await fetch(`${ASSET_BASE}data/${path}`, { signal });
-  if (!response.ok) throw new Error('The local collection is unavailable. Import the IKEA archive to connect it.');
+  if (!response.ok) throw new Error('The asset collection could not be loaded. Check the connection and try again.');
   return response.json();
 }
 
@@ -112,8 +113,8 @@ function Catalog() {
   return (
     <div className="app-shell catalog-shell">
       <SiteHeader current="catalog">
-        <div className={`live-status ${error ? 'inactive' : ''}`}><i />{error ? 'Library unavailable' : library ? 'Local collection' : 'Connecting library'}</div>
-        <a className="nav-cta" href="/#playground">Open playground <span aria-hidden="true">↗</span></a>
+        <div className={`live-status ${error ? 'inactive' : ''}`}><i />{error ? 'Library unavailable' : library ? 'Collection ready' : 'Connecting library'}</div>
+        <a className="nav-cta" href={`${SITE_BASE}#playground`}>Open playground <span aria-hidden="true">↗</span></a>
       </SiteHeader>
 
       <section className="workspace-title catalog-title" aria-labelledby="page-title">
@@ -235,7 +236,7 @@ function Catalog() {
               <button className="clear-filters" onClick={reset_filters}>Clear filters</button>
             </div>
           )}
-          {error ? <div className="catalog-empty" role="alert"><Icon name="info" size={28} /><h3>Connect your collection.</h3><p>{error}</p>
+          {error ? <div className="catalog-empty" role="alert"><Icon name="info" size={28} /><h3>The library could not load.</h3><p>{error}</p>
             <button className="primary-button" onClick={() => location.reload()}>Try again</button></div>
             : !library ? <div className="catalog-loading" role="status"><span className="loader" /><p>Opening your collection…</p><progress value={progress} max="1" aria-label="Loading catalog" /></div>
               : !results.length ? <div className="catalog-empty"><Icon name="grid" size={32} /><h3>{filters.saved ? 'Your next scene starts here.' : 'No pieces found.'}</h3>

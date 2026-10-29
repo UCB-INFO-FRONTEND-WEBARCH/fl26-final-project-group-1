@@ -3,14 +3,12 @@ import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const LIBRARY = new URL('../local_assets/ikea/', import.meta.url);
-const PREFIX = '/assets/ikea/';
 const FILES = /^(data\/(manifest|catalog-\d+)\.json|raw\/\d{8}\/model\.glb|thumbnails\/[a-f0-9]{24}\.jpg)$/;
 const MIME_TYPES = { json: 'application/json', glb: 'model/gltf-binary', jpg: 'image/jpeg' };
 
 async function serve_ikea(request, response, next) {
   const pathname = new URL(request.url, 'http://localhost').pathname;
-  if (!pathname.startsWith(PREFIX)) return next();
-  const relative = pathname.slice(PREFIX.length);
+  const relative = pathname.slice(1);
   if (!FILES.test(relative) || !['GET', 'HEAD'].includes(request.method)) {
     response.writeHead(404).end();
     return;
@@ -38,9 +36,12 @@ async function serve_ikea(request, response, next) {
 }
 
 export function ikea_assets() {
+  function mount(server) {
+    server.middlewares.use(`${server.config.base}assets/ikea`, serve_ikea);
+  }
   return {
     name: 'local-ikea-assets',
-    configureServer(server) { server.middlewares.use(serve_ikea); },
-    configurePreviewServer(server) { server.middlewares.use(serve_ikea); },
+    configureServer: mount,
+    configurePreviewServer: mount,
   };
 }

@@ -53,8 +53,9 @@ Exporting a selection does not insert it into the playground. Its apartment uses
 the fixed IKEA placements in `src/furniture_layout.js`.
 
 The furnished playground requires the imported collection. For static hosting,
-serve `local_assets/ikea/` at `/assets/ikea/` alongside `dist/`, or use Vite preview.
+serve `local_assets/ikea/` at `assets/ikea/` under the site base path, or use Vite preview.
 The collection is local data and is excluded from the Git repository and build.
+Set `VITE_IKEA_BASE_URL` at build time to use a separate HTTPS asset host.
 
 ```bash
 npm run build
@@ -63,7 +64,9 @@ npm run preview
 
 Vite writes the static website to `dist/`. Serve `dist/` over HTTP(S).
 Set the JavaScript module and WASM MIME types (`application/wasm` for `.wasm`).
-Enable compression on the host. The current build assumes hosting at `/`.
+Enable compression on the host. Use Vite's `--base /repository-name/` option for
+a project site. See [GitHub Pages deployment](docs/DEPLOYMENT.md) for the workflow,
+asset hosting requirements, and repository settings.
 
 ## Controls
 

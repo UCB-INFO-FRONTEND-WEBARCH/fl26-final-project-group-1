@@ -1,4 +1,5 @@
-export const ASSET_BASE = '/assets/ikea/';
+import { IKEA_BASE } from './asset_paths.js';
+export { IKEA_BASE as ASSET_BASE };
 export const DEFAULT_FILTERS = {
   query: '', category: '', colors: [], max_file: '', max_dimension: '',
   photo: false, unique: false, sort: 'featured', saved: false,
@@ -27,8 +28,8 @@ export function prepare_catalog(rows, columns, categories) {
     asset.category_labels = asset.path.map((_, index) => labels.get(asset.path.slice(0, index + 1).join('/')));
     asset.search = normalize([asset.name, asset.type, asset.variant, asset.id, ...asset.category_labels].join(' '));
     asset.max_dimension = Math.max(0, ...Object.values(asset.dimensions));
-    asset.model_url = `${ASSET_BASE}raw/${asset.id}/model.glb`;
-    asset.image = asset.image ? `${ASSET_BASE}${asset.image.slice(1)}` : '';
+    asset.model_url = `${IKEA_BASE}raw/${asset.id}/model.glb`;
+    asset.image = asset.image ? `${IKEA_BASE}${asset.image.slice(1)}` : '';
     const rank = FEATURED.indexOf(asset.name);
     asset.rank = rank < 0 ? 2000 : rank + 1000;
     return asset;
