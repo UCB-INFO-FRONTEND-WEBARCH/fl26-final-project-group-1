@@ -24,6 +24,41 @@ external inference endpoint, or cross-origin isolation headers.
 The first page load transfers approximately 50 MB of uncompressed assets.
 The browser can cache these assets for later loads.
 
+### Asset library
+
+Open `/catalog/`, or select **Asset library** in the header. This React page uses
+the catalog data and product photos from `IKEA_Furniture_and_Local_Catalog.zip`.
+Import the archive once after `npm install`:
+
+```bash
+python3 scripts/import_ikea.py /path/to/IKEA_Furniture_and_Local_Catalog.zip
+```
+
+The import requires Python 3.9+ and about 11 GB of free disk space. It writes
+models, photos, and catalog data to `local_assets/ikea/`. Git ignores this folder.
+Vite serves these files in development and preview mode without copying the
+collection into each build. Vite bundles the Draco decoder from Three.js.
+
+The library contains 36,447 article models and 26,561 unique model files.
+Search by series, type, variant, or article number. Filter by department,
+subcategory, color, file size, dimensions, photos, and unique files. Each page
+shows at most 24 cards. Opening a card loads its GLB into a single 3D viewer.
+The viewer supports orbit, front, and top cameras, a grid, wireframe, and rotation.
+Closing the preview releases its graphics resources.
+
+Save assets with **+**, review **Saved**, then export a JSON selection manifest.
+Selections persist in this browser. Exports retain article IDs, source URLs,
+checksums, local paths, and product dimensions. Models use metres and Y up.
+Exporting a selection does not insert it into the playground. Its apartment uses
+the fixed IKEA placements in `src/furniture_layout.js`.
+
+The furnished playground uses the imported collection in local development.
+For static hosting, run `python3 scripts/prepare_huggingface.py` and serve the
+prepared collection from `local_assets/huggingface/` at `assets/ikea/` under the
+site base path, or use the public [Hugging Face dataset](https://huggingface.co/datasets/T-K-233/ikea-furniture).
+Set `VITE_IKEA_BASE_URL` at build time to its pinned HTTPS base URL.
+The collection and upload staging folder are excluded from Git and the app build.
+
 ```bash
 npm run build
 npm run preview
@@ -31,7 +66,8 @@ npm run preview
 
 Vite writes the static website to `dist/`. Serve `dist/` over HTTP(S).
 Set the JavaScript module and WASM MIME types (`application/wasm` for `.wasm`).
-Enable compression on the host. The current build assumes hosting at `/`.
+Enable compression on the host. Use Vite's `--base /repository-name/` option for
+a project site.
 
 ## Controls
 
@@ -57,8 +93,12 @@ Select Resume to continue.
 
 ## Scene and robot
 
-- A 14 × 12 m apartment with living room, kitchen, study, two doorways, and gray-box furniture.
-- Rendering and physics use the same positions and dimensions for walls and furniture.
+- A 14 × 12 m apartment with living room, kitchen, study, and two doorways.
+- Fourteen IKEA placements use twelve original models: KIVIK seating, LACK and
+  TORNVIKEN tables, BESTÅ and HEMNES storage, KNOXHULT cabinets, a LAGAN refrigerator,
+  a MICKE desk, a MARKUS chair, BILLY shelves, a TILLREDA cooktop, and an ELLOVEN stand.
+- Models retain their original materials and metre scale. Rendering and physics
+  share their floor position, orientation, and conversion from Y up to Z up.
   The renderer shortens visible walls for a cutaway view. Physics retains their full 2.7 m collision height.
 - Official Unitree G1 meshes, inertias, joints, contacts, and actuator limits.
 - The walking checkpoint uses the **12-DoF G1 model**, with fixed arms and waist.
@@ -68,8 +108,35 @@ Select Resume to continue.
   obstacles, or recover from a fall. Falls stop the simulation and leave Reset available.
 
 This implementation supports manual exploration. The proposal includes later work
-for click-to-go navigation, challenge scores and history, detailed apartment assets,
-and a Hugging Face metadata explorer.
+for click-to-go navigation, challenge scores and history, and a Hugging Face
+metadata explorer.
+
+### Furniture collisions
+
+Furniture is fixed to the world. Each model uses compound convex collision
+meshes generated with CoACD. MuJoCo uses convex shapes for mesh contacts; a single
+object hull would fill gaps under desks and between legs.
+See the [MuJoCo collision documentation](https://mujoco.readthedocs.io/en/stable/computation.html).
+
+`src/furniture_assets.js` stores the generated hull vertices, original model
+dimensions, grounding origin, and source SHA-256 hashes. The preparation uses
+a 10 mm concavity target and at most 32 hulls per model. This is an approximation
+for navigation contacts, with separate surfaces for tabletops, legs, and shelves.
+The renderer checks model dimensions before enabling movement. Physics stays
+paused until all furniture visuals and the robot are ready.
+
+The checked-in collision data lets headless physics checks run without the GLBs.
+To regenerate it, use Python 3.12+ and Node.js:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r scripts/requirements-furniture.txt
+.venv/bin/python scripts/prepare_furniture.py
+```
+
+The preparation reads the placements from `src/furniture_layout.js`. It caches
+results in `local_assets/ikea/collisions/`, keyed by source hash and settings.
+Add `?collisions=1` to the playground URL to inspect the hulls as blue wireframes.
 
 ## Performance
 
@@ -86,12 +153,17 @@ The worker updates kinematics for rendering instead of repeating full forward dy
 Hidden tabs pause simulation and stop rendering. Paused views redraw for camera
 changes, a new pose, or a graphics setting change.
 
-Local browser samples show 25,990 triangles per frame, compared with 1,007,784 before
-the performance changes. Draw calls decreased from 179 to 40.
-CPU render submission time decreased from approximately 1.19 to 0.49 ms.
-The optimized page rendered at 60 frames per second (FPS).
-Physics maintained a real-time factor near 1.0. These measurements describe this
-test machine and do not guarantee the same frame rate on every device.
+Before furnishing, the optimized scene submitted 25,990 triangles in 40 draw calls,
+compared with 1,007,784 triangles and 179 calls before optimization.
+The furnished scene submits 112,674 triangles in 58 draw calls in Fast mode.
+Its twelve unique GLBs total 1.93 MB. Repeated cabinets and shelves share geometry
+and materials. Contact shadows use one merged mesh; Quality mode bakes static
+furniture shadows once. Collision decomposition runs offline.
+
+The furnished page rendered at 60 frames per second (FPS) in local browser checks.
+CPU render submission averaged about 0.81 ms, and physics maintained a real-time
+factor near 1.0. These measurements describe this test machine and do not
+guarantee the same frame rate on every device.
 
 Add `?profile=1` to the URL for live render diagnostics.
 See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the profiling method and the
@@ -133,17 +205,20 @@ The RTF readout shows the ratio of simulation time to wall time.
 ## Verification
 
 ```bash
-npm test                 # Keyboard commands, observation/quaternion contract, PD gains
+npm test                 # Catalog, furniture layout, controller contract, and render assets
 npm run test:simulation  # Real bundled MuJoCo WASM + ONNX runtime; no Python needed
 npm run build
 ```
 
 The simulation regression uses the same controller as the browser worker.
 It covers 20 s idle balance, 9 s forward walking, backward walking, turning,
-strafing, doorway crossing, and collision with a solid partition.
+strafing, doorway crossing, collision with a solid partition, and contact with
+the IKEA coffee table.
 The free-walking cases maintain a base height above 0.7 m.
 The collision case must produce a wall contact. The robot must remain on its
-original side of that wall. Further checks cover pause, reset, fall detection,
+original side of that wall. Furniture ray probes check the tabletop, legs,
+table opening, desk knee space, and bookcase opening. A falling sphere must settle
+on the visible tabletop height. Further checks cover pause, reset, fall detection,
 and rejection of invalid policy output.
 
 The ONNX exporter compares 200 stateful random steps with the original

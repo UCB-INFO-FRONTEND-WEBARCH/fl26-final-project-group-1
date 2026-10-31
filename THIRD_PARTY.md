@@ -29,6 +29,7 @@ License: BSD-3-Clause. The full upstream license text is at `public/assets/g1/LI
 | MuJoCo WASM | [google-deepmind/mujoco](https://github.com/google-deepmind/mujoco) | Apache-2.0 |
 | ONNX Runtime Web | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | MIT |
 | Three.js | [mrdoob/three.js](https://github.com/mrdoob/three.js) | MIT |
+| Draco (GLB mesh decoder) | [google/draco](https://github.com/google/draco) | Apache-2.0 |
 | React / React DOM | [facebook/react](https://github.com/facebook/react) | MIT |
 | Vite (build tooling) | [vitejs/vite](https://github.com/vitejs/vite) | MIT |
 | meshoptimizer (offline visual asset tooling) | [zeux/meshoptimizer](https://github.com/zeux/meshoptimizer) | MIT |
@@ -36,13 +37,32 @@ License: BSD-3-Clause. The full upstream license text is at `public/assets/g1/LI
 `package-lock.json` locks dependency versions. The installed npm packages include
 their license texts.
 
+The bundled Draco decoder comes from the Three.js npm package.
+Its license text is at `public/assets/licenses/draco.txt`.
+
+## Local IKEA collection
+
+The asset browser adapts the catalog draft supplied in
+`IKEA_Furniture_and_Local_Catalog.zip`, snapshot 2026-10-28. It uses the archive's
+prepared catalog rows, categories, cached photos, and original GLB files.
+Product source URLs and model checksums remain in exported selection manifests.
+The archive records [IKEA Browser](https://github.com/shish/blender-ikea-browser/)
+as the collection tool. No model or photo from this collection is tracked in Git.
+
+`scripts/prepare_furniture.py` derives compound convex collision meshes from
+twelve selected GLBs with [CoACD](https://github.com/SarahWeiii/CoACD) (MIT).
+The generated data in `src/furniture_assets.js` records each original file hash.
+`src/furniture_layout.js` defines the apartment placements. Models retain their
+original materials and metre scale. The renderer converts their Y up coordinates
+to the same Z up frame as the collision meshes.
+
 ## Fonts
 
 The application includes DM Sans and IBM Plex Mono from the [Google Fonts repository](https://github.com/google/fonts).
 The SIL Open Font License 1.1 covers these fonts. Their license texts are next to
 the font files in `public/assets/fonts/`.
 
-The project defines its own apartment gray-box geometry and interface.
+The project defines its own apartment walls, floor, and interface.
 The project does not include BEHAVIOR, ReplicaCAD, or other gated scene datasets.
 
 The performance design follows principles from the MicroDuck simulator and mjswan

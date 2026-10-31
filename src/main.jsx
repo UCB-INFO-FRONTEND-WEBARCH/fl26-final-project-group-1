@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SceneView } from './scene_view.js';
 import { command_from_keys } from './locomotion.js';
-import { SCENE_BOXES, ROOM_LABELS, SPAWN } from './scene_layout.js';
+import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
+import { Icon } from './icons.jsx';
+import { SiteHeader } from './site_header.jsx';
 import './style.css';
 
 const INITIAL_TELEMETRY = {
@@ -17,84 +19,18 @@ const INITIAL_TELEMETRY = {
   inference_ms: 0,
   simulation_rate: 1,
 };
+const CONTROL_KEYS = [
+  [['KeyQ', 'Strafe left'], ['KeyW', 'Walk forward'], ['KeyE', 'Strafe right']],
+  [['KeyA', 'Turn left'], ['KeyS', 'Walk backward'], ['KeyD', 'Turn right']],
+];
 const MOVEMENT_KEYS = new Set([
-  'KeyW',
-  'KeyA',
-  'KeyS',
-  'KeyD',
-  'KeyQ',
-  'KeyE',
+  ...CONTROL_KEYS.flat().map(([code]) => code),
   'ArrowUp',
   'ArrowDown',
   'ArrowLeft',
   'ArrowRight',
 ]);
 const CAMERA_MODES = ['follow', 'orbit', 'top'];
-
-function Icon({ name, size = 18 }) {
-  const paths = {
-    reset: (
-      <>
-        <path d="M3 10a9 9 0 1 1 2.5 8.2" />
-        <path d="M3 4v6h6" />
-      </>
-    ),
-    play: <path d="m8 5 11 7-11 7Z" />,
-    pause: (
-      <>
-        <path d="M9 5v14M15 5v14" />
-      </>
-    ),
-    camera: (
-      <>
-        <rect x="3" y="6" width="18" height="14" rx="3" />
-        <path d="m8 6 2-3h4l2 3" />
-        <circle cx="12" cy="13" r="3" />
-      </>
-    ),
-    grid: (
-      <>
-        <rect x="3" y="3" width="18" height="18" rx="3" />
-        <path d="M3 9h18M9 3v18M15 3v18M3 15h18" />
-      </>
-    ),
-    robot: (
-      <>
-        <rect x="4" y="7" width="16" height="13" rx="4" />
-        <path d="M12 7V3M9 3h6M1 12v4m22-4v4M8 16h8" />
-        <path d="M8 11v1m8-1v1" />
-      </>
-    ),
-    close: <path d="m6 6 12 12M6 18 18 6" />,
-    info: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 11v6m0-10v1" />
-      </>
-    ),
-    external: (
-      <>
-        <path d="M14 3h7v7m0-7L10 14" />
-        <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" />
-      </>
-    ),
-  };
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.65"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[name]}
-    </svg>
-  );
-}
 
 function MiniMap({ telemetry }) {
   return (
@@ -108,16 +44,22 @@ function MiniMap({ telemetry }) {
       <svg viewBox="-7.5 -6.5 15 13" aria-label="Apartment floor plan and live robot position" role="img">
         <rect x="-7" y="-6" width="14" height="12" rx="0.1" fill="#f3f4f6" />
         <g transform="scale(1,-1)">
-          {SCENE_BOXES.map((box) => (
+          {SCENE_WALLS.map((box) => (
             <rect
               key={box.name}
               x={box.center[0] - box.size[0] / 2}
               y={box.center[1] - box.size[1] / 2}
               width={box.size[0]}
               height={box.size[1]}
-              fill={box.kind === 'wall' ? '#92959d' : '#d3d5da'}
-              rx={box.kind === 'wall' ? 0 : 0.08}
+              fill="#92959d"
             />
+          ))}
+          {SCENE_FURNITURE.map((item) => (
+            <rect key={item.name}
+              transform={`translate(${item.position[0]},${item.position[1]}) rotate(${item.yaw * 180 / Math.PI})`}
+              x={-FURNITURE_ASSETS[item.article].size[0] / 2} y={-FURNITURE_ASSETS[item.article].size[1] / 2}
+              width={FURNITURE_ASSETS[item.article].size[0]} height={FURNITURE_ASSETS[item.article].size[1]}
+              fill="#cbd1da" rx="0.03" />
           ))}
           <circle cx={SPAWN[0]} cy={SPAWN[1]} r="0.27" fill="none" stroke="#9bbce9" strokeWidth="0.06" />
           <g
@@ -160,19 +102,12 @@ function App() {
   const [loading, set_loading] = useState('Starting the navigation lab');
   const [ready, set_ready] = useState(false);
   const [error, set_error] = useState('');
-  const [fps, set_fps] = useState(0);
   const [performance_stats, set_performance_stats] = useState(null);
   const [camera, set_camera] = useState('follow');
   const [render_quality, set_render_quality] = useState('performance');
   const [speed, set_speed] = useState(0.5);
   const [pressed, set_pressed] = useState(new Set());
   const [show_info, set_show_info] = useState(false);
-
-  function report_error(message) {
-    set_error(message);
-    ready_ref.current = false;
-    set_ready(false);
-  }
 
   function send_command() {
     if (!ready_ref.current) return;
@@ -212,40 +147,71 @@ function App() {
     let view;
     let worker;
     let last_ui_time = 0;
+    let active = true;
+    let robot_ready = false;
+    let furniture_ready = false;
+
+    function report_error(message) {
+      if (!active) return;
+      active = false;
+      worker?.terminate();
+      if (view) view.paused = true;
+      set_error(message);
+      ready_ref.current = false;
+      set_ready(false);
+    }
+
+    function finish_loading() {
+      if (!active || !robot_ready || !furniture_ready) return;
+      ready_ref.current = true;
+      set_ready(true);
+      worker.postMessage({ type: 'pause', paused: document.hidden });
+    }
+
     try {
-      view = new SceneView(viewport_ref.current, set_fps, set_performance_stats);
+      view = new SceneView(viewport_ref.current, set_performance_stats);
       view_ref.current = view;
+      view.load_furniture().then(() => {
+        furniture_ready = true;
+        finish_loading();
+      }).catch((exception) => report_error(`Could not load the IKEA furniture. ${exception.message}`));
       worker = new Worker(new URL('./simulation.worker.js', import.meta.url), { type: 'module' });
       worker_ref.current = worker;
       worker.onmessage = (event) => {
+        if (!active) return;
         const message = event.data;
-        if (message.type === 'loading') set_loading(message.message);
-        if (message.type === 'error') {
-          report_error(message.message);
-        }
-        if (message.type === 'ready') {
-          view.load_robot(message.geometries);
-          ready_ref.current = true;
-          set_ready(true);
-          if (document.hidden) worker.postMessage({ type: 'pause', paused: true });
-        }
-        if (message.type === 'frame') {
-          view.update_frame(message.transforms, message.telemetry);
-          worker.postMessage({ type: 'frame_received', buffer: message.transforms.buffer }, [
-            message.transforms.buffer,
-          ]);
-          // A paused state can be the last worker frame. Publish it without throttling.
-          const urgent =
-            message.telemetry.paused ||
-            message.telemetry.fallen ||
-            message.telemetry.time < telemetry_ref.current.time ||
-            message.telemetry.fallen !== telemetry_ref.current.fallen ||
-            message.telemetry.paused !== telemetry_ref.current.paused;
-          telemetry_ref.current = message.telemetry;
-          const now = performance.now();
-          if (now - last_ui_time > 250 || urgent) {
-            set_telemetry(message.telemetry);
-            last_ui_time = now;
+        switch (message.type) {
+          case 'loading':
+            set_loading(message.message);
+            break;
+          case 'error':
+            report_error(message.message);
+            break;
+          case 'ready':
+            view.load_robot(message.geometries);
+            robot_ready = true;
+            if (!furniture_ready) set_loading('Loading the IKEA apartment furniture');
+            finish_loading();
+            break;
+          case 'frame': {
+            view.update_frame(message.transforms, message.telemetry);
+            worker.postMessage({ type: 'frame_received', buffer: message.transforms.buffer }, [
+              message.transforms.buffer,
+            ]);
+            // A paused state can be the last worker frame. Publish it without throttling.
+            const urgent =
+              message.telemetry.paused ||
+              message.telemetry.fallen ||
+              message.telemetry.time < telemetry_ref.current.time ||
+              message.telemetry.fallen !== telemetry_ref.current.fallen ||
+              message.telemetry.paused !== telemetry_ref.current.paused;
+            telemetry_ref.current = message.telemetry;
+            const now = performance.now();
+            if (now - last_ui_time > 250 || urgent) {
+              set_telemetry(message.telemetry);
+              last_ui_time = now;
+            }
+            break;
           }
         }
       };
@@ -300,6 +266,7 @@ function App() {
     window.addEventListener('blur', lose_focus);
     document.addEventListener('visibilitychange', visibility_change);
     return () => {
+      active = false;
       window.removeEventListener('keydown', key_down);
       window.removeEventListener('keyup', key_up);
       window.removeEventListener('blur', lose_focus);
@@ -344,17 +311,8 @@ function App() {
 
   return (
     <div className="app-shell" id="top">
-      <header className="app-header">
-        <a className="brand" href="#top" aria-label="RoboPlay home">
-          <span className="brand-symbol">
-            <Icon name="robot" size={23} />
-          </span>
-          RoboPlay
-        </a>
-        <nav className="header-nav" aria-label="Main navigation">
-          <a href="#playground">Playground</a>
-          <button onClick={() => set_show_info(true)}>How it works</button>
-        </nav>
+      <SiteHeader current="playground">
+        <button className="header-info" onClick={() => set_show_info(true)}>How it works</button>
         <div className={`live-status ${telemetry.paused || telemetry.fallen || error ? 'inactive' : ''}`}>
           <i />
           {status}
@@ -366,7 +324,7 @@ function App() {
         >
           Try it <span aria-hidden="true">↗</span>
         </a>
-      </header>
+      </SiteHeader>
 
       <section className="workspace-title" aria-labelledby="page-title">
         <div className="eyebrow">The interactive robotics playground.</div>
@@ -388,7 +346,7 @@ function App() {
               </div>
               <div className="fps">
                 <i />
-                {fps || '—'} FPS
+                {performance_stats?.fps || '—'} FPS
               </div>
             </div>
             <div className="camera-switch" role="group" aria-label="Camera view">
@@ -422,7 +380,6 @@ function App() {
               <output className="performance-diagnostics" aria-label="Performance diagnostics">
                 {JSON.stringify(
                   {
-                    fps,
                     ...performance_stats,
                     rtf: telemetry.simulation_rate,
                     inference_ms: telemetry.inference_ms,
@@ -544,52 +501,19 @@ function App() {
             </div>
             <p className="section-description">Hold a key to move. Release to stand.</p>
             <div className="keyboard" aria-label="Movement controls">
-              <div className="key-row">
-                <ControlKey
-                  code="KeyQ"
-                  label="Q"
-                  title="Strafe left"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-                <ControlKey
-                  code="KeyW"
-                  label="W"
-                  title="Walk forward"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-                <ControlKey
-                  code="KeyE"
-                  label="E"
-                  title="Strafe right"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-              </div>
-              <div className="key-row">
-                <ControlKey
-                  code="KeyA"
-                  label="A"
-                  title="Turn left"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-                <ControlKey
-                  code="KeyS"
-                  label="S"
-                  title="Walk backward"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-                <ControlKey
-                  code="KeyD"
-                  label="D"
-                  title="Turn right"
-                  pressed={pressed}
-                  on_control={control_key}
-                />
-              </div>
+              {CONTROL_KEYS.map((row, index) => (
+                <div className="key-row" key={index}>
+                  {row.map(([code, title]) => (
+                    <ControlKey
+                      key={code}
+                      code={code}
+                      title={title}
+                      pressed={pressed}
+                      on_control={control_key}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
             <div className="key-explanations">
               <span>
@@ -788,7 +712,7 @@ function App() {
   );
 }
 
-function ControlKey({ code, label, title, pressed, on_control }) {
+function ControlKey({ code, title, pressed, on_control }) {
   return (
     <button
       className={`control-key ${pressed.has(code) ? 'pressed' : ''} ${code === 'KeyQ' || code === 'KeyE' ? 'auxiliary' : ''}`}
@@ -799,7 +723,7 @@ function ControlKey({ code, label, title, pressed, on_control }) {
       onPointerCancel={(event) => on_control(code, false, event)}
       onLostPointerCapture={(event) => on_control(code, false, event)}
     >
-      {label}
+      {code.slice(3)}
     </button>
   );
 }
