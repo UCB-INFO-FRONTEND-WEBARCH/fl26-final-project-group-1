@@ -7,6 +7,8 @@ import { make_scene_xml, SPAWN, SCENE_FURNITURE, FURNITURE_ASSETS } from '../src
 import { PHYSICS_DT, CONTROL_DECIMATION, DEFAULT_ANGLES } from '../src/locomotion.js';
 import { load_robot_files } from '../src/robot_assets.js';
 import { Simulation } from '../src/simulation.js';
+import { make_navigation_maps } from '../src/path_planner.js';
+import { FLOOR_HEIGHT, STAIRS, floor_of } from '../src/building.js';
 
 const asset_base = new URL('../public/assets/g1/', import.meta.url);
 const mujoco = await load_mujoco({
@@ -62,6 +64,7 @@ for (const [name, command, duration] of [
   ['turn', [0, 0, 0.7], 12],
   ['strafe', [0, 0.35, 0], 6],
 ]) {
+  console.log(`Checking physics: ${name}`);
   const result = await simulate(command, duration);
   assert.ok(result.min_height > 0.7, `${name}: robot lost balance`);
   results[name] = result;
@@ -139,7 +142,7 @@ assert.equal(simulation.step_count, 0);
 assert.equal(simulation.distance, 0);
 assert.ok(simulation.hidden.data.every((value) => value === 0));
 assert.ok(simulation.cell.data.every((value) => value === 0));
-assert.deepEqual(Array.from(simulation.state.qpos.slice(7)), DEFAULT_ANGLES);
+assert.deepEqual(Array.from(simulation.state.qpos.slice(7, 19)), DEFAULT_ANGLES);
 assert.equal(simulation.paused, false);
 simulation.state.qpos[2] = 0.3;
 await simulation.advance(10);
@@ -160,6 +163,96 @@ await assert.rejects(invalid.advance(10), /invalid joint targets/);
 assert.ok(invalid.action.every(Number.isFinite));
 invalid.dispose();
 
+const navigation_maps = make_navigation_maps();
+async function navigate(goal, start = SPAWN, limit = 100) {
+  const robot = new Simulation(mujoco, model, session, navigation_maps);
+  robot.reset(start);
+  robot.navigation.set_goal(robot.state.qpos, goal, 0);
+  let min_height = Infinity;
+  let previous = robot.state.qpos.slice(0, 3);
+  let phase = '';
+  let checked_lift_pause = false;
+  const obstacle_contacts = new Set();
+  while (['walking', 'waiting', 'riding'].includes(robot.navigation.state.status) && robot.step_count * PHYSICS_DT < limit) {
+    await robot.advance(CONTROL_DECIMATION);
+    const position = robot.state.qpos;
+    const surface = robot.elevator.occupied(position) ? robot.elevator.height : floor_of(position) * FLOOR_HEIGHT;
+    min_height = Math.min(min_height, position[2] - surface);
+    assert.ok(Math.hypot(...previous.map((value, axis) => position[axis] - value)) < 0.04, 'Navigation moved the robot discontinuously');
+    previous = position.slice(0, 3);
+    for (let index = 0; index < robot.state.ncon; index++) {
+      const contact = robot.state.contact.get(index);
+      for (const id of [contact.geom1, contact.geom2]) {
+        const name = mujoco.mj_id2name(model, 5, id);
+        if (name && (name.includes('_collision_') || /wall|partition|annex_|stair_/.test(name))) obstacle_contacts.add(name);
+      }
+      contact.delete();
+    }
+    if (!checked_lift_pause && robot.elevator.moving && robot.elevator.occupied(position) && robot.elevator.height > 0.5 && robot.elevator.height < 2.8) {
+      assert.ok(robot.elevator.gates.every(id => model.geom_contype[id] === 1), 'Landing gates opened during transit');
+      assert.equal(model.geom_contype[robot.elevator.front_rail], 1);
+      const frozen = robot.state.qpos.slice();
+      robot.paused = true;
+      assert.equal(await robot.advance(100), 0);
+      assert.deepEqual(robot.state.qpos, frozen);
+      assert.ok(robot.navigation.state.goal);
+      robot.paused = false;
+      checked_lift_pause = true;
+    }
+    if (phase !== robot.navigation.state.message) {
+      phase = robot.navigation.state.message;
+      console.log(`navigation: ${phase} at ${Array.from(previous).map(value => value.toFixed(2)).join(', ')}`);
+    }
+    if (robot.fallen) break;
+  }
+  if (robot.navigation.state.status === 'arrived') await robot.advance(Math.round(8 / PHYSICS_DT));
+  const result = robot.telemetry();
+  robot.dispose();
+  assert.equal(result.navigation.status, 'arrived', JSON.stringify(result));
+  assert.equal(result.fallen, false);
+  assert.equal(obstacle_contacts.size, 0, `Navigation hit obstacles: ${[...obstacle_contacts].join(', ')}`);
+  assert.equal(result.floor, goal[2]);
+  assert.ok(Math.hypot(result.position[0] - goal[0], result.position[1] - goal[1]) < 0.35);
+  assert.ok(min_height > 0.65, `Navigation lost balance: ${min_height}`);
+  console.log(`PASS navigation to ${goal}: ${result.time.toFixed(1)} simulated seconds, minimum height ${min_height.toFixed(3)} m`);
+}
+await navigate([3, 0, 0]);
+await navigate([...STAIRS.lower_landing, 0]);
+await navigate([-4.7, 5.1, 0]);
+await navigate([-4.7, -3.4, 1]);
+await navigate([-4.7, -3.4, 0], [-4.7, -3.4, FLOOR_HEIGHT + SPAWN[2]]);
+await navigate([3.5, 3, 1], [3, 0, FLOOR_HEIGHT + SPAWN[2]]);
+
+const rider = new Simulation(mujoco, model, session);
+rider.reset([-8.4, -4.2, SPAWN[2]]);
+rider.elevator.request(1);
+rider.command = [0.5, 0, 0];
+await rider.advance(Math.round(22 / PHYSICS_DT));
+assert.equal(rider.fallen, false, 'Manual input upset the robot during lift travel');
+assert.equal(rider.elevator.open_floor, 1);
+assert.ok(rider.state.qpos[2] > FLOOR_HEIGHT + 0.7, 'The lift did not physically carry its rider');
+assert.deepEqual(rider.command, [0, 0, 0], 'Manual motion bypassed the riding interlock');
+rider.dispose();
+
+const climber = new Simulation(mujoco, model, session, navigation_maps);
+climber.navigation.transfer = 'stairs';
+climber.navigation.set_goal(climber.state.qpos, [...STAIRS.upper_landing, 1], 0);
+let attempted_stairs = false;
+let touched_stairs = false;
+for (let tick = 0; tick < 3500 && !climber.fallen && climber.navigation.state.status === 'walking'; tick++) {
+  await climber.advance(CONTROL_DECIMATION);
+  attempted_stairs ||= climber.navigation.state.message.includes('Attempting stairs');
+  for (let index = 0; index < climber.state.ncon; index++) {
+    const contact = climber.state.contact.get(index);
+    touched_stairs ||= [contact.geom1, contact.geom2].some(id => mujoco.mj_id2name(model, 5, id)?.startsWith('stair_'));
+    contact.delete();
+  }
+}
+assert.ok(attempted_stairs, 'The stair route never reached the stair entry');
+assert.ok(touched_stairs, 'The current policy was not allowed to attempt a physical stair');
+console.log(`Stair attempt: fallen=${climber.fallen}, status=${climber.navigation.state.status}, position=${climber.telemetry().position.map(value => value.toFixed(2))}`);
+climber.dispose();
+
 await session.release();
 model.delete();
-console.log('PASS: 8 physics scenarios, furniture ray probes and drop test, pause, reset, fall detection, and invalid-action rejection.');
+console.log('PASS: 8 manual physics scenarios, 6 navigation routes including the stair entry and elevator trips both ways, a physical stair attempt, collision probes, pause/reset, fall detection, and invalid-action rejection.');
