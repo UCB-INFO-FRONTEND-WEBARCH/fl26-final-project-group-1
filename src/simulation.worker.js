@@ -7,6 +7,7 @@ import { make_scene_xml } from './scene_layout.js';
 import { PHYSICS_DT, CONTROL_DECIMATION } from './locomotion.js';
 import { load_robot_files, robot_geometry } from './robot_assets.js';
 import { Simulation } from './simulation.js';
+import { make_navigation_maps } from './path_planner.js';
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/g1/`;
 const FRAME_INTERVAL_MS = PHYSICS_DT * CONTROL_DECIMATION * 1000;
@@ -22,6 +23,7 @@ let last_frame_wall = 0;
 let frame_in_flight = false;
 let recycled_buffer = null;
 let force_frame = true;
+let pending_goal = null;
 
 function report_loading(message) {
   self.postMessage({ type: 'loading', message });
@@ -76,6 +78,12 @@ async function pump() {
       rate_step = 0;
       force_frame = true;
     }
+    if (pending_goal && !simulation.fallen) {
+      simulation.navigation.set_goal(simulation.state.qpos, pending_goal, simulation.step_count * PHYSICS_DT);
+      pending_goal = null;
+      simulation.command = [0, 0, 0];
+      force_frame = true;
+    }
     if (simulation.paused || simulation.fallen) {
       accumulated = 0;
     } else {
@@ -120,7 +128,8 @@ async function initialize() {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
   });
-  simulation = new Simulation(mujoco, model, session);
+  report_loading('Preparing floor routes and elevator controls');
+  simulation = new Simulation(mujoco, model, session, make_navigation_maps());
   simulation.paused = true;
 
   report_loading('Preparing optimized G1 visuals');
@@ -142,7 +151,22 @@ self.onmessage = (event) => {
   const message = event.data;
   switch (message.type) {
     case 'command':
+      pending_goal = null;
+      simulation.navigation.cancel();
       simulation.command = message.command;
+      force_frame = true;
+      break;
+    case 'goal':
+      pending_goal = message.goal;
+      break;
+    case 'cancel_navigation':
+      pending_goal = null;
+      simulation.navigation.cancel();
+      simulation.command = [0, 0, 0];
+      force_frame = true;
+      break;
+    case 'speed':
+      if (Number.isFinite(message.speed)) simulation.navigation.speed = Math.max(0.2, Math.min(0.8, message.speed));
       break;
     case 'pause':
       simulation.paused = message.paused;
@@ -150,6 +174,7 @@ self.onmessage = (event) => {
       force_frame = true;
       break;
     case 'reset':
+      pending_goal = null;
       simulation.request_reset();
       force_frame = true;
       break;

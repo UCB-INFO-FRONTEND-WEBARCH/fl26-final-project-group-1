@@ -72,6 +72,13 @@ asset hosting requirements, and repository settings.
 
 ## Controls
 
+Click open floor to walk there automatically. Select **Upper** to choose an
+upstairs destination; the robot calls and rides the elevator. **Building** shows
+both floors. WASD or **Escape** cancels automatic navigation. Pause preserves the
+route. Stairs have collision geometry; automatic routes use the elevator because
+the current checkpoint is a flat-floor walking policy.
+See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limits.
+
 | Input | Action |
 | --- | --- |
 | W / S or ↑ / ↓ | Walk forward / backward |
@@ -94,8 +101,8 @@ Select Resume to continue.
 
 ## Scene and robot
 
-- A 14 × 12 m apartment with living room, kitchen, study, and two doorways.
-- Fourteen IKEA placements use twelve original models: KIVIK seating, LACK and
+- Two 17 × 12 m floors, with living room, kitchen, study, a stairwell, and an elevator.
+- Nineteen IKEA placements use twelve original models: KIVIK seating, LACK and
   TORNVIKEN tables, BESTÅ and HEMNES storage, KNOXHULT cabinets, a LAGAN refrigerator,
   a MICKE desk, a MARKUS chair, BILLY shelves, a TILLREDA cooktop, and an ELLOVEN stand.
 - Models retain their original materials and metre scale. Rendering and physics
@@ -108,9 +115,10 @@ Select Resume to continue.
 - The learned policy handles flat-ground locomotion. It does not plan paths, avoid
   obstacles, or recover from a fall. Falls stop the simulation and leave Reset available.
 
-This implementation supports manual exploration. The proposal includes later work
-for click-to-go navigation, challenge scores and history, and a Hugging Face
-metadata explorer.
+Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
+Cross-floor routes call, board, and ride the physical lift. The asset library uses
+the complete catalog hosted on Hugging Face. Challenge scores and history remain
+future work.
 
 ### Furniture collisions
 
@@ -228,6 +236,10 @@ The exact hash and export contract are in `public/assets/g1/contract.json`.
 Browser checks verified loading, W movement, turning/strafe commands, pause/reset,
 camera switching, and the production bundle.
 
+Navigation checks exercise five learned-policy routes, including furniture and
+doorway avoidance, elevator travel in both directions, pause during a ride,
+landing-gate interlocks, and holding the destination after arrival.
+
 ## Repository layout
 
 ```text
@@ -235,6 +247,10 @@ src/main.jsx                React controls, telemetry, minimap, input handling
 src/style.css               Responsive interface
 src/scene_view.js           Three.js scene and camera
 src/scene_layout.js         Shared apartment geometry and MJCF generation
+src/building.js             Floor elevations, stairwell, lift, and slab openings
+src/path_planner.js         Collision-derived floor maps and Theta* search
+src/navigation.js           Route following and elevator transfer stages
+src/elevator.js             Lift servo and landing/cabin gate interlocks
 src/locomotion.js           Official observation/PD contract and keyboard mapping
 src/simulation.worker.js    MuJoCo/ONNX loading, clock, and worker messages
 src/simulation.js           Shared controller, policy state, and physics steps

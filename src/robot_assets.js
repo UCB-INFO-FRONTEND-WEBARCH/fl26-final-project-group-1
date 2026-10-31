@@ -14,7 +14,9 @@ export async function load_robot_files(mujoco, read_file) {
 }
 
 export function validate_model(mujoco, model) {
-  if (model.nu !== NUM_ACTIONS || model.nq !== NUM_ACTIONS + 7 || model.nv !== NUM_ACTIONS + 6) {
+  const lift = mujoco.mj_name2id(model, 3, 'lift_joint');
+  const extra = lift < 0 ? 0 : 1;
+  if (model.nu !== NUM_ACTIONS + extra || model.nq !== NUM_ACTIONS + 7 + extra || model.nv !== NUM_ACTIONS + 6 + extra) {
     throw new Error('G1 model dimensions do not match the walking policy.');
   }
   const MJOBJ_JOINT = 3;
@@ -22,6 +24,9 @@ export function validate_model(mujoco, model) {
     if (mujoco.mj_id2name(model, MJOBJ_JOINT, joint + 1) !== JOINT_NAMES[joint]) {
       throw new Error('G1 model joint ordering does not match the walking policy.');
     }
+  }
+  if (extra && (model.jnt_qposadr[lift] !== 19 || model.jnt_dofadr[lift] !== 18 || mujoco.mj_name2id(model, 19, 'lift_motor') !== 12)) {
+    throw new Error('The elevator must follow the G1 policy joints and actuators.');
   }
 }
 
