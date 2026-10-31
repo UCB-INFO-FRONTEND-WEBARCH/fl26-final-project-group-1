@@ -73,10 +73,11 @@ asset hosting requirements, and repository settings.
 ## Controls
 
 Click open floor to walk there automatically. Select **Upper** to choose an
-upstairs destination; the robot calls and rides the elevator. **Building** shows
+upstairs destination. Choose **Elevator** or **Stairs · experimental** for the
+cross-floor route. Clicking a step selects a stair destination. **Building** shows
 both floors. WASD or **Escape** cancels automatic navigation. Pause preserves the
-route. Stairs have collision geometry; automatic routes use the elevator because
-the current checkpoint is a flat-floor walking policy.
+route. Stair routes are enabled with the current walking policy and may fall or
+stall; press R to reset. Stairs and the elevator have separate approaches.
 See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limits.
 
 | Input | Action |
@@ -101,7 +102,7 @@ Select Resume to continue.
 
 ## Scene and robot
 
-- Two 17 × 12 m floors, with living room, kitchen, study, a stairwell, and an elevator.
+- Two 19 × 12 m floors, with living room, kitchen, study, a stairwell, and an elevator.
 - Nineteen IKEA placements use twelve original models: KIVIK seating, LACK and
   TORNVIKEN tables, BESTÅ and HEMNES storage, KNOXHULT cabinets, a LAGAN refrigerator,
   a MICKE desk, a MARKUS chair, BILLY shelves, a TILLREDA cooktop, and an ELLOVEN stand.
@@ -116,7 +117,7 @@ Select Resume to continue.
   obstacles, or recover from a fall. Falls stop the simulation and leave Reset available.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
-Cross-floor routes call, board, and ride the physical lift. The asset library uses
+Cross-floor routes use the physical lift or attempt the stair path. The asset library uses
 the complete catalog hosted on Hugging Face. Challenge scores and history remain
 future work.
 
@@ -236,9 +237,10 @@ The exact hash and export contract are in `public/assets/g1/contract.json`.
 Browser checks verified loading, W movement, turning/strafe commands, pause/reset,
 camera switching, and the production bundle.
 
-Navigation checks exercise five learned-policy routes, including furniture and
+Navigation checks exercise six learned-policy routes, including furniture and
 doorway avoidance, elevator travel in both directions, pause during a ride,
-landing-gate interlocks, and holding the destination after arrival.
+landing-gate interlocks, holding the destination after arrival, and a reachable
+stair entry. A separate test allows the current policy to attempt physical steps.
 
 ## Repository layout
 

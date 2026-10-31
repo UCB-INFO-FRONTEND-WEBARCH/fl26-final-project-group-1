@@ -2,6 +2,8 @@
 
 Click open floor in the scene or the floor plan to choose a destination.
 Use **Ground** and **Upper** to choose a floor, or **Building** to see both levels.
+Choose **Elevator** or **Stairs · experimental** under **Cross-floor route**.
+Clicking a step selects stair mode and routes to that step along the stair centre.
 The route is blue; the destination turns green on arrival. **Follow** tracks the
 robot and switches floors during elevator travel.
 
@@ -21,10 +23,11 @@ actuated elevator. Navigation has two levels:
    reject diagonal corner cutting. Clicked points are not snapped through walls.
    Following allows 12 cm of tracking error within that planning reserve, while
    still checking a conservative 30 cm body footprint against obstacles.
-2. A cross-floor route inserts elevator stages: walk to the landing, call and
-   wait, board, ride, exit, and walk to the destination. This building has one
-   usable inter-floor connector, so choosing it does not require another graph
-   search. More connectors would call for a floor/portal graph with travel costs.
+2. Cross-floor routes use the selected connector. Elevator routes walk to the
+   landing, call and wait, board, ride, exit, and walk to the destination. Stair
+   routes walk to a separate stair landing, follow the three-dimensional step
+   path, then continue on the destination floor. The connector is chosen by the
+   user; additional automatic choices could use a portal graph with travel costs.
 
 Planning runs in the physics worker. The map is built once at startup; rendering
 does not run searches. The follower runs at the walking policy's 50 Hz control
@@ -41,16 +44,20 @@ to its landing. Pausing freezes the entire physics simulation.
 The deck and rail geometry collide with the robot. The lift body's contact with
 the static world is excluded because its slide joint constrains it inside a
 modeled shaft; this also prevents the ground plane from pushing up the deck.
-Upper-floor slabs have actual stairwell and elevator openings.
+Upper-floor slabs have actual stairwell and elevator openings. The stairs and
+lift sit beside each other in a 5 m-wide annex, with separate access doors and
+clear lower and upper stair landings.
 
 ## Stairs and policy capability
 
 The stairs have solid risers and collision geometry. The current official G1
 checkpoint was deployed for flat-floor walking and has not been validated for
-stairs. Automatic navigation therefore excludes the stairwell and uses the lift.
-Stair routing requires a stair-capable policy and validation of its step-height,
-clearance, and stability limits. There is no scripted stair-climbing animation or
-robot teleportation.
+stairs. Stair mode is nevertheless enabled: it sends walking commands along the
+step path at up to 0.3 m/s. It may stall or fall. Reset with R to try again.
+Arrival requires reaching both the horizontal target and its actual step height;
+fall detection and camera tracking use the stair surface height.
+There is no scripted climbing animation, pose correction, or robot teleportation.
+Successful stair traversal will need a suitable policy and validation.
 
 ## Algorithm choices
 
@@ -77,7 +84,11 @@ References: [Theta*](https://arxiv.org/abs/1401.3843),
 ## Verification
 
 `npm test` checks routing, clearance, unreachable goals, numerical cell boundaries,
-stairwell exclusion, and slab openings. `npm run test:simulation` exercises the
+separate stair/lift approaches, 3D stair routes, and slab openings. Floor-only
+paths exclude the stairwell; explicit stair segments handle it.
+`npm run test:simulation` exercises the
 real MuJoCo model and learned policy: same-floor routes through doorways and
 around furniture, lift travel in both directions, and holding after arrival.
-It also retains manual locomotion, collision, pause/reset, and fall checks.
+It also verifies reaching the stair entry without obstruction and making a real
+stair contact. The stair attempt is allowed to fail with the current policy.
+Manual locomotion, collision, pause/reset, and fall checks remain in place.

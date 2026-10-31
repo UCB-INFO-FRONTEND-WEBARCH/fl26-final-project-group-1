@@ -6,7 +6,7 @@ import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } fr
 import { Icon } from './icons.jsx';
 import { SiteHeader } from './site_header.jsx';
 import { IDLE_NAVIGATION } from './navigation.js';
-import { FLOOR_HEIGHT, ELEVATOR, STAIRS } from './building.js';
+import { FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
 import './style.css';
 
 const INITIAL_TELEMETRY = {
@@ -44,14 +44,14 @@ function MiniMap({ telemetry, floor, on_destination }) {
         <span>
           <span className="tiny-square" /> Floor plan
         </span>
-        <span>{floor === 0 ? 'Ground' : 'Upper'} · 17 × 12 m</span>
+        <span>{floor === 0 ? 'Ground' : 'Upper'} · 19 × 12 m</span>
       </div>
-      <svg viewBox="-10.5 -6.5 18 13" aria-label="Floor plan: click an open spot to set a destination" role="img"
+      <svg viewBox="-12.5 -6.5 20 13" aria-label="Floor plan: click an open spot to set a destination" role="img"
         onClick={event => {
           const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(event.currentTarget.getScreenCTM().inverse());
           on_destination([point.x, -point.y, floor]);
         }}>
-        <rect x="-10" y="-6" width="17" height="12" rx="0.1" fill="#f3f4f6" />
+        <rect x={BUILDING_BOUNDS[0]} y="-6" width="19" height="12" rx="0.1" fill="#f3f4f6" />
         <g transform="scale(1,-1)">
           {SCENE_WALLS.map((box) => (
             <rect
@@ -63,7 +63,9 @@ function MiniMap({ telemetry, floor, on_destination }) {
               fill="#92959d"
             />
           ))}
-          <rect x={STAIRS.opening[0]} y={STAIRS.opening[2]} width="1.8" height="5.4" fill="#b7bdc6" />
+          <rect className="map-stairs" x={STAIRS.opening[0]} y={STAIRS.opening[2]} width="1.8" height="5.4" fill="#b7bdc6">
+            <title>Stairway — click to attempt climbing</title>
+          </rect>
           <rect x={ELEVATOR.center[0] - 0.85} y={ELEVATOR.center[1] - 0.85} width="1.7" height="1.7" fill="#b1ccec" />
           {SCENE_FURNITURE.filter(item => Math.floor((item.position[2] + 0.01) / FLOOR_HEIGHT) === floor).map((item) => (
             <rect key={item.name}
@@ -75,10 +77,12 @@ function MiniMap({ telemetry, floor, on_destination }) {
           <circle cx={SPAWN[0]} cy={SPAWN[1]} r="0.27" fill="none" stroke="#9bbce9" strokeWidth="0.06" />
           {(telemetry.navigation?.path || []).slice(1).map((point, index) => {
             const previous = telemetry.navigation.path[index];
-            return point[2] === floor * FLOOR_HEIGHT && previous[2] === point[2]
+            return (point[2] === floor * FLOOR_HEIGHT && previous[2] === point[2]) ||
+              (on_stairs(point) && on_stairs(previous))
               ? <line key={index} x1={previous[0]} y1={previous[1]} x2={point[0]} y2={point[1]} stroke="#0071e3" strokeWidth="0.08" /> : null;
           })}
-          {telemetry.navigation?.goal?.[2] === floor && <circle cx={telemetry.navigation.goal[0]} cy={telemetry.navigation.goal[1]} r="0.2" fill="#0071e3" />}
+          {telemetry.navigation?.goal && (telemetry.navigation.goal[2] === floor || on_stairs(telemetry.navigation.goal)) &&
+            <circle cx={telemetry.navigation.goal[0]} cy={telemetry.navigation.goal[1]} r="0.2" fill="#0071e3" />}
           <g opacity={telemetry.floor === floor ? 1 : 0.2}
             transform={`translate(${telemetry.position[0]},${telemetry.position[1]}) rotate(${(telemetry.heading * 180) / Math.PI})`}
           >
@@ -114,6 +118,7 @@ function App() {
   const keys_ref = useRef(new Set());
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
   const speed_ref = useRef(0.5);
+  const transfer_ref = useRef('elevator');
   const ready_ref = useRef(false);
   const [telemetry, set_telemetry] = useState(INITIAL_TELEMETRY);
   const [loading, set_loading] = useState('Starting the navigation lab');
@@ -126,6 +131,7 @@ function App() {
   const [pressed, set_pressed] = useState(new Set());
   const [show_info, set_show_info] = useState(false);
   const [viewed_floor, set_viewed_floor] = useState(0);
+  const [transfer, set_transfer] = useState('elevator');
 
   function send_command() {
     if (!ready_ref.current) return;
@@ -146,7 +152,14 @@ function App() {
   function navigate(goal) {
     if (!ready_ref.current || telemetry_ref.current.fallen) return;
     release_keys();
+    if (goal.length === 4 || on_stairs(goal)) change_transfer('stairs');
     worker_ref.current?.postMessage({ type: 'goal', goal });
+  }
+
+  function change_transfer(value) {
+    transfer_ref.current = value;
+    set_transfer(value);
+    worker_ref.current?.postMessage({ type: 'transfer', transfer: value });
   }
 
   function cancel_navigation() {
@@ -207,6 +220,7 @@ function App() {
       set_ready(true);
       worker.postMessage({ type: 'pause', paused: document.hidden });
       worker.postMessage({ type: 'speed', speed: speed_ref.current });
+      worker.postMessage({ type: 'transfer', transfer: transfer_ref.current });
     }
 
     try {
@@ -547,6 +561,12 @@ function App() {
           <section className="navigation-section">
             <div className="section-title"><h3>Click. Go explore.</h3><span>Automatic</span></div>
             <p className="section-description">Choose open floor in the scene or floor plan. Select Upper to go upstairs.</p>
+            <label className="transfer-choice">Cross-floor route
+              <select aria-label="Cross-floor route" value={transfer} onChange={event => change_transfer(event.target.value)}>
+                <option value="elevator">Elevator</option>
+                <option value="stairs">Stairs · experimental</option>
+              </select>
+            </label>
             <div className={`navigation-status ${telemetry.navigation?.status || 'idle'}`} role="status" aria-label="Navigation status">
               {telemetry.paused && ['walking', 'waiting', 'riding'].includes(telemetry.navigation?.status) ? 'Paused · route saved. Resume to continue.' : telemetry.navigation?.message || IDLE_NAVIGATION.message}
               {telemetry.navigation?.remaining > 0 && <span>{telemetry.navigation.remaining.toFixed(1)} m to walk</span>}
@@ -554,7 +574,9 @@ function App() {
             <button className="stop-navigation" onClick={cancel_navigation}
               disabled={!['walking', 'waiting', 'riding', 'arrived'].includes(telemetry.navigation?.status)}>
               {telemetry.navigation?.status === 'arrived' ? 'Clear route' : 'Stop navigation'} <kbd>ESC</kbd></button>
-            <p className="navigation-footnote">Cross-floor routes use the elevator. Stairs need a climbing policy.</p>
+            <p className="navigation-footnote">{transfer === 'stairs'
+              ? 'Stair routes attempt the climb with the current policy. If it falls, press R to reset.'
+              : 'Select Stairs or click a step to try the stairway.'}</p>
           </section>
 
           <section className="control-section">
@@ -757,7 +779,8 @@ function App() {
               have solid collision geometry. The visible walls are shortened for a cutaway view. Colliding can
               make the robot fall; press R to reset. A clearance-aware Theta* planner routes around furniture
               on each floor. The elevator physically carries the robot between floors. This walking policy
-              cannot climb stairs, so automatic routes use the elevator. WASD or Escape cancels the route.
+              has not been validated for stairs. Select Stairs or click a step to attempt the climb with
+              the current policy; falls and stalls remain possible. WASD or Escape cancels the route.
             </p>
             <p>
               Camera: drag to orbit, right-drag to pan, scroll to zoom, or press C to cycle views. Arrow keys

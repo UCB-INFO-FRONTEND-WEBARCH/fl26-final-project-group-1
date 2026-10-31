@@ -14,7 +14,7 @@ import {
 import { validate_model } from './robot_assets.js';
 import { Elevator } from './elevator.js';
 import { Navigation } from './navigation.js';
-import { FLOOR_HEIGHT, floor_of } from './building.js';
+import { FLOOR_HEIGHT, floor_of, on_stairs, stair_height } from './building.js';
 
 export class Simulation {
   constructor(mujoco, model, session, navigation_maps = null) {
@@ -101,7 +101,7 @@ export class Simulation {
 
       const pose = this.state.qpos;
       const upright = 1 - 2 * (pose[4] * pose[4] + pose[5] * pose[5]);
-      const surface = this.elevator?.occupied(pose) ? this.elevator.height : floor_of(pose) * FLOOR_HEIGHT;
+      const surface = this.elevator?.occupied(pose) ? this.elevator.height : on_stairs(pose) ? stair_height(pose) : floor_of(pose) * FLOOR_HEIGHT;
       if (pose[2] - surface < 0.45 || upright < 0.45 || !pose.every(Number.isFinite)) {
         this.fallen = true;
         this.command = [0, 0, 0];

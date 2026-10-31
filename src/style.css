@@ -104,6 +104,8 @@ h1 span { color: #86868b; }
 .stop-navigation:disabled { opacity: 0.4; cursor: default; }
 .stop-navigation kbd { font: 8px var(--mono); color: #a1a1aa; }
 .navigation-footnote { font-size: 9px; line-height: 1.6; color: #9999a1; margin-bottom: 0; }
+.transfer-choice { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: #86868b; margin-bottom: 10px; }
+.transfer-choice select { max-width: 150px; border: 1px solid #e3e3e9; border-radius: 9px; background: #fff; color: #62626d; font-size: 10px; padding: 6px; }
 .render-quality { position: absolute; right: 20px; top: 54px; display: flex; align-items: center; gap: 7px; font-size: 10px; color: #86868b; }
 .render-quality select { border: 1px solid #dedee4; border-radius: 20px; background: #fffffff0; padding: 6px 10px; color: #5b5b65; font-size: 11px; }
 .performance-diagnostics {
@@ -119,6 +121,7 @@ h1 span { color: #86868b; }
 .map-heading > span:first-child { display: flex; gap: 5px; align-items: center; color: #6e6e73; font-weight: 500; }
 .tiny-square { width: 5px; height: 5px; display: inline-block; border: 1px solid #aaaab2; }
 .minimap > svg { width: 100%; height: 105px; margin: 7px 0; cursor: crosshair; }
+.map-stairs:hover { fill: #a6b7cc; }
 .map-legend { display: flex; gap: 5px; align-items: center; font-size: 8px; color: #6e6e73; }
 .map-legend i { width: 5px; height: 5px; border-radius: 50%; background: #0071e3; }
 .map-legend > span { margin-left: auto; color: #a0a0a8; font-size: 8px; }

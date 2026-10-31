@@ -9,12 +9,13 @@ export { SCENE_FURNITURE, FURNITURE_ASSETS };
 export const SPAWN = [-4.7, -3.4, STANDING_HEIGHT];
 
 export const SCENE_WALLS = [
-  { name: 'north_wall', center: [-1.5, 6, 1.35], size: [17.3, 0.18, 2.7] },
-  { name: 'south_wall', center: [-1.5, -6, 1.35], size: [17.3, 0.18, 2.7] },
+  { name: 'north_wall', center: [-2.5, 6, 1.35], size: [19.3, 0.18, 2.7] },
+  { name: 'south_wall', center: [-2.5, -6, 1.35], size: [19.3, 0.18, 2.7] },
   { name: 'east_wall', center: [7, 0, 1.35], size: [0.18, 12, 2.7] },
-  { name: 'west_wall', center: [-10, 0, 1.35], size: [0.18, 12, 2.7] },
+  { name: 'west_wall', center: [-12, 0, 1.35], size: [0.18, 12, 2.7] },
   { name: 'annex_south', center: [-7, -5.55, 1.35], size: [0.18, 0.9, 2.7] },
-  { name: 'annex_middle', center: [-7, 0, 1.35], size: [0.18, 6.6, 2.7] },
+  { name: 'annex_between_entries', center: [-7, -3.05, 1.35], size: [0.18, 0.5, 2.7] },
+  { name: 'annex_middle', center: [-7, 1.25, 1.35], size: [0.18, 4.1, 2.7] },
   { name: 'annex_north', center: [-7, 5.65, 1.35], size: [0.18, 0.7, 2.7] },
   { name: 'partition_north', center: [1.4, 3.45, 1.35], size: [0.18, 5.1, 2.7] },
   { name: 'partition_south', center: [1.4, -3.45, 1.35], size: [0.18, 5.1, 2.7] },

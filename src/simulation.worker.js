@@ -168,6 +168,15 @@ self.onmessage = (event) => {
     case 'speed':
       if (Number.isFinite(message.speed)) simulation.navigation.speed = Math.max(0.2, Math.min(0.8, message.speed));
       break;
+    case 'transfer':
+      if (['elevator', 'stairs'].includes(message.transfer)) {
+        pending_goal = null;
+        simulation.navigation.cancel();
+        simulation.navigation.transfer = message.transfer;
+        simulation.command = [0, 0, 0];
+        force_frame = true;
+      }
+      break;
     case 'pause':
       simulation.paused = message.paused;
       simulation.command = [0, 0, 0];

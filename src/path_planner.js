@@ -206,7 +206,7 @@ export function make_navigation_maps() {
   const boxes = [...SCENE_WALLS, ...SHAFT_BOXES];
   const common = boxes.map(box => rectangle([box.center[0] - box.size[0] / 2, box.center[0] + box.size[0] / 2,
     box.center[1] - box.size[1] / 2, box.center[1] + box.size[1] / 2]));
-  // This pretrained policy cannot climb stairs. The well is a forbidden region on both floors.
+  // Floor paths cannot cross the well; explicit stair segments follow its 3D steps.
   common.push(rectangle(STAIRS.opening));
   return [0, 1].map(floor => {
     const polygons = [...common];

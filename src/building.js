@@ -2,13 +2,26 @@
 export const FLOOR_HEIGHT = 3.3;
 export const STANDING_HEIGHT = 0.793;
 export const FLOOR_NAMES = ['Ground floor', 'Upper floor'];
-export const BUILDING_BOUNDS = [-10, 7, -6, 6];
+export const BUILDING_BOUNDS = [-12, 7, -6, 6];
 export const ELEVATOR = {
   center: [-8.4, -4.2], landing: [-6.15, -4.2],
   size: [1.7, 1.7, 0.16], speed: 0.3,
   opening: [-9.3, -7.5, -5.1, -3.3],
 };
-export const STAIRS = { opening: [-9.4, -7.6, -2.4, 3], steps: 20 };
+export const STAIRS = {
+  opening: [-11.6, -9.8, -1.6, 3.8], steps: 20,
+  center_x: -10.7, lower_landing: [-10.7, -2.7], upper_landing: [-10.7, 4.6],
+};
+
+export function on_stairs(position, padding = 0) {
+  const [left, right, bottom, top] = STAIRS.opening;
+  return position[0] >= left - padding && position[0] <= right + padding && position[1] >= bottom - padding && position[1] <= top + padding;
+}
+
+export function stair_height(position) {
+  const fraction = (position[1] - STAIRS.opening[2]) / (STAIRS.opening[3] - STAIRS.opening[2]);
+  return Math.max(1, Math.min(STAIRS.steps, Math.floor(fraction * STAIRS.steps) + 1)) * FLOOR_HEIGHT / STAIRS.steps;
+}
 
 export function floor_of(position) {
   return Math.max(0, Math.min(1, Math.round((position[2] - STANDING_HEIGHT) / FLOOR_HEIGHT)));
@@ -17,9 +30,12 @@ export function floor_of(position) {
 export const STAIR_BOXES = Array.from({ length: STAIRS.steps }, (_, index) => {
   const height = (index + 1) * FLOOR_HEIGHT / STAIRS.steps;
   const tread = (STAIRS.opening[3] - STAIRS.opening[2]) / STAIRS.steps;
-  return { name: `stair_${index}`, center: [-8.5, STAIRS.opening[2] + (index + 0.5) * tread, height / 2],
+  return { name: `stair_${index}`, center: [STAIRS.center_x, STAIRS.opening[2] + (index + 0.5) * tread, height / 2],
     size: [1.8, tread, height] };
 });
+export const STAIR_PATH = [[...STAIRS.lower_landing, 0],
+  ...STAIR_BOXES.map(box => [box.center[0], box.center[1], box.size[2]]),
+  [...STAIRS.upper_landing, FLOOR_HEIGHT]];
 export const STAIR_RAIL_BOXES = STAIR_BOXES.flatMap((box, index) => [-0.94, 0.94].flatMap((offset, side) => [
   { name: `stair_rail_${index}_${side}`, center: [box.center[0] + offset, box.center[1], box.size[2] + 0.85], size: [0.06, box.size[1], 0.06] },
   ...([0, 5, 10, 15, 19].includes(index) ? [{ name: `stair_post_${index}_${side}`,

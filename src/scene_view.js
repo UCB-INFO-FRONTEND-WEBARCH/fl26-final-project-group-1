@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { create_model_loader, dispose_model } from './model_assets.js';
 import { IKEA_BASE, model_path } from './asset_paths.js';
-import { FLOOR_HEIGHT, ELEVATOR, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, upper_slabs } from './building.js';
+import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 
 function floor_label(text, width, color = '#85858d') {
@@ -130,7 +130,7 @@ export class SceneView {
     for (let floor = 0; floor < 2; floor++) {
       const z = floor * FLOOR_HEIGHT;
       const group = this.floor_groups[floor];
-      const slabs = floor ? upper_slabs() : [{ center: [-1.5, 0, -0.08], size: [17, 12, 0.16] }];
+      const slabs = floor ? upper_slabs() : [{ center: [-2.5, 0, -0.08], size: [19, 12, 0.16] }];
       const surface = boxes_mesh(slabs, new THREE.MeshLambertMaterial({ color: floor ? '#e8e7e5' : '#eeeff1' }));
       surface.userData.floor = floor;
       group.add(surface);
@@ -141,8 +141,8 @@ export class SceneView {
       });
       group.add(boxes_mesh(walls, new THREE.MeshLambertMaterial({ color: '#c7c9ce' })));
       const grid = [];
-      for (let x = -10; x <= 7; x++) grid.push(x, -6, z + 0.008, x, 6, z + 0.008);
-      for (let y = -6; y <= 6; y++) grid.push(-10, y, z + 0.008, 7, y, z + 0.008);
+      for (let x = BUILDING_BOUNDS[0]; x <= BUILDING_BOUNDS[1]; x++) grid.push(x, -6, z + 0.008, x, 6, z + 0.008);
+      for (let y = -6; y <= 6; y++) grid.push(BUILDING_BOUNDS[0], y, z + 0.008, BUILDING_BOUNDS[1], y, z + 0.008);
       group.add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(grid, 3)),
         new THREE.LineBasicMaterial({ color: '#9a9da7', transparent: true, opacity: 0.14 })));
       for (const room of ROOM_LABELS) {
@@ -153,6 +153,9 @@ export class SceneView {
       const lift_label = floor_label('ELEVATOR', 1.45, '#0071e3');
       lift_label.position.set(-6, -4.8, z + 0.02);
       group.add(lift_label);
+      const stair_label = floor_label(floor ? 'STAIRS DOWN' : 'STAIRS UP', 1.65, '#8b7651');
+      stair_label.position.set(STAIRS.center_x, floor ? 5.05 : -3.15, z + 0.02);
+      group.add(stair_label);
       const contact = SCENE_FURNITURE.filter(item => Math.floor((item.position[2] + 0.01) / FLOOR_HEIGHT) === floor).map(item => {
         const [width, depth] = FURNITURE_ASSETS[item.article].size;
         return new THREE.PlaneGeometry(width * 1.1, depth * 1.1).rotateZ(item.yaw)
@@ -165,7 +168,8 @@ export class SceneView {
     }
 
     const stairs = [...STAIR_BOXES, ...STAIR_RAIL_BOXES];
-    this.scene.add(boxes_mesh(stairs, new THREE.MeshLambertMaterial({ color: '#c5cbd4' })));
+    this.stair_mesh = boxes_mesh(stairs, new THREE.MeshLambertMaterial({ color: '#c5cbd4' }));
+    this.scene.add(this.stair_mesh);
     this.scene.add(boxes_mesh(SHAFT_BOXES, new THREE.MeshLambertMaterial({ color: '#8eb9db', transparent: true, opacity: 0.16, depthWrite: false })));
     this.lift_group = new THREE.Group();
     this.lift_group.position.set(...ELEVATOR.center, 0);
@@ -305,7 +309,8 @@ export class SceneView {
       this.robot_meshes[index].visible = robot_visible;
     }
     const on_lift = Math.abs(telemetry.position[0] - ELEVATOR.center[0]) < 0.8 && Math.abs(telemetry.position[1] - ELEVATOR.center[1]) < 0.8;
-    const surface = on_lift ? (telemetry.elevator?.height || 0) : this.current_floor * FLOOR_HEIGHT;
+    this.vertical_motion = this.lift_moving || on_stairs(telemetry.position);
+    const surface = on_lift ? (telemetry.elevator?.height || 0) : on_stairs(telemetry.position) ? stair_height(telemetry.position) : this.current_floor * FLOOR_HEIGHT;
     this.robot_marker.visible = this.robot_shadow.visible = robot_visible;
     this.robot_marker.position.set(telemetry.position[0], telemetry.position[1], surface + 0.025);
     this.robot_marker.rotation.z = telemetry.heading;
@@ -344,11 +349,11 @@ export class SceneView {
       this.camera.position.copy(this.robot_position).add(new THREE.Vector3(-5.3, -6.3, 5));
       this.controls.target.copy(this.robot_position).add(new THREE.Vector3(0.7, 0.2, -0.2));
     } else if (mode === 'top') {
-      this.camera.position.set(-1.5, -0.01, 23 + z);
-      this.controls.target.set(-1.5, 0, z);
+      this.camera.position.set(-2.5, -0.01, 24 + z);
+      this.controls.target.set(-2.5, 0, z);
     } else {
-      this.camera.position.set(-11.5, -14, 11 + z);
-      this.controls.target.set(-1.5, 0, z + 0.1);
+      this.camera.position.set(-13, -15, 12 + z);
+      this.controls.target.set(-2.5, 0, z + 0.1);
     }
     this.last_follow_position.copy(this.robot_position);
     this.controls.update();
@@ -378,7 +383,7 @@ export class SceneView {
     this.route.geometry = new THREE.BufferGeometry().setFromPoints(navigation.path.map(point => new THREE.Vector3(point[0], point[1], point[2] + 0.045)));
     this.route.visible = navigation.path.length > 1;
     this.destination.visible = Boolean(navigation.goal);
-    if (navigation.goal) this.destination.position.set(navigation.goal[0], navigation.goal[1], navigation.goal[2] * FLOOR_HEIGHT + 0.05);
+    if (navigation.goal) this.destination.position.set(navigation.goal[0], navigation.goal[1], (navigation.goal[3] ?? navigation.goal[2] * FLOOR_HEIGHT) + 0.05);
     this.destination.material.color.set(navigation.status === 'arrived' ? '#30a46c' : navigation.status === 'blocked' ? '#d56b36' : '#0071e3');
     this.needs_render = true;
   }
@@ -400,9 +405,13 @@ export class SceneView {
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - bounds.left) / bounds.width * 2 - 1,
         1 - (event.clientY - bounds.top) / bounds.height * 2), this.camera);
       const surfaces = this.floor_surfaces.filter(surface => this.viewed_floor === 'all' || surface.userData.floor === this.viewed_floor);
+      surfaces.push(this.stair_mesh);
       if (this.lift_open_floor >= 0 && (this.viewed_floor === 'all' || this.lift_open_floor === this.viewed_floor)) surfaces.push(this.lift_deck);
       const hit = raycaster.intersectObjects(surfaces, false)[0];
-      if (hit) this.on_destination?.([hit.point.x, hit.point.y, hit.object === this.lift_deck ? this.lift_open_floor : hit.object.userData.floor]);
+      if (hit) {
+        if (hit.object === this.stair_mesh) this.on_destination?.([hit.point.x, hit.point.y, Math.round(stair_height([hit.point.x, hit.point.y]) / FLOOR_HEIGHT), stair_height([hit.point.x, hit.point.y])]);
+        else this.on_destination?.([hit.point.x, hit.point.y, hit.object === this.lift_deck ? this.lift_open_floor : hit.object.userData.floor]);
+      }
       canvas.focus({ preventScroll: true });
     };
     for (const [name, handler] of [['pointerdown', down], ['pointermove', move], ['pointerup', up], ['pointercancel', cancel]]) canvas.addEventListener(name, handler);
@@ -434,7 +443,7 @@ export class SceneView {
     const started = performance.now();
     if (this.mode === 'follow') {
       const delta = this.follow_delta.copy(this.robot_position).sub(this.last_follow_position);
-      if (!this.lift_moving) delta.z = 0;
+      if (!this.vertical_motion) delta.z = 0;
       this.camera.position.add(delta);
       this.controls.target.add(delta);
       this.last_follow_position.copy(this.robot_position);
