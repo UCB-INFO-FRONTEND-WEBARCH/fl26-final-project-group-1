@@ -1,0 +1,54 @@
+name: Build and deploy Pages
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_IKEA_BASE_URL: ${{ vars.IKEA_ASSET_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:simulation
+      - name: Verify the public asset host
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          case "$VITE_IKEA_BASE_URL" in
+            https://*) ;;
+            *) echo '::error::Set IKEA_ASSET_BASE_URL to the HTTPS root of the IKEA collection.'; exit 1 ;;
+          esac
+          node scripts/verify_asset_host.js "$VITE_IKEA_BASE_URL" "https://${GITHUB_REPOSITORY_OWNER}.github.io"
+      - name: Build the project site
+        run: npm run build -- --base "/${GITHUB_REPOSITORY#*/}/"
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
