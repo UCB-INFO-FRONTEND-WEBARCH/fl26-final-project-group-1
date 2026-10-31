@@ -1,0 +1,20 @@
+{
+  "source": "https://github.com/unitreerobotics/unitree_rl_gym",
+  "commit": "276801e46c5d433564f24658bac64f254b7d2d4b",
+  "checkpoint": "deploy/pre_train/g1/motion.pt",
+  "license": "BSD-3-Clause",
+  "observation_size": 47,
+  "action_size": 12,
+  "hidden_shape": [
+    1,
+    1,
+    64
+  ],
+  "physics_dt": 0.002,
+  "control_decimation": 10,
+  "action_scale": 0.25,
+  "export": "Unchanged weights; explicit LSTM hidden/cell inputs and outputs; ONNX opset 17",
+  "parity_steps": 200,
+  "parity_max_absolute_error": 6.794929504394531e-06,
+  "sha256": "e4609876b7d165a0802e19f21547f9540aa56d7a8895b0fc9f8b5175733d8497"
+}
