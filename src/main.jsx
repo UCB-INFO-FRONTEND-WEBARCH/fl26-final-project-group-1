@@ -44,14 +44,14 @@ function MiniMap({ telemetry, floor, on_destination }) {
         <span>
           <span className="tiny-square" /> Floor plan
         </span>
-        <span>{floor === 0 ? 'Ground' : 'Upper'} · 19 × 12 m</span>
+        <span>{floor === 0 ? 'Ground' : 'Upper'} · 19 × 14 m</span>
       </div>
-      <svg viewBox="-12.5 -6.5 20 13" aria-label="Floor plan: click an open spot to set a destination" role="img"
+      <svg viewBox="-12.5 -7.5 20 15" aria-label="Floor plan: click an open spot to set a destination" role="img"
         onClick={event => {
           const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(event.currentTarget.getScreenCTM().inverse());
           on_destination([point.x, -point.y, floor]);
         }}>
-        <rect x={BUILDING_BOUNDS[0]} y="-6" width="19" height="12" rx="0.1" fill="#f3f4f6" />
+        <rect x={BUILDING_BOUNDS[0]} y={BUILDING_BOUNDS[2]} width="19" height="14" rx="0.1" fill="#f3f4f6" />
         <g transform="scale(1,-1)">
           {SCENE_WALLS.map((box) => (
             <rect
@@ -63,7 +63,7 @@ function MiniMap({ telemetry, floor, on_destination }) {
               fill="#92959d"
             />
           ))}
-          <rect className="map-stairs" x={STAIRS.opening[0]} y={STAIRS.opening[2]} width="1.8" height="5.4" fill="#b7bdc6">
+          <rect className="map-stairs" x={STAIRS.opening[0]} y={STAIRS.opening[2]} width={STAIRS.opening[1] - STAIRS.opening[0]} height={STAIRS.opening[3] - STAIRS.opening[2]} fill="#b7bdc6">
             <title>Stairway — click to attempt climbing</title>
           </rect>
           <rect x={ELEVATOR.center[0] - 0.85} y={ELEVATOR.center[1] - 0.85} width="1.7" height="1.7" fill="#b1ccec" />
@@ -105,7 +105,7 @@ function MiniMap({ telemetry, floor, on_destination }) {
         ))}
       </svg>
       <div className="map-legend">
-        <i /> Unitree G1 <span>Click to go</span>
+        <i /> Berkeley Lite Pro <span>Click to go</span>
       </div>
     </div>
   );
@@ -117,7 +117,7 @@ function App() {
   const worker_ref = useRef(null);
   const keys_ref = useRef(new Set());
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
-  const speed_ref = useRef(0.5);
+  const speed_ref = useRef(0.6);
   const transfer_ref = useRef('elevator');
   const ready_ref = useRef(false);
   const [telemetry, set_telemetry] = useState(INITIAL_TELEMETRY);
@@ -127,7 +127,7 @@ function App() {
   const [performance_stats, set_performance_stats] = useState(null);
   const [camera, set_camera] = useState('follow');
   const [render_quality, set_render_quality] = useState('performance');
-  const [speed, set_speed] = useState(0.5);
+  const [speed, set_speed] = useState(0.6);
   const [pressed, set_pressed] = useState(new Set());
   const [show_info, set_show_info] = useState(false);
   const [viewed_floor, set_viewed_floor] = useState(0);
@@ -467,7 +467,7 @@ function App() {
               <div className="loading-overlay" role="status">
                 <div className="loading-card">
                   {error ? <Icon name="info" size={28} /> : <span className="loader" />}
-                  <h2>{error ? 'The lab could not start' : 'Getting the G1 ready'}</h2>
+                  <h2>{error ? 'The lab could not start' : 'Getting Lite Pro ready'}</h2>
                   <p>{error || loading}</p>
                   {error ? (
                     <button className="primary-button" onClick={() => window.location.reload()}>
@@ -484,7 +484,7 @@ function App() {
             {ready && telemetry.fallen && (
               <div className="fallen-banner" role="alert">
                 <Icon name="info" />
-                <span>The G1 lost its balance. Reset to try again.</span>
+                <span>Lite Pro lost its balance. Reset to try again.</span>
                 <button onClick={reset}>
                   Reset robot <kbd>R</kbd>
                 </button>
@@ -545,17 +545,17 @@ function App() {
               <Icon name="robot" size={34} />
             </div>
             <div>
-              <span className="eyebrow">Unitree Robotics</span>
+              <span className="eyebrow">Berkeley Humanoids</span>
               <h2>
-                G1 <span>Humanoid</span>
+                Lite Pro <span>Humanoid</span>
               </h2>
-              <p>12 actuated leg joints</p>
+              <p>34 actuated body joints</p>
             </div>
           </div>
           <div className="policy-tag">
             <i />
             {ready ? 'Learned locomotion' : 'Loading locomotion'}
-            <span>PPO / LSTM</span>
+            <span>SuperMimic / depth</span>
           </div>
 
           <section className="navigation-section">
@@ -575,7 +575,7 @@ function App() {
               disabled={!['walking', 'waiting', 'riding', 'arrived'].includes(telemetry.navigation?.status)}>
               {telemetry.navigation?.status === 'arrived' ? 'Clear route' : 'Stop navigation'} <kbd>ESC</kbd></button>
             <p className="navigation-footnote">{transfer === 'stairs'
-              ? 'Stair routes attempt the climb with the current policy. If it falls, press R to reset.'
+              ? 'The head depth camera guides stair walking. Press R to reset after a fall.'
               : 'Select Stairs or click a step to try the stairway.'}</p>
           </section>
 
@@ -702,11 +702,11 @@ function App() {
             </div>
             <p>Pick a destination or use your keys. A neural network handles balance and every step.</p>
             <div className="policy-flow">
-              <span>47 obs</span>
+              <span>2,798 obs</span>
               <span>→</span>
-              <strong>LSTM</strong>
+              <strong>CNN + MLP</strong>
               <span>→</span>
-              <span>12 actions</span>
+              <span>34 actions</span>
             </div>
             <button className="text-button" onClick={() => set_show_info(true)}>
               How it works <span>↗</span>
@@ -717,7 +717,7 @@ function App() {
               POLICY <b>50 Hz</b>
             </span>
             <span>
-              PHYSICS <b>500 Hz</b>
+              PHYSICS <b>200 Hz</b>
             </span>
             <span>
               RTF <b>{telemetry.simulation_rate.toFixed(2)}×</b>
@@ -761,26 +761,24 @@ function App() {
             <span className="eyebrow">UNDER THE HOOD</span>
             <h2 id="info-title">From a goal to a footstep.</h2>
             <p>
-              Click a floor to plan a route around walls and furniture, including elevator transfers between
-              floors. WASD takes over with forward velocity and turning commands. Q/E adds sideways velocity. The official
-              Unitree G1 recurrent PPO policy receives these commands alongside the simulated joint states,
-              gravity direction, angular velocity, previous actions, and gait phase.
+              Click a floor to plan a route around walls and furniture, including stairs and elevator transfers.
+              WASD takes over with forward velocity and turning commands. Q/E adds sideways velocity.
+              The S3 SuperMimic policy combines these goals with joint history and a head depth camera.
             </p>
             <div className="info-flow">
-              Keyboard → 47 observations → LSTM → 12 joint targets → PD torques → MuJoCo
+              Goal + depth image + body history → CNN / MLP → 34 joint targets → motor torques → MuJoCo
             </div>
             <p>
-              The unchanged pretrained weights run at 50 Hz using ONNX Runtime Web. A PD controller applies
-              joint torques every 2 ms in MuJoCo WASM. Three.js renders lightweight meshes derived from the
-              official G1 model, using the resulting physics state.
+              The unchanged velocity-mode checkpoint runs at 50 Hz using ONNX Runtime Web. The head camera
+              casts 48 × 27 rays and produces an 18 × 32 policy image. MuJoCo simulates the trained robot,
+              motor torque–speed limits, and command delays at 200 Hz. Three.js renders its physical pose.
             </p>
             <p>
-              The G1 has 12 active leg joints; its arms and waist are fixed in this model. Walls and furniture
-              have solid collision geometry. The visible walls are shortened for a cutaway view. Colliding can
-              make the robot fall; press R to reset. A clearance-aware Theta* planner routes around furniture
-              on each floor. The elevator physically carries the robot between floors. This walking policy
-              has not been validated for stairs. Select Stairs or click a step to attempt the climb with
-              the current policy; falls and stalls remain possible. WASD or Escape cancels the route.
+              Lite Pro has 34 active joints in its legs, waist, arms, and neck; its fingers are fixed.
+              Walls, IKEA furniture, and individual stair treads have solid collision geometry. A
+              clearance-aware Theta* planner routes around furniture on each floor. Stair mode walks
+              along the steps; the elevator physically carries its rider. Collisions and difficult
+              terrain can cause a fall; press R to reset. WASD or Escape cancels the route.
             </p>
             <p>
               Camera: drag to orbit, right-drag to pan, scroll to zoom, or press C to cycle views. Arrow keys
@@ -788,11 +786,11 @@ function App() {
               simulation.
             </p>
             <a
-              href="https://github.com/unitreerobotics/unitree_rl_gym/tree/276801e46c5d433564f24658bac64f254b7d2d4b"
+              href="https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516"
               target="_blank"
               rel="noreferrer"
             >
-              Official model & policy · BSD-3-Clause <Icon name="external" size={14} />
+              InstinctMJ policy · CC BY-NC 4.0 <Icon name="external" size={14} />
             </a>
           </section>
         </div>

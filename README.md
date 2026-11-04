@@ -1,8 +1,9 @@
 # RoboPlay
 
-RoboPlay is a React application for manual control of a Unitree G1 in a three-room
-indoor scene. A pretrained policy controls the robot's leg joints in MuJoCo physics.
-The policy keeps memory between control steps.
+RoboPlay is a React application for manual and automatic navigation of Berkeley
+Lite Pro in a furnished, two-floor apartment. The S3 SuperMimic policy controls
+34 body joints using velocity goals, body history, and a head depth camera.
+MuJoCo simulates the robot, stairs, furniture, and elevator in the browser.
 
 WASD keys send velocity commands to the policy.
 The keyboard handler does not translate the robot or play a walking animation.
@@ -21,7 +22,7 @@ Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
 The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
 the local server. The application runs without a Python server, API key, GPU,
 external inference endpoint, or cross-origin isolation headers.
-The first page load transfers approximately 50 MB of uncompressed assets.
+The first page load transfers approximately 40 MB of uncompressed robot and runtime assets.
 The browser can cache these assets for later loads.
 
 ### Asset library
@@ -91,7 +92,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
 The speed slider sets forward and backward speed from 0.2 to 0.8 m/s.
-The controller limits lateral commands to 0.35 m/s and turning commands to 0.7 rad/s.
+Backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
 When you release a movement input, the controller requests zero velocity.
 The policy continues to balance the robot, which can still take small steps or drift.
 
@@ -101,19 +102,20 @@ Select Resume to continue.
 
 ## Scene and robot
 
-- Two 19 × 12 m floors, with living room, kitchen, study, a stairwell, and an elevator.
+- Two 19 × 14 m floors, with living room, kitchen, study, a stairwell, and an elevator.
 - Nineteen IKEA placements use twelve original models: KIVIK seating, LACK and
   TORNVIKEN tables, BESTÅ and HEMNES storage, KNOXHULT cabinets, a LAGAN refrigerator,
   a MICKE desk, a MARKUS chair, BILLY shelves, a TILLREDA cooktop, and an ELLOVEN stand.
 - Models retain their original materials and metre scale. Rendering and physics
   share their floor position, orientation, and conversion from Y up to Z up.
   The renderer shortens visible walls for a cutaway view. Physics retains their full 2.7 m collision height.
-- Official Unitree G1 meshes, inertias, joints, contacts, and actuator limits.
-- The walking checkpoint uses the **12-DoF G1 model**, with fixed arms and waist.
+- Berkeley Lite Pro: 34 controlled joints, including the waist, arms, and neck; fingers are fixed.
+- The model, contacts, joint inertias, gains, and motor torque–speed envelopes match the upstream browser export.
+- The floors are 2.64 m apart. Twenty-four solid treads have an 11 cm rise, 45 cm run, and 2.2 m width.
 - Live robot-frame commands, actual speed, world position, heading, base height,
   simulation time, distance, rendering FPS, and real-time factor.
-- The learned policy handles flat-ground locomotion. It does not plan paths, avoid
-  obstacles, or recover from a fall. Falls stop the simulation and leave Reset available.
+- The perceptive policy handles walking and stair motion. Theta* supplies the global route.
+  Falls stop the simulation and leave Reset available; the policy does not perform get-up recovery.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
 Cross-floor routes use the physical lift or attempt the stair path. The asset library uses
@@ -149,67 +151,46 @@ Add `?collisions=1` to the playground URL to inspect the hulls as blue wireframe
 
 ## Performance
 
-The page defaults to **Graphics → Fast**. Fast mode uses a 25,142-triangle G1 mesh
-for rendering, with 95% fewer triangles than the original visual model.
-Fast mode uses one merged room mesh, simple lighting, a contact shadow, and at most
-1× device pixel ratio. **Quality** adds a static room shadow and permits up to
-1.5× resolution, with a one-megapixel limit. Both modes use the original robot
-collision geometry, inertias, timestep, and policy.
+The page defaults to **Graphics → Fast**. The render-only Lite Pro mesh has
+6,196 triangles and uses about 148 KiB, compared with 100,996 triangles in the
+upstream model. Camera rays and physics keep the upstream meshes and contacts.
+**Quality** adds static shadows and increases the allowed render resolution.
 
-The worker sends poses at most 50 times per second. It permits one outstanding
-message and reuses the transfer buffer. React updates telemetry at 4 Hz.
-The worker updates kinematics for rendering instead of repeating full forward dynamics.
-Hidden tabs pause simulation and stop rendering. Paused views redraw for camera
-changes, a new pose, or a graphics setting change.
+Physics and inference run in a worker. Poses are sent at most 50 times per second,
+with one outstanding message and a reused transfer buffer. React updates telemetry
+at 4 Hz. Hidden tabs pause simulation and rendering; paused views redraw when needed.
+Repeated IKEA models share geometry and materials. Furniture collision decomposition
+runs offline. No training code or GPU service runs in the website.
 
-Before furnishing, the optimized scene submitted 25,990 triangles in 40 draw calls,
-compared with 1,007,784 triangles and 179 calls before optimization.
-The furnished scene submits 112,674 triangles in 58 draw calls in Fast mode.
-Its twelve unique GLBs total 1.93 MB. Repeated cabinets and shelves share geometry
-and materials. Contact shadows use one merged mesh; Quality mode bakes static
-furniture shadows once. Collision decomposition runs offline.
-
-The furnished page rendered at 60 frames per second (FPS) in local browser checks.
-CPU render submission averaged about 0.81 ms, and physics maintained a real-time
-factor near 1.0. These measurements describe this test machine and do not
-guarantee the same frame rate on every device.
-
-Add `?profile=1` to the URL for live render diagnostics.
-See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for the profiling method and the
-MicroDuck/mjswan source references used for this optimization.
+Add `?profile=1` for live render diagnostics. [Performance notes](docs/PERFORMANCE.md)
+retain the earlier G1 optimization measurements; they are historical, not Lite Pro benchmarks.
 
 ## Policy and simulation
 
-The application pins the model and checkpoint to
-[`unitreerobotics/unitree_rl_gym`, commit `276801e46c5d433564f24658bac64f254b7d2d4b`](https://github.com/unitreerobotics/unitree_rl_gym/tree/276801e46c5d433564f24658bac64f254b7d2d4b).
-
-The policy uses a long short-term memory (LSTM) network.
-A proportional-derivative (PD) controller applies its joint targets.
+The application uses the S3 goal-mode Mix checkpoint at iteration 20,000 from
+[InstinctMJ, `feat/lite-pro`](https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516).
+Its unchanged ONNX export includes normalization, the velocity goal mask, depth
+encoder, and actor. The contract and hashes are in `public/assets/lite_pro/contract.json`.
 
 ```text
-Keyboard: [forward m/s, lateral m/s, yaw rad/s]
+WASD / route → ten future velocity goals and a 0.73 m ground-relative pelvis height
+Head camera → 48 × 27 rays → filtered, cropped 18 × 32 depth image
+Body state → eight frames of gravity, angular velocity, joints, and previous actions
     ↓
-47 observations: body angular velocity, projected gravity, command,
-                joint positions/velocities, previous actions, gait phase
+2,798 observations → CNN + MLP → 34 joint targets, 50 Hz
     ↓
-LSTM (64 hidden units) → MLP (32 hidden units) → 12 actions, 50 Hz
+Per-joint PD + motor torque–speed limits + 5–10 ms command delay
     ↓
-Joint target = default angle + action × 0.25
-    ↓
-PD torques at 500 Hz → MuJoCo contacts and rigid-body dynamics
-    ↓
-Physics state → Three.js rendering + next observation
+MuJoCo rigid-body dynamics and contacts, 200 Hz → Three.js poses
 ```
 
-The export preserves the official `motion.pt` weights. The ONNX export exposes the
-LSTM hidden and cell states as `[1, 1, 64]` inputs and outputs. Reset clears both states.
-Observation order, scaling, joint order, PD gains, the 0.8 s gait phase, and the 2 ms
-timestep follow the bundled official reference files.
+The shared policy implementation follows the upstream browser controller. Its depth
+images, observations, actions, and physical poses match across a seeded 24-step
+comparison, including depth noise and history rollover. See [policy integration](docs/POLICY.md)
+for provenance, sensor groups, motor mapping, and validation limits.
 
-The simulation runs in a dedicated Web Worker. Three.js and React run on the main
-thread. If a device cannot process every step in real time, simulation time advances
-more slowly than wall time. The simulation does not skip physics steps.
-The RTF readout shows the ratio of simulation time to wall time.
+The original G1 policy is available in the earlier 3D-scene PR. It cannot control
+Lite Pro: the joint layout and policy contract differ. The active app loads only Lite Pro.
 
 ## Verification
 
@@ -219,61 +200,41 @@ npm run test:simulation  # Real bundled MuJoCo WASM + ONNX runtime; no Python ne
 npm run build
 ```
 
-The simulation regression uses the same controller as the browser worker.
-It covers 20 s idle balance, 9 s forward walking, backward walking, turning,
-strafing, doorway crossing, collision with a solid partition, and contact with
-the IKEA coffee table.
-The free-walking cases maintain a base height above 0.7 m.
-The collision case must produce a wall contact. The robot must remain on its
-original side of that wall. Furniture ray probes check the tabletop, legs,
-table opening, desk knee space, and bookcase opening. A falling sphere must settle
-on the visible tabletop height. Further checks cover pause, reset, fall detection,
-and rejection of invalid policy output.
-
-The ONNX exporter compares 200 stateful random steps with the original
-TorchScript checkpoint. The maximum absolute action error was **6.8e-6** (limit 1e-4).
-The exact hash and export contract are in `public/assets/g1/contract.json`.
-Browser checks verified loading, W movement, turning/strafe commands, pause/reset,
-camera switching, and the production bundle.
-
-Navigation checks exercise six learned-policy routes, including furniture and
-doorway avoidance, elevator travel in both directions, pause during a ride,
-landing-gate interlocks, holding the destination after arrival, and a reachable
-stair entry. A separate test allows the current policy to attempt physical steps.
+The simulation regression uses the same controller as the browser worker. It checks
+manual locomotion, wall and furniture contacts, compound collision ray probes, pause,
+reset, fall detection, and invalid policy output. Automatic routes cover doorways,
+furniture avoidance, elevator transfers, stair ascent/descent, and holding after arrival.
+The upstream comparison runs before those scenarios.
 
 ## Repository layout
 
 ```text
-src/main.jsx                React controls, telemetry, minimap, input handling
-src/style.css               Responsive interface
-src/scene_view.js           Three.js scene and camera
-src/scene_layout.js         Shared apartment geometry and MJCF generation
-src/building.js             Floor elevations, stairwell, lift, and slab openings
-src/path_planner.js         Collision-derived floor maps and Theta* search
-src/navigation.js           Route following and elevator transfer stages
-src/elevator.js             Lift servo and landing/cabin gate interlocks
-src/locomotion.js           Official observation/PD contract and keyboard mapping
-src/simulation.worker.js    MuJoCo/ONNX loading, clock, and worker messages
-src/simulation.js           Shared controller, policy state, and physics steps
-src/robot_assets.js         Shared model loading, model checks, and render geometry
-public/assets/g1/           Pinned meshes, source checkpoint, ONNX export, licenses
-scripts/fetch_assets.py     Re-fetch original upstream assets and record SHA-256s
-scripts/export_policy.py    Reproduce the ONNX export and verify stateful parity
-scripts/verify_simulation.js Headless WASM physics regression
-scripts/prepare_visual_assets.js Offline render-only mesh simplification
-tests/locomotion.test.js    Controller contract tests
-tests/visual_assets.test.js Optimized asset integrity and size budget
+src/main.jsx                  React controls, telemetry, minimap, and input
+src/scene_view.js              Three.js scene and camera
+src/scene_layout.js            Shared apartment geometry and MJCF generation
+src/lite_pro_policy.js         S3 depth, history, observation, and motor control
+src/policy_constants.js        Generated constants from the pinned export
+src/locomotion.js              Timing, joint names, keyboard commands, and heading
+src/simulation.js              Physical stepping, reset, fall detection, and routing
+src/simulation.worker.js       Runtime loading, clock, and worker messages
+src/navigation.js             Route following and connector stages
+src/path_planner.js            Clearance-aware Theta* maps
+public/assets/lite_pro/        ONNX, MJCF, meshes, reference controller, and licenses
+scripts/import_lite_pro.py     Re-fetch and verify the pinned policy/model export
+scripts/prepare_visual_assets.js Render-only mesh simplification
+scripts/verify_policy_parity.js Compare against the unchanged upstream controller
+scripts/verify_simulation.js   Headless MuJoCo + ONNX physics checks
 ```
 
-The bundled assets are ready to use. To reproduce the export, use a temporary
-Python 3.12 virtual environment. Install `torch==2.6.0`, `onnx==1.17.0`,
-`onnxruntime==1.26.0`, and `numpy`. The CPU version of PyTorch is sufficient.
-Run these commands:
+The bundled assets are ready to use. To reproduce the import and render meshes:
 
 ```bash
-python scripts/fetch_assets.py
-python scripts/export_policy.py
+python3 scripts/import_lite_pro.py
 npm run assets:visuals
 ```
+
+Exporting a newly trained checkpoint requires the InstinctMJ training environment
+and `scripts/lite_pro_browser_export.py` in that repository. Pin and validate its
+constants, model, and controller together before changing the bundled checkpoint.
 
 See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution and license locations.

@@ -6,10 +6,12 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const path_length = path => path.slice(1).reduce((sum, point, index) => sum + Math.hypot(
   point[0] - path[index][0], point[1] - path[index][1], (point[2] || 0) - (path[index][2] || 0)), 0);
 const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
-function hold_position(position, target, heading) {
-  if (distance(position, target) < 0.08) return [0, 0, 0];
-  const dx = clamp((target[0] - position[0]) * 0.8, 0.12);
-  const dy = clamp((target[1] - position[1]) * 0.8, 0.12);
+export function hold_position(position, target, heading, speed_limit = 0.12) {
+  const remaining = distance(position, target);
+  if (remaining < 0.08) return [0, 0, 0];
+  const scale = Math.min(speed_limit, remaining * 1.4) / remaining;
+  const dx = (target[0] - position[0]) * scale;
+  const dy = (target[1] - position[1]) * scale;
   return [dx * Math.cos(heading) + dy * Math.sin(heading), -dx * Math.sin(heading) + dy * Math.cos(heading), 0];
 }
 
@@ -20,9 +22,16 @@ function stair_segment(from, to) {
   return { type: 'stairs', path: [[...from], ...between.map(point => [...point]), [...to]] };
 }
 
+function route_points(segments) {
+  return segments.flatMap(segment => segment.type === 'walk'
+    ? segment.path.map(point => [...point, segment.floor * FLOOR_HEIGHT])
+    : segment.type === 'stairs' ? segment.path : segment.type === 'ride' ? [[...ELEVATOR.center, segment.floor * FLOOR_HEIGHT]] : []);
+}
+
 function steer(position, target, heading, speed, limit = 0.6) {
   const angle = Math.atan2(target[1] - position[1], target[0] - position[0]);
   const error = Math.atan2(Math.sin(angle - heading), Math.cos(angle - heading));
+  if (Math.abs(error) > 0.5) return [0, 0, clamp(error * 1.6, 0.7)];
   const pace = Math.min(speed, limit, distance(position, target) * 0.9);
   const alignment = Math.max(0, Math.cos(error));
   return [pace * alignment * alignment, clamp(pace * Math.sin(error) * 0.6, 0.2), clamp(error * 1.6, 0.7)];
@@ -32,7 +41,7 @@ export class Navigation {
   constructor(maps, elevator) {
     this.maps = maps;
     this.elevator = elevator;
-    this.speed = 0.5;
+    this.speed = 0.6;
     this.transfer = 'elevator';
     this.state = { ...IDLE_NAVIGATION };
     this.segments = [];
@@ -55,7 +64,7 @@ export class Navigation {
     const stair_goal = on_stairs(goal) || (goal.length === 4 && on_stairs(goal, 0.12));
     if (goal.length === 4 && !stair_goal) { this.fail('Choose a point on the stairway.', null); return; }
     if (stair_goal) {
-      const step = STAIR_BOXES.find(box => Math.abs(goal[1] - box.center[1]) <= box.size[1] / 2 + 1e-8) || STAIR_BOXES.at(-1);
+      const step = STAIR_BOXES[Math.round(stair_height(goal) * STAIRS.steps / FLOOR_HEIGHT) - 1];
       goal = [STAIRS.center_x, step.center[1], Math.round(step.size[2] / FLOOR_HEIGHT), step.size[2]];
     }
     if (this.elevator.moving && this.elevator.occupied(position)) {
@@ -93,13 +102,13 @@ export class Navigation {
     if (this.segments.some(segment => segment.type === 'walk' && !segment.path)) {
       this.fail('No safe route from here. Move into open space and try again.', goal); return;
     }
-    const route = this.segments.flatMap(segment => segment.type === 'walk'
-      ? segment.path.map(point => [...point, segment.floor * FLOOR_HEIGHT])
-      : segment.type === 'stairs' ? segment.path : segment.type === 'ride' ? [[...ELEVATOR.center, segment.floor * FLOOR_HEIGHT]] : []);
+    const route = route_points(this.segments);
     this.index = 0;
     this.waypoint = 1;
     this.last_progress = time;
     this.best_remaining = Infinity;
+    this.replans = 0;
+    this.last_replan = -Infinity;
     this.state = { version: this.state.version + 1, status: 'walking', message: 'Walking to your destination.',
       goal: [...goal], path: route, remaining: this.segments.reduce((sum, segment) => sum + (segment.path ? path_length(segment.path) : 0), 0),
       planning_ms: performance.now() - started };
@@ -125,15 +134,18 @@ export class Navigation {
       if (!segment.started) { this.elevator.request(segment.floor); segment.started = true; }
       this.state.status = segment.type === 'call' ? 'waiting' : 'riding';
       this.state.message = segment.type === 'call' ? 'Waiting for the elevator.' : `Riding to the ${FLOOR_NAMES[segment.floor].toLowerCase()}.`;
-      if (this.elevator.open_floor === segment.floor && !this.elevator.moving) this.next(time);
+      if (this.elevator.open_floor === segment.floor && !this.elevator.moving &&
+          (segment.type === 'call' || (distance(position, ELEVATOR.center) < 0.2 && Math.abs(heading) < 0.25))) this.next(time);
       if (segment.type === 'call') {
         return hold_position(position, ELEVATOR.landing, heading);
       }
-      return [0, 0, 0];
+      const cabin_command = hold_position(position, ELEVATOR.center, heading, 0.25);
+      cabin_command[2] = clamp(-heading * 1.4, 0.5);
+      return cabin_command;
     }
     this.state.status = 'walking';
     this.state.message = segment.boarding ? 'Boarding the elevator.' : segment.stair_approach ? 'Walking to the stair entry.' : `Walking on the ${FLOOR_NAMES[segment.floor].toLowerCase()}.`;
-    const path = segment.path;
+    let path = segment.path;
     if (distance(position, path.at(-1)) < (segment.boarding ? 0.15 : 0.22)) { this.next(time); return [0, 0, 0]; }
     const map = this.maps[segment.floor];
     for (let index = path.length - 1; index >= this.waypoint; index--) {
@@ -141,9 +153,17 @@ export class Navigation {
     }
     if (this.waypoint < path.length - 1 && distance(position, path[this.waypoint]) < 0.25 &&
         map.line_clear(position, path[this.waypoint + 1], true)) this.waypoint++;
-    const target = path[this.waypoint];
+    let target = path[this.waypoint];
     if (!map.line_clear(position, target, true)) {
-      this.fail('The robot left its safe route. Choose a new destination.'); return [0, 0, 0];
+      const recovery = !segment.boarding && this.replans < 4 && time - this.last_replan > 1 && map.plan(position, path.at(-1));
+      if (!recovery) { this.fail('The robot left its safe route. Choose a new destination.'); return [0, 0, 0]; }
+      path = segment.path = recovery;
+      this.waypoint = 1;
+      target = path[this.waypoint];
+      this.last_replan = this.last_progress = time;
+      this.replans++;
+      this.state.path = route_points(this.segments.slice(this.index));
+      this.state.version++;
     }
     const remaining = distance(position, target) + path_length(path.slice(this.waypoint));
     this.state.remaining = remaining + this.segments.slice(this.index + 1).reduce((sum, next) => sum + (next.path ? path_length(next.path) : 0), 0);
@@ -153,15 +173,19 @@ export class Navigation {
   }
   follow_stairs(position, heading, time, path) {
     this.state.status = 'walking';
-    this.state.message = 'Attempting stairs with the current policy.';
+    this.state.message = 'Walking on the stairs with depth perception.';
     const height = position[2] - STANDING_HEIGHT;
     const finish = path.at(-1);
-    if (distance(position, finish) < 0.2 && Math.abs(height - finish[2]) < 0.12) { this.next(time); return [0, 0, 0]; }
-    if (Math.abs(position[0] - STAIRS.center_x) > 0.55) {
+    if (distance(position, finish) < 0.2 && Math.abs(height - finish[2]) < 0.2) { this.next(time); return [0, 0, 0]; }
+    if (on_stairs(position) && Math.abs(position[0] - STAIRS.center_x) > 0.75) {
       this.fail('The robot left the stair route. Reset or choose another destination.'); return [0, 0, 0];
     }
-    while (this.waypoint < path.length - 1 && distance(position, path[this.waypoint]) < 0.25 &&
-           Math.abs(height - path[this.waypoint][2]) < 0.12) this.waypoint++;
+    const direction = Math.sign(finish[1] - path[0][1]);
+    if (!on_stairs(position) && distance(position, finish) < 1 && Math.abs(height - finish[2]) < 0.2) {
+      return steer(position, finish, heading, Math.min(this.speed, 0.3));
+    }
+    while (this.waypoint < path.length - 1 && (distance(position, path[this.waypoint]) < 0.25 ||
+           direction * (position[1] - path[this.waypoint][1]) > 0)) this.waypoint++;
     const remaining = Math.hypot(position[0] - path[this.waypoint][0], position[1] - path[this.waypoint][1], height - path[this.waypoint][2]) +
       path_length(path.slice(this.waypoint));
     this.state.remaining = remaining + this.segments.slice(this.index + 1).reduce((sum, next) => sum + (next.path ? path_length(next.path) : 0), 0);
@@ -169,6 +193,12 @@ export class Navigation {
     if (time - this.last_progress > 12) {
       this.fail('The current policy could not climb the stairs. Reset or choose another route.'); return [0, 0, 0];
     }
-    return steer(position, path[Math.min(this.waypoint + 2, path.length - 1)], heading, this.speed, 0.3);
+    // Keep a steady heading and cadence on treads; pelvis height varies within each step.
+    const desired_heading = direction * Math.PI / 2;
+    const error = Math.atan2(Math.sin(desired_heading - heading), Math.cos(desired_heading - heading));
+    const alignment = Math.max(0, Math.cos(error));
+    const pace = Math.min(this.speed, 0.6, distance(position, finish) * 0.9);
+    return [pace * (on_stairs(position) ? 1 : alignment * alignment), 0,
+      clamp(2 * error + 1.5 * direction * (position[0] - STAIRS.center_x), 0.5)];
   }
 }
