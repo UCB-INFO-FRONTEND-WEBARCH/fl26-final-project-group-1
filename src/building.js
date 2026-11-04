@@ -1,16 +1,16 @@
 // All dimensions are metres, in the same Z-up frame as MuJoCo.
-export const FLOOR_HEIGHT = 3.3;
-export const STANDING_HEIGHT = 0.793;
+export const FLOOR_HEIGHT = 2.64;
+export const STANDING_HEIGHT = 0.73;
 export const FLOOR_NAMES = ['Ground floor', 'Upper floor'];
-export const BUILDING_BOUNDS = [-12, 7, -6, 6];
+export const BUILDING_BOUNDS = [-12, 7, -7, 7];
 export const ELEVATOR = {
-  center: [-8.4, -4.2], landing: [-6.15, -4.2],
+  center: [-8.4, -2], landing: [-6.15, -2],
   size: [1.7, 1.7, 0.16], speed: 0.3,
-  opening: [-9.3, -7.5, -5.1, -3.3],
+  opening: [-9.3, -7.5, -2.9, -1.1],
 };
 export const STAIRS = {
-  opening: [-11.6, -9.8, -1.6, 3.8], steps: 20,
-  center_x: -10.7, lower_landing: [-10.7, -2.7], upper_landing: [-10.7, 4.6],
+  opening: [-11.8, -9.6, -5.4, 5.4], steps: 24,
+  center_x: -10.7, lower_landing: [-10.7, -6.1], upper_landing: [-10.7, 6.1],
 };
 
 export function on_stairs(position, padding = 0) {
@@ -31,21 +31,21 @@ export const STAIR_BOXES = Array.from({ length: STAIRS.steps }, (_, index) => {
   const height = (index + 1) * FLOOR_HEIGHT / STAIRS.steps;
   const tread = (STAIRS.opening[3] - STAIRS.opening[2]) / STAIRS.steps;
   return { name: `stair_${index}`, center: [STAIRS.center_x, STAIRS.opening[2] + (index + 0.5) * tread, height / 2],
-    size: [1.8, tread, height] };
+    size: [STAIRS.opening[1] - STAIRS.opening[0], tread, height] };
 });
 export const STAIR_PATH = [[...STAIRS.lower_landing, 0],
   ...STAIR_BOXES.map(box => [box.center[0], box.center[1], box.size[2]]),
   [...STAIRS.upper_landing, FLOOR_HEIGHT]];
-export const STAIR_RAIL_BOXES = STAIR_BOXES.flatMap((box, index) => [-0.94, 0.94].flatMap((offset, side) => [
+export const STAIR_RAIL_BOXES = STAIR_BOXES.flatMap((box, index) => [-1.14, 1.14].flatMap((offset, side) => [
   { name: `stair_rail_${index}_${side}`, center: [box.center[0] + offset, box.center[1], box.size[2] + 0.85], size: [0.06, box.size[1], 0.06] },
-  ...([0, 5, 10, 15, 19].includes(index) ? [{ name: `stair_post_${index}_${side}`,
+  ...((index % 5 === 0 || index === STAIRS.steps - 1) ? [{ name: `stair_post_${index}_${side}`,
     center: [box.center[0] + offset, box.center[1], box.size[2] + 0.425], size: [0.06, 0.06, 0.85] }] : []),
 ]));
 
 export const SHAFT_BOXES = [
-  { name: 'shaft_back', center: [-9.4, -4.2, 2.65], size: [0.12, 2.12, 5.3] },
-  { name: 'shaft_south', center: [-8.4, -5.2, 2.65], size: [2.12, 0.12, 5.3] },
-  { name: 'shaft_north', center: [-8.4, -3.2, 2.65], size: [2.12, 0.12, 5.3] },
+  { name: 'shaft_back', center: [-9.4, -2, 2.65], size: [0.12, 2.12, 5.3] },
+  { name: 'shaft_south', center: [-8.4, -3, 2.65], size: [2.12, 0.12, 5.3] },
+  { name: 'shaft_north', center: [-8.4, -1, 2.65], size: [2.12, 0.12, 5.3] },
 ];
 
 // Split the upper slab around real openings, rather than drawing holes over a solid floor.
@@ -73,5 +73,5 @@ export const LIFT_RAILS = [
 ];
 
 export function box_xml(box, prefix = '') {
-  return `<geom name="${prefix}${box.name || 'slab'}" type="box" pos="${box.center.join(' ')}" size="${box.size.map(value => value / 2).join(' ')}" group="3"/>`;
+  return `<geom name="${prefix}${box.name || 'slab'}" type="box" pos="${box.center.join(' ')}" size="${box.size.map(value => value / 2).join(' ')}" group="0"/>`;
 }

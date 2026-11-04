@@ -14,14 +14,14 @@ holds the destination after arrival; **Clear route** releases this hold.
 
 ## Planner
 
-The building has two floors, 3.3 metres apart, joined by physical stairs and an
+The building has two floors, 2.64 metres apart, joined by physical stairs and an
 actuated elevator. Navigation has two levels:
 
 1. Theta* searches a 10 cm occupancy grid on each floor. Walls and the projections
-   of the actual furniture collision hulls are inflated by a 42 cm robot radius,
+   of the actual furniture collision hulls are inflated by a 52 cm planning radius,
    plus half a cell diagonal. Line-of-sight checks cover every crossed cell and
    reject diagonal corner cutting. Clicked points are not snapped through walls.
-   Following allows 12 cm of tracking error within that planning reserve, while
+   Following allows 22 cm of tracking error within that planning reserve, while
    still checking a conservative 30 cm body footprint against obstacles.
 2. Cross-floor routes use the selected connector. Elevator routes walk to the
    landing, call and wait, board, ride, exit, and walk to the destination. Stair
@@ -33,12 +33,15 @@ Planning runs in the physics worker. The map is built once at startup; rendering
 does not run searches. The follower runs at the walking policy's 50 Hz control
 rate and sends robot-frame forward, lateral, and yaw velocity commands. It never
 sets the robot's position or joint angles. Automatic walking is capped at 0.6 m/s.
-Routes stop if the robot leaves its safe corridor or makes no progress.
+When a segment becomes obstructed but the robot still has planning clearance,
+the follower can replan from its current position up to four times. It turns
+before advancing through a sharp heading change. Routes stop if no safe recovery
+exists or the robot makes no progress.
 
 The elevator has a gravity-compensated slide joint and a separate position servo.
 Travel is limited to 0.3 m/s with gradual acceleration. Landing gates close when
 the deck is absent, and a cabin rail closes during travel. Manual movement is
-interlocked while riding. Canceling a route during travel leaves the lift running
+interlocked while riding; velocity feedback holds the cabin centre and turns the robot toward the exit. Canceling a route during travel leaves the lift running
 to its landing. Pausing freezes the entire physics simulation.
 
 The deck and rail geometry collide with the robot. The lift body's contact with
@@ -50,14 +53,14 @@ clear lower and upper stair landings.
 
 ## Stairs and policy capability
 
-The stairs have solid risers and collision geometry. The current official G1
-checkpoint was deployed for flat-floor walking and has not been validated for
-stairs. Stair mode is nevertheless enabled: it sends walking commands along the
-step path at up to 0.3 m/s. It may stall or fall. Reset with R to try again.
+The stairs have 24 solid box treads, each 11 cm high, 45 cm deep, and 2.2 m wide.
+The S3 Lite Pro policy uses head depth and body history for perceptive walking.
+Stair mode follows the step path at up to 0.6 m/s with a steady heading and cadence.
+It may stall or fall. Reset with R to try again.
 Arrival requires reaching both the horizontal target and its actual step height;
 fall detection and camera tracking use the stair surface height.
 There is no scripted climbing animation, pose correction, or robot teleportation.
-Successful stair traversal will need a suitable policy and validation.
+See [policy integration](POLICY.md) for the pinned checkpoint and sensor/motor contract.
 
 ## Algorithm choices
 
@@ -89,6 +92,6 @@ paths exclude the stairwell; explicit stair segments handle it.
 `npm run test:simulation` exercises the
 real MuJoCo model and learned policy: same-floor routes through doorways and
 around furniture, lift travel in both directions, and holding after arrival.
-It also verifies reaching the stair entry without obstruction and making a real
-stair contact. The stair attempt is allowed to fail with the current policy.
+It also checks reaching the stair entry and completing physical ascent and descent,
+including a route from the apartment spawn to the upper landing.
 Manual locomotion, collision, pause/reset, and fall checks remain in place.

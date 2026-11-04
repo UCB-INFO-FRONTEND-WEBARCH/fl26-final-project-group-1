@@ -3,8 +3,18 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
+test('bundled model, policy, and reference files retain their recorded hashes', async () => {
+  const base = new URL('../public/assets/lite_pro/', import.meta.url);
+  const source = JSON.parse(await readFile(new URL('manifest.json', base), 'utf8'));
+  for (const file of source.files) {
+    const bytes = await readFile(new URL(file.file, base));
+    assert.equal(bytes.byteLength, file.bytes, file.file);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256, file.file);
+  }
+});
+
 test('render LOD stays within its size budget and contains valid indexed geometry', async () => {
-  const base = new URL('../public/assets/g1/', import.meta.url);
+  const base = new URL('../public/assets/lite_pro/', import.meta.url);
   const manifest = JSON.parse(await readFile(new URL('visuals.json', base), 'utf8'));
   const source = JSON.parse(await readFile(new URL('manifest.json', base), 'utf8'));
   const binary = await readFile(new URL('visuals.bin', base));

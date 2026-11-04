@@ -1,26 +1,26 @@
 # Third-party assets and libraries
 
-## Unitree G1 model and locomotion policy
+## Berkeley Lite Pro model and S3 policy
 
-Source: [Unitree Robotics — unitree_rl_gym](https://github.com/unitreerobotics/unitree_rl_gym)
-at commit `276801e46c5d433564f24658bac64f254b7d2d4b`.
-License: BSD-3-Clause. The full upstream license text is at `public/assets/g1/LICENSE`.
+Source: [Berkeley Humanoids — InstinctMJ](https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516),
+commit `07396764422e274e4316719f9dfb1fd734e9a516`, and the published
+[Lite Pro Motion Tracking artifact](https://claude.ai/artifact/8nh5Z94mUcC7iCdg3cDGpo),
+section 3.10. The checkpoint is the S3 goal-mode Mix run at iteration 20,000.
 
-- `g1_12dof.xml` and `meshes/*.STL` contain unchanged copies from
-  `resources/robots/g1_description/`.
-- `motion.pt` contains an unchanged copy of `deploy/pre_train/g1/motion.pt`.
-- `reference/g1.yaml` and `reference/deploy_mujoco.py` contain unchanged upstream files.
-- `policy.onnx` is a derived export using unchanged network weights, with explicit
-  LSTM hidden/cell inputs and outputs. See `scripts/export_policy.py` and
-  `public/assets/g1/contract.json` for the transformation and parity evidence.
-- `src/locomotion.js`, `src/simulation.js`, and `src/simulation.worker.js`
-  adapt the official deployment observation layout, timing, and PD controller.
-  The official robot XML remains unchanged. The application defines the apartment separately.
-- `visuals.bin` and `visuals.json` contain meshes for rendering.
-  Meshoptimizer simplifies the official meshes offline in MuJoCo's compiled mesh frame.
-  The simplification targets 4 mm geometric error and reduces 503,229 to 25,142
-  triangles. The original files remain the source of the physics model.
-- `public/assets/g1/manifest.json` records the source hashes.
+- `public/assets/lite_pro/policy.onnx` is the unchanged velocity-mode export.
+  `constants.json` retains the matching joint, camera, normalization-layout, and motor settings.
+- `src/lite_pro_policy.js` adapts the upstream browser controller, under
+  CC BY-NC 4.0. The full license is in `public/assets/lite_pro/LICENSE`.
+  The unchanged reference implementation is in `public/assets/lite_pro/reference/core.js`.
+- Lite Pro MJCF and meshes originate from
+  [lite_description](https://github.com/berkeley-humanoids/lite_description),
+  under MIT; its full license is in `public/assets/lite_pro/ROBOT_LICENSE`.
+  The imported browser model preserves the trained joint configuration and contacts.
+  `robot.xml` removes the demo's terrain, origin markers, and lighting; the app supplies its own scene.
+- `scripts/import_lite_pro.py` checks the source hashes, unpacks the original browser
+  meshes, and generates `src/policy_constants.js`. The asset manifest records file hashes.
+- `visuals.bin` and `visuals.json` are derived render meshes, simplified offline with
+  meshoptimizer at a 4 mm error target. The camera and physics use the imported meshes.
 
 ## Runtime libraries
 

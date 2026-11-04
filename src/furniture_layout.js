@@ -1,3 +1,5 @@
+import { FLOOR_HEIGHT } from './building.js';
+
 // Metres, Z up. Each position is the horizontal model centre at its lowest surface.
 export const SCENE_FURNITURE = [
   { name: 'sofa', article: '39440593', position: [-4.4, 3.6, 0], yaw: 0 },
@@ -14,9 +16,9 @@ export const SCENE_FURNITURE = [
   { name: 'bookshelf_north', article: '20522046', position: [6.69, 4.93, 0], yaw: -Math.PI / 2 },
   { name: 'cooktop', article: '10493520', position: [3.0, -5.5, 0.9148], yaw: Math.PI },
   { name: 'monitor_stand', article: '50474770', position: [4.2, 5.42, 0.7525], yaw: 0 },
-  { name: 'upper_sofa', article: '39440593', position: [-4.4, 3.6, 3.3], yaw: 0 },
-  { name: 'upper_table', article: '00104291', position: [-4.2, 1.35, 3.3], yaw: 0 },
-  { name: 'upper_desk', article: '90214308', position: [4.2, 5.35, 3.3], yaw: 0 },
-  { name: 'upper_chair', article: '30521862', position: [4.2, 4.15, 3.3], yaw: Math.PI },
-  { name: 'upper_bookshelf', article: '20522046', position: [6.69, 4.12, 3.3], yaw: -Math.PI / 2 },
+  { name: 'upper_sofa', article: '39440593', position: [-4.4, 3.6, FLOOR_HEIGHT], yaw: 0 },
+  { name: 'upper_table', article: '00104291', position: [-4.2, 1.35, FLOOR_HEIGHT], yaw: 0 },
+  { name: 'upper_desk', article: '90214308', position: [4.2, 5.35, FLOOR_HEIGHT], yaw: 0 },
+  { name: 'upper_chair', article: '30521862', position: [4.2, 4.15, FLOOR_HEIGHT], yaw: Math.PI },
+  { name: 'upper_bookshelf', article: '20522046', position: [6.69, 4.12, FLOOR_HEIGHT], yaw: -Math.PI / 2 },
 ];

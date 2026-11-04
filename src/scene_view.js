@@ -46,7 +46,7 @@ export class SceneView {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D apartment with Unitree G1 robot');
+    this.renderer.domElement.setAttribute('aria-label', 'Interactive 3D apartment with Berkeley Lite Pro robot');
     this.renderer.domElement.setAttribute('tabindex', '0');
     container.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(44, 1, 0.05, 100);
@@ -130,7 +130,7 @@ export class SceneView {
     for (let floor = 0; floor < 2; floor++) {
       const z = floor * FLOOR_HEIGHT;
       const group = this.floor_groups[floor];
-      const slabs = floor ? upper_slabs() : [{ center: [-2.5, 0, -0.08], size: [19, 12, 0.16] }];
+      const slabs = floor ? upper_slabs() : [{ center: [-2.5, 0, -0.08], size: [19, 14, 0.16] }];
       const surface = boxes_mesh(slabs, new THREE.MeshLambertMaterial({ color: floor ? '#e8e7e5' : '#eeeff1' }));
       surface.userData.floor = floor;
       group.add(surface);
@@ -141,8 +141,8 @@ export class SceneView {
       });
       group.add(boxes_mesh(walls, new THREE.MeshLambertMaterial({ color: '#c7c9ce' })));
       const grid = [];
-      for (let x = BUILDING_BOUNDS[0]; x <= BUILDING_BOUNDS[1]; x++) grid.push(x, -6, z + 0.008, x, 6, z + 0.008);
-      for (let y = -6; y <= 6; y++) grid.push(BUILDING_BOUNDS[0], y, z + 0.008, BUILDING_BOUNDS[1], y, z + 0.008);
+      for (let x = BUILDING_BOUNDS[0]; x <= BUILDING_BOUNDS[1]; x++) grid.push(x, BUILDING_BOUNDS[2], z + 0.008, x, BUILDING_BOUNDS[3], z + 0.008);
+      for (let y = BUILDING_BOUNDS[2]; y <= BUILDING_BOUNDS[3]; y++) grid.push(BUILDING_BOUNDS[0], y, z + 0.008, BUILDING_BOUNDS[1], y, z + 0.008);
       group.add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(grid, 3)),
         new THREE.LineBasicMaterial({ color: '#9a9da7', transparent: true, opacity: 0.14 })));
       for (const room of ROOM_LABELS) {
@@ -151,10 +151,10 @@ export class SceneView {
         group.add(label);
       }
       const lift_label = floor_label('ELEVATOR', 1.45, '#0071e3');
-      lift_label.position.set(-6, -4.8, z + 0.02);
+      lift_label.position.set(-6, ELEVATOR.center[1] - 0.6, z + 0.02);
       group.add(lift_label);
       const stair_label = floor_label(floor ? 'STAIRS DOWN' : 'STAIRS UP', 1.65, '#8b7651');
-      stair_label.position.set(STAIRS.center_x, floor ? 5.05 : -3.15, z + 0.02);
+      stair_label.position.set(STAIRS.center_x, floor ? 6.45 : -6.45, z + 0.02);
       group.add(stair_label);
       const contact = SCENE_FURNITURE.filter(item => Math.floor((item.position[2] + 0.01) / FLOOR_HEIGHT) === floor).map(item => {
         const [width, depth] = FURNITURE_ASSETS[item.article].size;
@@ -182,7 +182,7 @@ export class SceneView {
     }
     this.scene.add(this.lift_group);
     this.lift_gates = [0, 1].map(floor => {
-      const gate = new THREE.Mesh(box_geometry([-7.48, -4.2, floor * FLOOR_HEIGHT + 0.8], [0.1, 1.72, 1.6]),
+      const gate = new THREE.Mesh(box_geometry([-7.48, ELEVATOR.center[1], floor * FLOOR_HEIGHT + 0.8], [0.1, 1.72, 1.6]),
         new THREE.MeshLambertMaterial({ color: '#8aafcf', transparent: true, opacity: 0.3, depthWrite: false }));
       this.floor_groups[floor].add(gate);
       return gate;

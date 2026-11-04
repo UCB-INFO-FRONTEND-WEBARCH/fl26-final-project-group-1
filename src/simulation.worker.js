@@ -9,7 +9,7 @@ import { load_robot_files, robot_geometry } from './robot_assets.js';
 import { Simulation } from './simulation.js';
 import { make_navigation_maps } from './path_planner.js';
 
-const ASSET_BASE = `${import.meta.env.BASE_URL}assets/g1/`;
+const ASSET_BASE = `${import.meta.env.BASE_URL}assets/lite_pro/`;
 const FRAME_INTERVAL_MS = PHYSICS_DT * CONTROL_DECIMATION * 1000;
 let simulation;
 let rendered_ids = [];
@@ -38,8 +38,8 @@ async function fetch_file(path) {
 function send_frame() {
   // One pending pose prevents stale frames from accumulating on a slow renderer.
   if (frame_in_flight) return;
-  const { mujoco, model, state } = simulation;
-  mujoco.mj_kinematics(model, state);
+  // Read the transforms from the physics step without changing camera observation state.
+  const { state } = simulation;
   const transforms = recycled_buffer
     ? new Float32Array(recycled_buffer)
     : new Float32Array(rendered_ids.length * 12);
@@ -115,10 +115,10 @@ async function pump() {
 async function initialize() {
   report_loading('Starting MuJoCo physics');
   const mujoco = await load_mujoco({ locateFile: () => mujoco_wasm_url });
-  report_loading('Loading official Unitree G1 meshes');
+  report_loading('Loading Berkeley Lite Pro model');
   await load_robot_files(mujoco, fetch_file);
-  mujoco.FS.writeFile('/g1/apartment.xml', make_scene_xml());
-  const model = mujoco.MjModel.from_xml_path('/g1/apartment.xml');
+  mujoco.FS.writeFile('/robot/apartment.xml', make_scene_xml());
+  const model = mujoco.MjModel.from_xml_path('/robot/apartment.xml');
 
   report_loading('Loading pretrained walking policy');
   ort.env.wasm.numThreads = 1;
@@ -132,7 +132,7 @@ async function initialize() {
   simulation = new Simulation(mujoco, model, session, make_navigation_maps());
   simulation.paused = true;
 
-  report_loading('Preparing optimized G1 visuals');
+  report_loading('Preparing optimized Lite Pro visuals');
   const [visual_json, visual_bytes] = await Promise.all([
     fetch_file('visuals.json'),
     fetch_file('visuals.bin'),

@@ -69,7 +69,7 @@ class MinHeap {
 }
 
 export class NavigationMap {
-  constructor(polygons, bounds = BUILDING_BOUNDS, resolution = 0.1, radius = 0.42) {
+  constructor(polygons, bounds = BUILDING_BOUNDS, resolution = 0.1, radius = 0.42, tracking_radius = Math.max(0, radius - 0.12)) {
     this.bounds = bounds;
     this.resolution = resolution;
     this.width = Math.ceil((bounds[1] - bounds[0]) / resolution);
@@ -77,7 +77,7 @@ export class NavigationMap {
     this.blocked = new Uint8Array(this.width * this.height);
     this.tracking_blocked = new Uint8Array(this.blocked.length);
     const margin = radius + resolution * Math.SQRT1_2;
-    const tracking_margin = Math.max(0, radius - 0.12) + resolution * Math.SQRT1_2;
+    const tracking_margin = tracking_radius + resolution * Math.SQRT1_2;
     for (let index = 0; index < this.blocked.length; index++) {
       const [x, y] = this.point(index);
       if (Math.min(x - bounds[0], bounds[1] - x, y - bounds[2], bounds[3] - y) < margin) this.blocked[index] = 1;
@@ -220,6 +220,7 @@ export function make_navigation_maps() {
           item.position[1] + sine * point[0] + cosine * point[1]])));
       }
     }
-    return new NavigationMap(polygons);
+    // Lite Pro needs more tracking reserve than the previous G1 controller.
+    return new NavigationMap(polygons, BUILDING_BOUNDS, 0.1, 0.52, 0.3);
   });
 }

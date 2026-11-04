@@ -1,0 +1,17 @@
+{
+  "source": "https://github.com/berkeley-humanoids/instinctmj",
+  "commit": "07396764422e274e4316719f9dfb1fd734e9a516",
+  "artifact": "https://claude.ai/artifact/8nh5Z94mUcC7iCdg3cDGpo",
+  "asset_base": "https://3f1123b8-917d-4021-97d5-7e93a5cd0100.frame.claudeusercontent.com/_f/1793787187-3873/demo/",
+  "checkpoint": "S3 goal-mode mix run, iteration 20,000",
+  "license": "CC-BY-NC-4.0",
+  "robot_license": "MIT",
+  "observation_size": 2798,
+  "action_size": 34,
+  "physics_dt": 0.005,
+  "control_decimation": 4,
+  "sha256": "f0ff3ef686b6fae8690ffc5a9a8003c8e45c74830c2287fd90f25258563c7a28",
+  "constants_sha256": "c8f0363249b7c80f5cbcc77eeeab7dc5786a0409c85cf69c15d32ef686a396b1",
+  "source_scene_sha256": "fd319455c187b8840e42c7385e1d989d9ccb65e67877b42d16808ce218ce87eb",
+  "export": "Unchanged upstream velocity-mode ONNX, including normalizer, goal mask, depth encoder, and actor"
+}

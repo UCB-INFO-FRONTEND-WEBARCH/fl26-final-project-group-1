@@ -8,15 +8,19 @@ import { PHYSICS_DT, CONTROL_DECIMATION, DEFAULT_ANGLES } from '../src/locomotio
 import { load_robot_files } from '../src/robot_assets.js';
 import { Simulation } from '../src/simulation.js';
 import { make_navigation_maps } from '../src/path_planner.js';
-import { FLOOR_HEIGHT, STAIRS, floor_of } from '../src/building.js';
+import { FLOOR_HEIGHT, STANDING_HEIGHT, STAIRS, ELEVATOR, floor_of, on_stairs, stair_height } from '../src/building.js';
 
-const asset_base = new URL('../public/assets/g1/', import.meta.url);
+function seeded_random(seed = 1) {
+  return () => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed / 4294967296; };
+}
+
+const asset_base = new URL('../public/assets/lite_pro/', import.meta.url);
 const mujoco = await load_mujoco({
   locateFile: () => fileURLToPath(new URL('../node_modules/@mujoco/mujoco/mujoco.wasm', import.meta.url)),
 });
 await load_robot_files(mujoco, (path) => readFile(new URL(path, asset_base)));
-mujoco.FS.writeFile('/g1/apartment.xml', make_scene_xml());
-const model = mujoco.MjModel.from_xml_path('/g1/apartment.xml');
+mujoco.FS.writeFile('/robot/apartment.xml', make_scene_xml());
+const model = mujoco.MjModel.from_xml_path('/robot/apartment.xml');
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.wasmPaths = {
   wasm: new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm', import.meta.url).href,
@@ -28,7 +32,7 @@ const session = await ort.InferenceSession.create(
 );
 
 async function simulate(command, seconds, start = SPAWN) {
-  const simulation = new Simulation(mujoco, model, session);
+  const simulation = new Simulation(mujoco, model, session, null, seeded_random());
   simulation.reset(start);
   simulation.command = command;
   let min_height = 10;
@@ -59,29 +63,29 @@ async function simulate(command, seconds, start = SPAWN) {
 const results = {};
 for (const [name, command, duration] of [
   ['idle', [0, 0, 0], 20],
-  ['forward', [0.5, 0, 0], 9],
-  ['backward', [-0.5, 0, 0], 2],
+  ['forward', [0.6, 0, 0], 9],
+  ['backward', [-0.4, 0, 0], 2],
   ['turn', [0, 0, 0.7], 12],
-  ['strafe', [0, 0.35, 0], 6],
+  ['strafe', [0, 0.3, 0], 6],
 ]) {
   console.log(`Checking physics: ${name}`);
   const result = await simulate(command, duration);
-  assert.ok(result.min_height > 0.7, `${name}: robot lost balance`);
+  assert.ok(!result.fallen && result.min_height > 0.55, `${name}: robot lost balance`);
   results[name] = result;
 }
 assert.ok(results.forward.position[0] > -1);
 assert.ok(results.backward.position[0] < -5.2);
 assert.ok(results.strafe.position[1] > -2.2);
 assert.ok(Math.abs(results.turn.heading) > 0.5);
-results.doorway = await simulate([0.5, 0, 0], 8, [-0.7, 0.2, 0.793]);
+results.doorway = await simulate([0.5, 0, 0], 8, [-0.7, 0.2, STANDING_HEIGHT]);
 assert.ok(
-  results.doorway.position[0] > 2.2 && results.doorway.min_height > 0.7,
+  results.doorway.position[0] > 2.2 && results.doorway.min_height > 0.55,
   'Cannot walk through doorway',
 );
-results.wall_collision = await simulate([0.5, 0, 0], 10, [-0.7, -3.4, 0.793]);
+results.wall_collision = await simulate([0.5, 0, 0], 10, [-0.7, -3.4, STANDING_HEIGHT]);
 assert.ok(results.wall_collision.obstacle_contact, 'Partition did not produce a collision');
 assert.ok(results.wall_collision.position[0] < 1.6, 'Robot passed through a wall');
-results.furniture_collision = await simulate([0.5, 0, 0], 6, [-6.3, 1.35, 0.793]);
+results.furniture_collision = await simulate([0.5, 0, 0], 6, [-6.3, 1.35, STANDING_HEIGHT]);
 assert.ok(results.furniture_collision.contact_names.some((name) => name.startsWith('coffee_table_collision_')),
   'IKEA coffee table did not produce robot contacts');
 assert.ok(results.furniture_collision.position[0] < -3.5, 'Robot passed through the coffee table');
@@ -100,7 +104,7 @@ function furniture_ray(name, point, direction) {
   const origin = [item.position[0] + cosine * point[0] - sine * point[1],
     item.position[1] + sine * point[0] + cosine * point[1], item.position[2] + point[2]];
   const vector = [cosine * direction[0] - sine * direction[1], sine * direction[0] + cosine * direction[1], direction[2]];
-  return mujoco.mj_ray(model, ray_state, origin, vector, [0, 0, 0, 1, 0, 0], true, -1,
+  return mujoco.mj_ray(model, ray_state, origin, vector, [1, 0, 0, 0, 0, 0], true, -1,
     new Int32Array(1), new Float64Array(3));
 }
 const tabletop = furniture_ray('coffee_table', [0, 0, 1], [0, 0, -1]);
@@ -116,7 +120,7 @@ assert.ok(desk_opening < 0 || desk_opening > 0.9, 'Desk knee space is blocked');
 ray_state.delete();
 
 const table = SCENE_FURNITURE.find((item) => item.name === 'coffee_table');
-const probe_xml = make_scene_xml().replace('<include file="g1_12dof.xml"/>', '<compiler angle="radian"/>')
+const probe_xml = make_scene_xml().replace('<include file="robot.xml"/>', '<compiler angle="radian"/>')
   .replace('<worldbody>', `<worldbody><body name="probe" pos="${table.position[0]} ${table.position[1]} 0.9"><freejoint/><geom type="sphere" size="0.05" mass="1"/></body>`);
 const probe_model = mujoco.MjModel.from_xml_string(probe_xml);
 const probe_state = new mujoco.MjData(probe_model);
@@ -126,10 +130,11 @@ assert.ok(Math.abs(probe_state.qpos[2] - (FURNITURE_ASSETS[table.article].size[2
 probe_state.delete();
 probe_model.delete();
 
-const simulation = new Simulation(mujoco, model, session);
+const simulation = new Simulation(mujoco, model, session, null, seeded_random());
 simulation.command = [0.5, 0, 0];
 await simulation.advance(100);
-assert.ok(simulation.hidden.data.some((value) => value !== 0));
+assert.ok(simulation.policy.hist);
+assert.ok(simulation.action.some(value => value !== 0));
 simulation.paused = true;
 const pose = simulation.state.qpos.slice();
 assert.equal(await simulation.advance(10), 0);
@@ -140,11 +145,12 @@ simulation.reset();
 assert.deepEqual(simulation.command, [0.3, 0, 0]);
 assert.equal(simulation.step_count, 0);
 assert.equal(simulation.distance, 0);
-assert.ok(simulation.hidden.data.every((value) => value === 0));
-assert.ok(simulation.cell.data.every((value) => value === 0));
-assert.deepEqual(Array.from(simulation.state.qpos.slice(7, 19)), DEFAULT_ANGLES);
+assert.equal(simulation.policy.hist, null);
+assert.ok(simulation.action.every(value => value === 0));
+assert.deepEqual(Array.from(simulation.state.qpos.slice(7, 41)), DEFAULT_ANGLES);
 assert.equal(simulation.paused, false);
 simulation.state.qpos[2] = 0.3;
+simulation.state.qpos.set([0, 1, 0, 0], 3);
 await simulation.advance(10);
 assert.equal(simulation.fallen, true);
 assert.deepEqual(simulation.command, [0, 0, 0]);
@@ -164,9 +170,10 @@ assert.ok(invalid.action.every(Number.isFinite));
 invalid.dispose();
 
 const navigation_maps = make_navigation_maps();
-async function navigate(goal, start = SPAWN, limit = 100) {
-  const robot = new Simulation(mujoco, model, session, navigation_maps);
-  robot.reset(start);
+async function navigate(goal, { start = SPAWN, limit = 100, transfer = 'elevator', yaw = 0 } = {}) {
+  const robot = new Simulation(mujoco, model, session, navigation_maps, seeded_random());
+  robot.reset(start, yaw);
+  robot.navigation.transfer = transfer;
   robot.navigation.set_goal(robot.state.qpos, goal, 0);
   let min_height = Infinity;
   let previous = robot.state.qpos.slice(0, 3);
@@ -176,7 +183,7 @@ async function navigate(goal, start = SPAWN, limit = 100) {
   while (['walking', 'waiting', 'riding'].includes(robot.navigation.state.status) && robot.step_count * PHYSICS_DT < limit) {
     await robot.advance(CONTROL_DECIMATION);
     const position = robot.state.qpos;
-    const surface = robot.elevator.occupied(position) ? robot.elevator.height : floor_of(position) * FLOOR_HEIGHT;
+    const surface = robot.elevator.occupied(position) ? robot.elevator.height : on_stairs(position) ? stair_height(position) : floor_of(position) * FLOOR_HEIGHT;
     min_height = Math.min(min_height, position[2] - surface);
     assert.ok(Math.hypot(...previous.map((value, axis) => position[axis] - value)) < 0.04, 'Navigation moved the robot discontinuously');
     previous = position.slice(0, 3);
@@ -184,7 +191,7 @@ async function navigate(goal, start = SPAWN, limit = 100) {
       const contact = robot.state.contact.get(index);
       for (const id of [contact.geom1, contact.geom2]) {
         const name = mujoco.mj_id2name(model, 5, id);
-        if (name && (name.includes('_collision_') || /wall|partition|annex_|stair_/.test(name))) obstacle_contacts.add(name);
+        if (name && !name.startsWith('robot/') && (name.includes('_collision_') || /wall|partition|annex_/.test(name) || (transfer !== 'stairs' && name.startsWith('stair_')))) obstacle_contacts.add(name);
       }
       contact.delete();
     }
@@ -213,18 +220,18 @@ async function navigate(goal, start = SPAWN, limit = 100) {
   assert.equal(obstacle_contacts.size, 0, `Navigation hit obstacles: ${[...obstacle_contacts].join(', ')}`);
   assert.equal(result.floor, goal[2]);
   assert.ok(Math.hypot(result.position[0] - goal[0], result.position[1] - goal[1]) < 0.35);
-  assert.ok(min_height > 0.65, `Navigation lost balance: ${min_height}`);
+  assert.ok(min_height > (transfer === 'stairs' ? 0.45 : 0.6), `Navigation lost balance: ${min_height}`);
   console.log(`PASS navigation to ${goal}: ${result.time.toFixed(1)} simulated seconds, minimum height ${min_height.toFixed(3)} m`);
 }
 await navigate([3, 0, 0]);
 await navigate([...STAIRS.lower_landing, 0]);
 await navigate([-4.7, 5.1, 0]);
 await navigate([-4.7, -3.4, 1]);
-await navigate([-4.7, -3.4, 0], [-4.7, -3.4, FLOOR_HEIGHT + SPAWN[2]]);
-await navigate([3.5, 3, 1], [3, 0, FLOOR_HEIGHT + SPAWN[2]]);
+await navigate([-4.7, -3.4, 0], { start: [-4.7, -3.4, FLOOR_HEIGHT + SPAWN[2]] });
+await navigate([3.5, 3, 1], { start: [3, 0, FLOOR_HEIGHT + SPAWN[2]] });
 
-const rider = new Simulation(mujoco, model, session);
-rider.reset([-8.4, -4.2, SPAWN[2]]);
+const rider = new Simulation(mujoco, model, session, null, seeded_random());
+rider.reset([...ELEVATOR.center, SPAWN[2]]);
 rider.elevator.request(1);
 rider.command = [0.5, 0, 0];
 await rider.advance(Math.round(22 / PHYSICS_DT));
@@ -234,25 +241,14 @@ assert.ok(rider.state.qpos[2] > FLOOR_HEIGHT + 0.7, 'The lift did not physically
 assert.deepEqual(rider.command, [0, 0, 0], 'Manual motion bypassed the riding interlock');
 rider.dispose();
 
-const climber = new Simulation(mujoco, model, session, navigation_maps);
-climber.navigation.transfer = 'stairs';
-climber.navigation.set_goal(climber.state.qpos, [...STAIRS.upper_landing, 1], 0);
-let attempted_stairs = false;
-let touched_stairs = false;
-for (let tick = 0; tick < 3500 && !climber.fallen && climber.navigation.state.status === 'walking'; tick++) {
-  await climber.advance(CONTROL_DECIMATION);
-  attempted_stairs ||= climber.navigation.state.message.includes('Attempting stairs');
-  for (let index = 0; index < climber.state.ncon; index++) {
-    const contact = climber.state.contact.get(index);
-    touched_stairs ||= [contact.geom1, contact.geom2].some(id => mujoco.mj_id2name(model, 5, id)?.startsWith('stair_'));
-    contact.delete();
-  }
-}
-assert.ok(attempted_stairs, 'The stair route never reached the stair entry');
-assert.ok(touched_stairs, 'The current policy was not allowed to attempt a physical stair');
-console.log(`Stair attempt: fallen=${climber.fallen}, status=${climber.navigation.state.status}, position=${climber.telemetry().position.map(value => value.toFixed(2))}`);
-climber.dispose();
+await navigate([...STAIRS.upper_landing, 1], {
+  start: [...STAIRS.lower_landing, STANDING_HEIGHT], yaw: Math.PI / 2, transfer: 'stairs',
+});
+await navigate([...STAIRS.lower_landing, 0], {
+  start: [...STAIRS.upper_landing, FLOOR_HEIGHT + STANDING_HEIGHT], yaw: -Math.PI / 2, transfer: 'stairs',
+});
+await navigate([...STAIRS.upper_landing, 1], { transfer: 'stairs' });
 
 await session.release();
 model.delete();
-console.log('PASS: 8 manual physics scenarios, 6 navigation routes including the stair entry and elevator trips both ways, a physical stair attempt, collision probes, pause/reset, fall detection, and invalid-action rejection.');
+console.log('PASS: manual locomotion and collisions, 9 navigation routes including physical stair ascent/descent and elevator travel, arrival hold, pause/reset, and invalid-action rejection.');

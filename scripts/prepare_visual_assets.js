@@ -1,4 +1,4 @@
-// Offline render-only LOD. Physics continues to load the untouched official meshes.
+// Render-only LOD. Camera rays and physics keep the upstream Lite Pro meshes.
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -7,13 +7,13 @@ import { MeshoptSimplifier } from 'meshoptimizer';
 import { BufferAttribute, BufferGeometry } from 'three';
 import { load_robot_files } from '../src/robot_assets.js';
 
-const asset_base = new URL('../public/assets/g1/', import.meta.url);
+const asset_base = new URL('../public/assets/lite_pro/', import.meta.url);
 const mujoco = await load_mujoco({
   locateFile: () => fileURLToPath(new URL('../node_modules/@mujoco/mujoco/mujoco.wasm', import.meta.url)),
 });
 await MeshoptSimplifier.ready;
 const source_manifest = await load_robot_files(mujoco, (path) => readFile(new URL(path, asset_base)));
-const model = mujoco.MjModel.from_xml_path('/g1/g1_12dof.xml');
+const model = mujoco.MjModel.from_xml_path('/robot/robot.xml');
 const chunks = [];
 let byte_offset = 0;
 let original_triangles = 0;
@@ -37,7 +37,7 @@ for (let mesh_id = 0; mesh_id < model.nmesh; mesh_id++) {
   const faces = new Uint32Array(
     model.mesh_face.slice(face_start, face_start + model.mesh_facenum[mesh_id] * 3),
   );
-  const target_count = Math.max(240, Math.floor((faces.length * 0.05) / 3) * 3);
+  const target_count = Math.min(faces.length, Math.max(240, Math.floor((faces.length * 0.05) / 3) * 3));
   const [simplified, error] = MeshoptSimplifier.simplify(faces, positions, 3, target_count, 0.004, [
     'ErrorAbsolute',
     'Permissive',

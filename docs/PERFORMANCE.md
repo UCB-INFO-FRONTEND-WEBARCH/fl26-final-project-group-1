@@ -1,5 +1,9 @@
 # Browser performance
 
+These are historical measurements of the earlier Unitree G1 implementation. The
+active Lite Pro renderer uses 6,196 triangles (about 148 KiB); its depth sensor and
+physics retain the upstream model. New policy details are in [POLICY.md](POLICY.md).
+
 ## What was expensive
 
 The initial renderer used all 503,229 triangles from Unitree's original CAD/STL
