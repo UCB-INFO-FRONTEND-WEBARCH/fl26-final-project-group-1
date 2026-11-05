@@ -14,8 +14,10 @@ export function dispose_model(model) {
   const geometries = new Set();
   const materials = new Set();
   const textures = new Set();
+  const skeletons = new Set();
   model.traverse((object) => {
     if (object.geometry) geometries.add(object.geometry);
+    if (object.skeleton) skeletons.add(object.skeleton);
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
       if (!material) continue;
       materials.add(material);
@@ -24,6 +26,7 @@ export function dispose_model(model) {
   });
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();
+  for (const skeleton of skeletons) skeleton.dispose();
   for (const texture of textures) {
     texture.source?.data?.close?.();
     texture.dispose();

@@ -5,7 +5,7 @@ import ort_wasm_url from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
 import ort_module_url from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url';
 import { make_scene_xml } from './scene_layout.js';
 import { PHYSICS_DT, CONTROL_DECIMATION } from './locomotion.js';
-import { load_robot_files, robot_geometry } from './robot_assets.js';
+import { load_robot_files, robot_geometry, character_rig, write_robot_pose, ROBOT_POSE_SIZE } from './robot_assets.js';
 import { Simulation } from './simulation.js';
 import { make_navigation_maps } from './path_planner.js';
 
@@ -42,7 +42,7 @@ function send_frame() {
   const { state } = simulation;
   const transforms = recycled_buffer
     ? new Float32Array(recycled_buffer)
-    : new Float32Array(rendered_ids.length * 12);
+    : new Float32Array(rendered_ids.length * 12 + ROBOT_POSE_SIZE);
   recycled_buffer = null;
   const positions = state.geom_xpos;
   const rotations = state.geom_xmat;
@@ -51,6 +51,7 @@ function send_frame() {
     transforms.set(positions.subarray(id * 3, id * 3 + 3), index * 12);
     transforms.set(rotations.subarray(id * 9, id * 9 + 9), index * 12 + 3);
   }
+  write_robot_pose(transforms.subarray(rendered_ids.length * 12), state, simulation.policy.joint_qpos);
   self.postMessage(
     {
       type: 'frame',
@@ -140,7 +141,7 @@ async function initialize() {
   const manifest = JSON.parse(new TextDecoder().decode(visual_json));
   const geometries = robot_geometry(model, manifest, visual_bytes.buffer);
   rendered_ids = geometries.map((geometry) => geometry.id);
-  self.postMessage({ type: 'ready', geometries }, [visual_bytes.buffer]);
+  self.postMessage({ type: 'ready', geometries, character_rig: character_rig(mujoco, model, geometries) }, [visual_bytes.buffer]);
   last_wall_time = rate_wall_time = performance.now();
   send_frame();
   pump();
