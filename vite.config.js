@@ -7,6 +7,6 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@mujoco/mujoco', 'onnxruntime-web'] },
   build: {
     target: 'es2022',
-    rollupOptions: { input: ['index.html', 'catalog/index.html'] },
+    rollupOptions: { input: ['index.html', 'catalog/index.html', 'how-it-works/index.html'] },
   },
 });

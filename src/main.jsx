@@ -7,6 +7,7 @@ import { Icon } from './icons.jsx';
 import { SiteHeader } from './site_header.jsx';
 import { IDLE_NAVIGATION } from './navigation.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
+import { SITE_BASE } from './asset_paths.js';
 import './style.css';
 
 const INITIAL_TELEMETRY = {
@@ -129,7 +130,6 @@ function App() {
   const [render_quality, set_render_quality] = useState('performance');
   const [speed, set_speed] = useState(0.6);
   const [pressed, set_pressed] = useState(new Set());
-  const [show_info, set_show_info] = useState(false);
   const [viewed_floor, set_viewed_floor] = useState(0);
   const [transfer, set_transfer] = useState('elevator');
 
@@ -334,13 +334,6 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (show_info) {
-      release_keys();
-      if (ready_ref.current && !telemetry_ref.current.paused && !telemetry_ref.current.fallen) toggle_pause();
-    }
-  }, [show_info]);
-
   function control_key(code, down, event) {
     event.preventDefault();
     if (down) {
@@ -370,7 +363,6 @@ function App() {
   return (
     <div className="app-shell" id="top">
       <SiteHeader current="playground">
-        <button className="header-info" onClick={() => set_show_info(true)}>How it works</button>
         <div className={`live-status ${telemetry.paused || telemetry.fallen || error ? 'inactive' : ''}`}>
           <i />
           {status}
@@ -708,9 +700,9 @@ function App() {
               <span>→</span>
               <span>34 actions</span>
             </div>
-            <button className="text-button" onClick={() => set_show_info(true)}>
+            <a className="text-button" href={`${SITE_BASE}how-it-works/`}>
               How it works <span>↗</span>
-            </button>
+            </a>
           </div>
           <div className="runtime-meta">
             <span>
@@ -725,76 +717,6 @@ function App() {
           </div>
         </aside>
       </div>
-      {show_info && (
-        <div className="modal-backdrop" onClick={() => set_show_info(false)}>
-          <section
-            className="info-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="info-title"
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') set_show_info(false);
-              if (event.key === 'Tab') {
-                const controls = event.currentTarget.querySelectorAll('button, a[href]');
-                const first = controls[0];
-                const last = controls[controls.length - 1];
-                if (event.shiftKey && document.activeElement === first) {
-                  event.preventDefault();
-                  last.focus();
-                }
-                if (!event.shiftKey && document.activeElement === last) {
-                  event.preventDefault();
-                  first.focus();
-                }
-              }
-            }}
-          >
-            <button
-              className="icon-button modal-close"
-              onClick={() => set_show_info(false)}
-              aria-label="Close information"
-              autoFocus
-            >
-              <Icon name="close" />
-            </button>
-            <span className="eyebrow">UNDER THE HOOD</span>
-            <h2 id="info-title">From a goal to a footstep.</h2>
-            <p>
-              Click a floor to plan a route around walls and furniture, including stairs and elevator transfers.
-              WASD takes over with forward velocity and turning commands. Q/E adds sideways velocity.
-              The S3 SuperMimic policy combines these goals with joint history and a head depth camera.
-            </p>
-            <div className="info-flow">
-              Goal + depth image + body history → CNN / MLP → 34 joint targets → motor torques → MuJoCo
-            </div>
-            <p>
-              The unchanged velocity-mode checkpoint runs at 50 Hz using ONNX Runtime Web. The head camera
-              casts 48 × 27 rays and produces an 18 × 32 policy image. MuJoCo simulates the trained robot,
-              motor torque–speed limits, and command delays at 200 Hz. Three.js renders its physical pose.
-            </p>
-            <p>
-              Lite Pro has 34 active joints in its legs, waist, arms, and neck; its fingers are fixed.
-              Walls, IKEA furniture, and individual stair treads have solid collision geometry. A
-              clearance-aware Theta* planner routes around furniture on each floor. Stair mode walks
-              along the steps; the elevator physically carries its rider. Collisions and difficult
-              terrain can cause a fall; press R to reset. WASD or Escape cancels the route.
-            </p>
-            <p>
-              Camera: drag to orbit, right-drag to pan, scroll to zoom, or press C to cycle views. Arrow keys
-              also drive the robot. Input clears when the window loses focus; switching tabs pauses the
-              simulation.
-            </p>
-            <a
-              href="https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516"
-              target="_blank"
-              rel="noreferrer"
-            >
-              InstinctMJ policy · CC BY-NC 4.0 <Icon name="external" size={14} />
-            </a>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

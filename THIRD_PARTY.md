@@ -21,6 +21,10 @@ section 3.10. The checkpoint is the S3 goal-mode Mix run at iteration 20,000.
   meshes, and generates `src/policy_constants.js`. The asset manifest records file hashes.
 - `visuals.bin` and `visuals.json` are derived render meshes, simplified offline with
   meshoptimizer at a 4 mm error target. The camera and physics use the imported meshes.
+- `public/assets/explainer/` contains poses and depth images from two seeded S3
+  policy runs in the apartment. `scripts/record_explainer.js` generates these recordings.
+  `motion.json` records the source commit, policy hash, and attribution. The
+  explanation page reuses the Lite Pro render meshes and links to the original report.
 
 ## Runtime libraries
 
