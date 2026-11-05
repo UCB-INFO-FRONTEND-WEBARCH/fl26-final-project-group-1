@@ -3,15 +3,20 @@ name: Build and deploy Pages
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       VITE_IKEA_BASE_URL: ${{ vars.IKEA_ASSET_BASE_URL }}
     steps:
@@ -24,7 +29,7 @@ jobs:
       - run: npm test
       - run: npm run test:simulation
       - name: Verify the public asset host
-        if: github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
         run: |
           case "$VITE_IKEA_BASE_URL" in
             https://*) ;;
@@ -34,14 +39,15 @@ jobs:
       - name: Build the project site
         run: npm run build -- --base "/${GITHUB_REPOSITORY#*/}/"
       - uses: actions/upload-pages-artifact@v4
-        if: github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pages: write

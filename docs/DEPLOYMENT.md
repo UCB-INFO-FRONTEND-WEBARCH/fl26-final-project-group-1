@@ -5,8 +5,14 @@ The project site URL is:
 `https://ucb-info-frontend-webarch.github.io/fl26-final-project-group-1/`
 
 GitHub Pages is already configured to use GitHub Actions for this repository.
-The workflow in `.github/workflows/pages.yml` tests every PR and push to `main`.
-Deployment starts only through **Run workflow**, after the PR is merged.
+The workflow in `.github/workflows/pages.yml` tests every PR and push to `dev`.
+Each successful push to `dev` publishes the site. Pull requests only build and test.
+The deploy job accepts only `refs/heads/dev`, including manual runs.
+The `github-pages` environment permits deployments from `dev` only.
+
+`dev` is the integration branch for the current playground. It includes the
+feature branches before their PRs merge into `main`. This lets the public demo
+follow current work while the feature PRs stay separate for review.
 
 ## Asset storage
 
@@ -100,9 +106,25 @@ Download traffic is subject to [Hub rate limits](https://huggingface.co/docs/hub
 1. Finish the dataset upload and obtain its commit SHA.
 2. In the repository, open **Settings → Secrets and variables → Actions → Variables**.
 3. Set `IKEA_ASSET_BASE_URL` to the pinned Hugging Face `/resolve/<commit>/` URL.
-4. Merge the reviewed PR into `main`.
-5. Open **Actions → Build and deploy Pages → Run workflow**. Select `main`.
-6. Open the URL in the completed `github-pages` deployment.
+4. In **Settings → Pages**, set **Source** to **GitHub Actions**.
+5. In **Settings → Environments → github-pages**, permit the `dev` branch only.
+6. Push the complete application to `dev`.
+7. Open the URL in the completed `github-pages` deployment.
+
+For later updates, commit or merge the intended changes into `dev`, then push:
+
+```bash
+git switch dev
+git push origin dev
+```
+
+Each repository has one Pages site. A successful `dev` deployment updates the
+same project URL. It does not create a separate preview URL for each branch.
+The workflow never deploys a pull request or `main`.
+
+Use **Re-run jobs** on the Actions run to retry a failed deployment. GitHub shows
+**Run workflow** only when the default branch contains the workflow file. When
+that option is available, select `dev`.
 
 The workflow validates CORS, catalog files, and the playground's model hashes
 before deployment. This prevents publishing furniture visuals that differ from
@@ -121,7 +143,8 @@ npm run build -- --base /fl26-final-project-group-1/
 npm run preview -- --base /fl26-final-project-group-1/ --port 4182
 ```
 
-Open `http://127.0.0.1:4182/fl26-final-project-group-1/` and its `catalog/` page.
+Open `http://127.0.0.1:4182/fl26-final-project-group-1/` and its `catalog/` and
+`how-it-works/` pages.
 The local preview serves the imported collection under that path.
 
 To check an external host before deploying:
