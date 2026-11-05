@@ -25,6 +25,25 @@ external inference endpoint, or cross-origin isolation headers.
 The first page load transfers approximately 40 MB of uncompressed robot and runtime assets.
 The browser can cache these assets for later loads.
 
+### How it works
+
+Open `/how-it-works/`, or select **How it works** in the header. The page explains
+the S3 control loop, depth input, training method, stair contacts, and navigation.
+Use the recorded 3D motion player, command sliders, and diagrams to explore each step.
+The player shows physical policy recordings with synchronized depth images.
+It does not load MuJoCo or ONNX Runtime. Playback starts paused and stops outside the viewport.
+The **Motion** control stops diagram animations. The page also respects the system preference for reduced motion.
+
+To regenerate the two seeded stair recordings, run:
+
+```bash
+node scripts/record_explainer.js
+```
+
+The script checks that both routes finish without a fall. It writes poses, policy
+depth images, and source metadata to `public/assets/explainer/`. The page loads
+the ascent recording first and fetches the descent recording when you select it.
+
 ### Asset library
 
 Open `/catalog/`, or select **Asset library** in the header. This React page uses
@@ -97,7 +116,7 @@ When you release a movement input, the controller requests zero velocity.
 The policy continues to balance the robot, which can still take small steps or drift.
 
 When the window loses focus, the application clears held inputs.
-When you hide the page or open the explanation dialog, the application pauses physics.
+When you hide the page, the application pauses physics.
 Select Resume to continue.
 
 ## Scene and robot

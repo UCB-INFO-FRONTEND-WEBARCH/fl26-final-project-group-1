@@ -12,6 +12,7 @@ export function SiteHeader({ current, children }) {
       <nav className="header-nav" aria-label="Main navigation">
         <a href={`${SITE_BASE}#playground`} aria-current={current === 'playground' ? 'page' : undefined}>Playground</a>
         <a href={`${SITE_BASE}catalog/`} aria-current={current === 'catalog' ? 'page' : undefined}>Asset library</a>
+        <a href={`${SITE_BASE}how-it-works/`} aria-current={current === 'how-it-works' ? 'page' : undefined}>How it works</a>
       </nav>
       {children}
     </header>
