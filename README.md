@@ -55,7 +55,7 @@ the fixed IKEA placements in `src/furniture_layout.js`.
 The furnished playground uses the imported collection in local development.
 For static hosting, run `python3 scripts/prepare_huggingface.py` and serve the
 prepared collection from `local_assets/huggingface/` at `assets/ikea/` under the
-site base path, or use the public [Hugging Face dataset](https://huggingface.co/datasets/T-K-233/ikea-furniture).
+site base path, or use the public Hugging Face dataset described in the deployment guide.
 Set `VITE_IKEA_BASE_URL` at build time to its pinned HTTPS base URL.
 The collection and upload staging folder are excluded from Git and the app build.
 
@@ -67,7 +67,8 @@ npm run preview
 Vite writes the static website to `dist/`. Serve `dist/` over HTTP(S).
 Set the JavaScript module and WASM MIME types (`application/wasm` for `.wasm`).
 Enable compression on the host. Use Vite's `--base /repository-name/` option for
-a project site.
+a project site. See [GitHub Pages deployment](docs/DEPLOYMENT.md) for the workflow,
+asset hosting requirements, and repository settings.
 
 ## Controls
 
