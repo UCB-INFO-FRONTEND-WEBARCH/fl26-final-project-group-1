@@ -5,6 +5,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { create_model_loader, dispose_model } from './model_assets.js';
 import { IKEA_BASE, model_path } from './asset_paths.js';
+import { ROBOT_POSE_SIZE } from './robot_assets.js';
+import { CHARACTER_ASSET } from './character_asset.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 
@@ -35,6 +37,11 @@ export class SceneView {
     this.paused = false;
     this.quality = 'performance';
     this.furniture_abort = new AbortController();
+    this.character_abort = new AbortController();
+    this.appearance = this.requested_appearance = 'robot';
+    this.latest_robot_pose = new Float32Array(ROBOT_POSE_SIZE);
+    this.has_robot_pose = false;
+    this.disposed = false;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#f5f5f7');
     this.scene.fog = new THREE.Fog('#f5f5f7', 23, 48);
@@ -272,7 +279,8 @@ export class SceneView {
     this.needs_render = true;
   }
 
-  load_robot(geometries) {
+  load_robot(geometries, rig) {
+    this.character_rig = rig;
     const material_cache = new Map();
     for (const descriptor of geometries) {
       const geometry = new THREE.BufferGeometry();
@@ -293,6 +301,41 @@ export class SceneView {
     }
   }
 
+  async set_appearance(appearance) {
+    this.requested_appearance = appearance;
+    if (appearance === 'character' && !this.character) {
+      if (!this.character_load) {
+        this.character_load = import('./character_view.js').then(({ load_character }) =>
+          load_character(this.character_rig, this.character_abort.signal)).then(character => {
+          if (this.disposed) {
+            dispose_model(character.object);
+            return;
+          }
+          this.character = character;
+          character.object.visible = false;
+          this.scene.add(character.object);
+        }).catch(error => { this.character_load = null; throw error; });
+      }
+      await this.character_load;
+    }
+    if (this.disposed || this.requested_appearance !== appearance) return false;
+    this.appearance = appearance;
+    this.renderer.domElement.setAttribute('aria-label', appearance === 'character'
+      ? `Interactive 3D apartment with ${CHARACTER_ASSET.name} character driven by Lite Pro`
+      : 'Interactive 3D apartment with Berkeley Lite Pro robot');
+    if (appearance === 'character' && this.has_robot_pose) this.character.pose.update(this.latest_robot_pose);
+    this.update_figure_visibility();
+    this.needs_render = true;
+    return true;
+  }
+
+  update_figure_visibility() {
+    const visible = this.viewed_floor === 'all' || this.viewed_floor === (this.current_floor || 0);
+    for (const mesh of this.robot_meshes) mesh.visible = visible && this.appearance === 'robot';
+    if (this.character) this.character.object.visible = visible && this.appearance === 'character';
+    this.robot_marker.visible = this.robot_shadow.visible = visible;
+  }
+
   update_frame(transforms, telemetry) {
     this.needs_render = true;
     this.paused = telemetry.paused || telemetry.fallen;
@@ -300,18 +343,19 @@ export class SceneView {
     this.current_floor = telemetry.floor || 0;
     this.lift_moving = telemetry.elevator?.moving || false;
     if (this.mode === 'follow' && this.viewed_floor !== this.current_floor) this.set_floor(this.current_floor);
-    const robot_visible = this.viewed_floor === 'all' || this.viewed_floor === this.current_floor;
     for (let index = 0; index < this.robot_meshes.length; index++) {
       const t = transforms.subarray(index * 12, index * 12 + 12);
       this.robot_meshes[index].matrix.set(t[3], t[4], t[5], t[0], t[6], t[7], t[8], t[1],
         t[9], t[10], t[11], t[2], 0, 0, 0, 1);
       this.robot_meshes[index].matrixWorldNeedsUpdate = true;
-      this.robot_meshes[index].visible = robot_visible;
     }
+    this.latest_robot_pose.set(transforms.subarray(this.robot_meshes.length * 12));
+    this.has_robot_pose = true;
+    if (this.appearance === 'character') this.character.pose.update(this.latest_robot_pose);
+    this.update_figure_visibility();
     const on_lift = Math.abs(telemetry.position[0] - ELEVATOR.center[0]) < 0.8 && Math.abs(telemetry.position[1] - ELEVATOR.center[1]) < 0.8;
     this.vertical_motion = this.lift_moving || on_stairs(telemetry.position);
     const surface = on_lift ? (telemetry.elevator?.height || 0) : on_stairs(telemetry.position) ? stair_height(telemetry.position) : this.current_floor * FLOOR_HEIGHT;
-    this.robot_marker.visible = this.robot_shadow.visible = robot_visible;
     this.robot_marker.position.set(telemetry.position[0], telemetry.position[1], surface + 0.025);
     this.robot_marker.rotation.z = telemetry.heading;
     this.robot_shadow.position.set(telemetry.position[0], telemetry.position[1], surface + 0.016);
@@ -359,11 +403,15 @@ export class SceneView {
     this.controls.update();
   }
 
+  zoom(factor) {
+    this.camera.position.sub(this.controls.target).multiplyScalar(factor).add(this.controls.target);
+    this.controls.update();
+    this.needs_render = true;
+  }
+
   set_floor(floor) {
     this.viewed_floor = floor;
-    const robot_visible = floor === 'all' || floor === (this.current_floor || 0);
-    for (const mesh of this.robot_meshes) mesh.visible = robot_visible;
-    this.robot_marker.visible = this.robot_shadow.visible = robot_visible;
+    this.update_figure_visibility();
     for (let level = 0; level < 2; level++) {
       this.floor_groups[level].visible = floor === 'all' || floor === level;
       const material = this.floor_surfaces[level].material;
@@ -469,7 +517,9 @@ export class SceneView {
   }
 
   dispose() {
+    this.disposed = true;
     this.furniture_abort.abort();
+    this.character_abort.abort();
     document.removeEventListener('visibilitychange', this.visibility_handler);
     this.resize_observer.disconnect();
     this.renderer.setAnimationLoop(null);

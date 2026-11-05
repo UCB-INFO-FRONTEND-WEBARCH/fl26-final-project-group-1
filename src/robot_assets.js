@@ -1,5 +1,38 @@
 import { JOINT_NAMES, NUM_ACTIONS } from './locomotion.js';
 
+export const ROBOT_POSE_SIZE = 7 + NUM_ACTIONS;
+
+/** Copy the measured pelvis pose (xyz, wxyz) and policy-ordered joint angles. */
+export function write_robot_pose(output, state, joint_qpos) {
+  output.set(state.qpos.subarray(0, 7));
+  for (let index = 0; index < NUM_ACTIONS; index++) output[7 + index] = state.qpos[joint_qpos[index]];
+}
+
+/** Read joint axes and the sole height at zero joint angles, relative to the pelvis. */
+export function character_rig(mujoco, model, geometries) {
+  const rest = new mujoco.MjData(model);
+  try {
+    rest.qpos.fill(0);
+    rest.qpos[3] = 1;
+    mujoco.mj_forward(model, rest);
+    const joints = JOINT_NAMES.map(name => mujoco.mj_name2id(model, 3, name));
+    const axes = joints.map(id => Array.from(rest.xaxis.subarray(id * 3, id * 3 + 3)));
+    const hips = ['robot/left_hip_pitch', 'robot/right_hip_pitch'].map(name => mujoco.mj_name2id(model, 3, name));
+    const hip_center = [0, 1].map(axis => hips.reduce((sum, id) => sum + rest.xanchor[id * 3 + axis], 0) / 2);
+    let sole = Infinity;
+    for (const { id, vertices } of geometries) {
+      const z = rest.geom_xpos[id * 3 + 2];
+      const r = rest.geom_xmat.subarray(id * 9 + 6, id * 9 + 9);
+      for (let index = 0; index < vertices.length; index += 3) {
+        sole = Math.min(sole, z + r[0] * vertices[index] + r[1] * vertices[index + 1] + r[2] * vertices[index + 2]);
+      }
+    }
+    return { joint_names: JOINT_NAMES.map(name => name.slice('robot/'.length)), axes, hip_center, sole };
+  } finally {
+    rest.delete();
+  }
+}
+
 export async function load_robot_files(mujoco, read_file) {
   mujoco.FS.mkdir('/robot');
   mujoco.FS.mkdir('/robot/meshes');

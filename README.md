@@ -8,6 +8,22 @@ MuJoCo simulates the robot, stairs, furniture, and elevator in the browser.
 WASD keys send velocity commands to the policy.
 The keyboard handler does not translate the robot or play a walking animation.
 
+Select **Character** below the scene to display the same motion on a VRM character.
+Select **Robot** to return to Lite Pro. The switch preserves the simulation, route,
+pause state, and camera. The character loads once, on first selection.
+Use the **+** and **−** buttons in the scene to inspect the figure at close range.
+
+Character mode reads the measured pelvis pose and 34 joint angles from MuJoCo.
+Each bone uses the corresponding robot joints in their chain order, as in
+[Lite-Motions](https://huggingface.co/spaces/Berkeley-Humanoids/Lite-Motions).
+The mode adds no IK, motion filtering, foot locking, or secondary animation.
+The character keeps its original proportions, so its feet can slide or intersect
+surfaces. The trained robot still supplies physics, contacts, and depth sensing.
+
+The public character is Seed-san by VirtualCast, Inc., from the official VRM samples.
+`src/character_asset.js` pins its source URL and hash. The app loads the original
+file from its host and does not include a copy in the Pages artifact.
+
 ## Run locally
 
 Use Node.js 18.19+ and npm. Use a recent desktop browser with WebGL 2 and
