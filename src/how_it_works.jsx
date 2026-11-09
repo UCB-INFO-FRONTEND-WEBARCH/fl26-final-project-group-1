@@ -316,9 +316,10 @@ function PlaygroundControls() {
     <div><dl>
       <div><dt>Choose a goal</dt><dd>Click open floor in the scene or floor plan. Select Upper to choose an upstairs goal.</dd></div>
       <div><dt>Move manually</dt><dd>Hold W/S to move forward or backward. Hold A/D to turn. Hold Q/E to move sideways. Arrow keys also drive.</dd></div>
+      <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. Press R to reset after a fall. Reset clears the route.</dd></div>
-      <div><dt>Change the camera</dt><dd>Drag to orbit. Drag with the right button to pan. Scroll to zoom. Press C to cycle camera views.</dd></div>
+      <div><dt>Change the camera</dt><dd>Drag to orbit. Drag with the right button to pan. Scroll or use +/− to zoom. Press C to cycle camera views.</dd></div>
     </dl><p>The playground clears held keys when the window loses focus. It pauses physics when you hide the page.</p></div>
   </details>;
 }

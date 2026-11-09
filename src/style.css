@@ -131,6 +131,9 @@ h1 span { color: #86868b; }
 .axis-label b:nth-child(2) { color: #83a894; }
 .axis-label b:nth-child(3) { color: #87a6c6; }
 .mouse-hint { margin-left: auto; }
+.scene-zoom { position: absolute; right: 18px; bottom: 42px; display: flex; gap: 1px; padding: 3px; border: 1px solid #e2e5eb; border-radius: 20px; background: #ffffffed; }
+.scene-zoom button { width: 29px; height: 27px; border: 0; background: transparent; color: #778291; border-radius: 50%; font-size: 17px; }
+.scene-zoom button:hover { color: #0071e3; background: #edf4ff; }
 
 .session-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 13px 2px 12px; border-bottom: 1px solid #ebebee; }
 .session-controls { display: flex; gap: 8px; }
@@ -144,6 +147,13 @@ h1 span { color: #86868b; }
 .session-stats > span { display: flex; gap: 8px; align-items: center; font: 8px var(--mono); letter-spacing: .5px; color: #9999a1; }
 .session-stats strong { font: 12px var(--mono); color: #5b5b65; letter-spacing: 0; }
 .session-stats small { font-size: 9px; color: #9999a1; }
+.figure-switch { display: flex; padding: 3px; gap: 3px; background: #f1f3f6; border: 1px solid #e5e8ee; border-radius: 24px; }
+.figure-switch button { border: 0; border-radius: 20px; background: transparent; color: #7b828d; padding: 7px 11px; font-size: 10px; }
+.figure-switch button[aria-pressed='true'] { background: #fff; color: #0071e3; box-shadow: 0 1px 3px #1d1d1f0a; }
+.character-status { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; line-height: 1.6; color: #6e7785; }
+.character-status:not(:empty) { padding: 12px 2px 0; }
+.character-status a { text-underline-offset: 3px; text-decoration-color: #ced9e7; }
+.character-status > span { color: #8993a1; }
 .workspace-note { display: flex; justify-content: space-between; align-items: center; margin-top: 11px; color: #9999a1; font-size: 10px; }
 .workspace-note > span:first-child { display: flex; align-items: center; gap: 6px; }
 .workspace-note > span:last-child { font-size: 9px; }
@@ -304,7 +314,9 @@ input[type='range']::-moz-range-thumb { width: 9px; height: 9px; border: 3px sol
   .map-legend { font-size: 7px; }
   .viewport-caption { left: 15px; right: 15px; font-size: 8px; }
   .mouse-hint { display: none; }
-  .session-toolbar { padding: 12px 0; }
+  .session-toolbar { padding: 12px 0; flex-wrap: wrap; gap: 12px; }
+  .figure-switch { order: 3; margin: 0 auto; }
+  .character-status { font-size: 9px; flex-wrap: wrap; gap: 3px 12px; }
   .session-controls { gap: 6px; }
   .primary-button, .secondary-button { padding: 9px 12px; font-size: 11px; }
   .session-stats { gap: 12px; }

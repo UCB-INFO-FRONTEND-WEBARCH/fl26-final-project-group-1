@@ -8,6 +8,7 @@ import { SiteHeader } from './site_header.jsx';
 import { IDLE_NAVIGATION } from './navigation.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
 import { SITE_BASE } from './asset_paths.js';
+import { CHARACTER_ASSET } from './character_asset.js';
 import './style.css';
 
 const INITIAL_TELEMETRY = {
@@ -121,6 +122,7 @@ function App() {
   const speed_ref = useRef(0.6);
   const transfer_ref = useRef('elevator');
   const ready_ref = useRef(false);
+  const figure_request = useRef(0);
   const [telemetry, set_telemetry] = useState(INITIAL_TELEMETRY);
   const [loading, set_loading] = useState('Starting the navigation lab');
   const [ready, set_ready] = useState(false);
@@ -132,6 +134,27 @@ function App() {
   const [pressed, set_pressed] = useState(new Set());
   const [viewed_floor, set_viewed_floor] = useState(0);
   const [transfer, set_transfer] = useState('elevator');
+  const [figure, set_figure] = useState('robot');
+  const [character_loading, set_character_loading] = useState(false);
+  const [character_error, set_character_error] = useState('');
+
+  async function change_figure(value) {
+    const request = ++figure_request.current;
+    const view = view_ref.current;
+    if (!view || !ready_ref.current) return;
+    set_character_error('');
+    set_character_loading(value === 'character' && !view.character);
+    try {
+      const applied = await view.set_appearance(value);
+      if (request !== figure_request.current) return;
+      if (applied) set_figure(value);
+    } catch (exception) {
+      if (request !== figure_request.current || exception.name === 'AbortError') return;
+      set_character_error(`${exception.message} Select Character to retry.`);
+    } finally {
+      if (request === figure_request.current) set_character_loading(false);
+    }
+  }
 
   function send_command() {
     if (!ready_ref.current) return;
@@ -243,7 +266,7 @@ function App() {
             report_error(message.message);
             break;
           case 'ready':
-            view.load_robot(message.geometries);
+            view.load_robot(message.geometries, message.character_rig);
             robot_ready = true;
             if (!furniture_ready) set_loading('Loading the IKEA apartment furniture');
             finish_loading();
@@ -325,6 +348,7 @@ function App() {
     document.addEventListener('visibilitychange', visibility_change);
     return () => {
       active = false;
+      figure_request.current++;
       window.removeEventListener('keydown', key_down);
       window.removeEventListener('keyup', key_up);
       window.removeEventListener('blur', lose_focus);
@@ -454,6 +478,10 @@ function App() {
               </span>
               Click a floor to walk there <span className="mouse-hint">Drag to orbit · scroll to zoom</span>
             </div>
+            <div className="scene-zoom" role="group" aria-label="Scene zoom">
+              <button aria-label="Zoom out" title="Zoom out" onClick={() => view_ref.current?.zoom(1.4)}>−</button>
+              <button aria-label="Zoom in" title="Zoom in" onClick={() => view_ref.current?.zoom(1 / 1.4)}>+</button>
+            </div>
 
             {!ready && (
               <div className="loading-overlay" role="status">
@@ -501,6 +529,12 @@ function App() {
                 Reset<kbd>R</kbd>
               </button>
             </div>
+            <div className="figure-switch" role="group" aria-label="Figure appearance">
+              {['robot', 'character'].map(value => <button key={value} aria-pressed={figure === value}
+                disabled={!ready || (value === 'character' && character_loading)} onClick={() => change_figure(value)}>
+                {value === 'robot' ? 'Robot' : 'Character'}
+              </button>)}
+            </div>
             <div className="session-stats">
               <span>
                 SESSION{' '}
@@ -515,6 +549,12 @@ function App() {
                 </strong>
               </span>
             </div>
+          </div>
+          <div className="character-status" role="status" aria-live="polite">
+            {character_loading ? 'Loading character…' : character_error || (figure === 'character' && <>
+              <a href={CHARACTER_ASSET.source} target="_blank" rel="noreferrer">{CHARACTER_ASSET.name} by {CHARACTER_ASSET.author}</a>
+              <span>Same policy · robot collisions</span>
+            </>)}
           </div>
           <div className="workspace-note">
             <span>

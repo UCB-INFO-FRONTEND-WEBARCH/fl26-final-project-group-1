@@ -26,6 +26,25 @@ section 3.10. The checkpoint is the S3 goal-mode Mix run at iteration 20,000.
   `motion.json` records the source commit, policy hash, and attribution. The
   explanation page reuses the Lite Pro render meshes and links to the original report.
 
+## Character view
+
+The direct joint-to-bone mapping follows
+[Lite-Motion-Retargeting](https://github.com/berkeley-humanoids/lite-motion-retargeting/blob/8a732d145917c8f547cf3ae4e87aec0f36a02089/site/app.js)
+and its [motion browser description](https://github.com/berkeley-humanoids/lite-motion-retargeting/blob/8a732d145917c8f547cf3ae4e87aec0f36a02089/docs/browser.md).
+The app copies measured robot motion. It does not run the repository's motion-retargeting tools.
+
+The default character is **NAI**, by **-T.K.-**, from the
+[Lite-Motions Space](https://huggingface.co/spaces/Berkeley-Humanoids/Lite-Motions).
+The project owner authorizes NAI use by RoboPlay visitors.
+The UI displays the author and source. `src/character_asset.js` pins the model's
+URL and SHA-256. The app downloads the original file from its source only when
+Character mode is selected. The repository and Pages artifact do not contain the file.
+
+NAI's original VRM Public License 1.0 metadata permits avatar use only by the author
+and prohibits redistribution and modification. The project-specific authorization
+does not change these restrictions for other uses. The original file and its
+embedded metadata remain unchanged.
+
 ## Runtime libraries
 
 | Library | Source | License |
@@ -33,6 +52,7 @@ section 3.10. The checkpoint is the S3 goal-mode Mix run at iteration 20,000.
 | MuJoCo WASM | [google-deepmind/mujoco](https://github.com/google-deepmind/mujoco) | Apache-2.0 |
 | ONNX Runtime Web | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | MIT |
 | Three.js | [mrdoob/three.js](https://github.com/mrdoob/three.js) | MIT |
+| three-vrm | [pixiv/three-vrm](https://github.com/pixiv/three-vrm) | MIT |
 | Draco (GLB mesh decoder) | [google/draco](https://github.com/google/draco) | Apache-2.0 |
 | React / React DOM | [facebook/react](https://github.com/facebook/react) | MIT |
 | Vite (build tooling) | [vitejs/vite](https://github.com/vitejs/vite) | MIT |
