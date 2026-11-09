@@ -33,17 +33,17 @@ The direct joint-to-bone mapping follows
 and its [motion browser description](https://github.com/berkeley-humanoids/lite-motion-retargeting/blob/8a732d145917c8f547cf3ae4e87aec0f36a02089/docs/browser.md).
 The app copies measured robot motion. It does not run the repository's motion-retargeting tools.
 
-The default character is **Seed-san**, by **VirtualCast, Inc.**, from the
-[VRM specification samples](https://github.com/vrm-c/vrm-specification/tree/94e82dd346fa6cf0337c4421728640e5252dd38e/samples/Seed-san).
-Its embedded VRM Public License 1.0 metadata permits avatar use by everyone,
-commercial use, redistribution, and modification, and requires credit.
+The default character is **NAI**, by **-T.K.-**, from the
+[Lite-Motions Space](https://huggingface.co/spaces/Berkeley-Humanoids/Lite-Motions).
+The project owner authorizes NAI use by RoboPlay visitors.
 The UI displays the author and source. `src/character_asset.js` pins the model's
 URL and SHA-256. The app downloads the original file from its source only when
 Character mode is selected. The repository and Pages artifact do not contain the file.
 
-The Lite-Motions Space uses NAI by -T.K.-. Its embedded metadata permits avatar use
-only by the author and prohibits redistribution and modification. NAI is not
-included in this project or selected as its public character.
+NAI's original VRM Public License 1.0 metadata permits avatar use only by the author
+and prohibits redistribution and modification. The project-specific authorization
+does not change these restrictions for other uses. The original file and its
+embedded metadata remain unchanged.
 
 ## Runtime libraries
 

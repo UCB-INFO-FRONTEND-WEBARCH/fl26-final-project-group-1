@@ -20,7 +20,7 @@ The mode adds no IK, motion filtering, foot locking, or secondary animation.
 The character keeps its original proportions, so its feet can slide or intersect
 surfaces. The trained robot still supplies physics, contacts, and depth sensing.
 
-The public character is Seed-san by VirtualCast, Inc., from the official VRM samples.
+The public character is NAI by -T.K.-, from the Lite-Motions Space, with authorization for RoboPlay visitor use.
 `src/character_asset.js` pins its source URL and hash. The app loads the original
 file from its host and does not include a copy in the Pages artifact.
 
