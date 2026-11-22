@@ -234,7 +234,7 @@ function Terrain() {
       <input id="contact-position" type="range" min="1" max="99" value={point} onChange={event => set_point(Number(event.target.value))} />
     </div><div className="ex-terrain-copy"><span className="ex-kicker">A FIX FROM THE REPORT</span>
       <h3>{exact ? 'Each step has a solid box.' : 'A hull can bridge several steps.'}</h3>
-      <p>{exact ? 'RoboPlay gives every tread its own collision box. The head camera sees the same step geometry that supports the feet.'
+      <p>{exact ? 'Centoria gives every tread its own collision box. The head camera sees the same step geometry that supports the feet.'
         : 'The report found that convex parts spanned several treads. Earlier stair tests often measured motion on ramps.'}</p>
       <p>The playground uses 24 steps between two floors. Stair motion still depends on the approach, balance, and command.</p>
       <div className="ex-dimensions"><div><strong>{(FLOOR_HEIGHT / STAIRS.steps * 100).toFixed(0)}<small>cm</small></strong><span>riser</span></div>
@@ -370,7 +370,7 @@ function HowItWorks() {
         </section>
       </div>
     </main>
-    <footer className="ex-footer"><a className="brand" href={SITE_BASE}><Icon name="robot" size={20} />RoboPlay</a>
+    <footer className="ex-footer"><a className="brand" href={SITE_BASE}><Icon name="robot" size={20} />Centoria</a>
       <span>Lite Pro · SuperMimic · MuJoCo</span><span>Policy and controller: <a href={`${SITE_BASE}assets/lite_pro/LICENSE`}>CC BY-NC 4.0</a> · Robot: <a href={`${SITE_BASE}assets/lite_pro/ROBOT_LICENSE`}>MIT</a></span>
     </footer>
   </div>;

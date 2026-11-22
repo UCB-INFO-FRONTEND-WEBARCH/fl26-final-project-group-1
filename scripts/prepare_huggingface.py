@@ -70,7 +70,7 @@ size_categories:
 This collection contains {len(articles):,} GLB product models and {len(images):,} cached
 product photos, with searchable metadata from an IKEA catalog snapshot dated
 {manifest['snapshot']}. It supports furniture inspection and indoor robot navigation
-research in [RoboPlay](https://github.com/UCB-INFO-FRONTEND-WEBARCH/fl26-final-project-group-1).
+research in [Centoria](https://github.com/UCB-INFO-FRONTEND-WEBARCH/fl26-final-project-group-1).
 
 ## Files
 
@@ -95,7 +95,7 @@ grant a new license to the source assets. Source URLs are retained for attributi
 
 Use public `/resolve/<commit>/` file URLs. Pin the commit when pairing visuals
 with precomputed collision meshes. The repository is a file collection; the
-catalog JSON is consumed directly by RoboPlay rather than the Hub dataset viewer.
+catalog JSON is consumed directly by Centoria rather than the Hub dataset viewer.
 """)
   print(f"Staged {len(articles):,} models and {len(images):,} photos at {output}")
   print("Model and photo files are hard links: do not edit the staged asset bytes.")

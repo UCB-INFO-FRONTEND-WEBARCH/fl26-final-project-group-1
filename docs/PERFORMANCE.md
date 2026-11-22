@@ -31,13 +31,13 @@ buffers. Paused views still rendered the entire scene.
   The renderer reads cached simulation state.
 - [mjswan yieldToBrowser.ts](https://github.com/ttktjmt/mjswan/blob/main/src/mjswan/template/src/core/engine/yieldToBrowser.ts):
   The source explains why overdue simulation work must still yield.
-  RoboPlay keeps physics in a dedicated worker and limits work per timer cycle.
+  Centoria keeps physics in a dedicated worker and limits work per timer cycle.
 - [meshoptimizer JavaScript API](https://github.com/zeux/meshoptimizer/tree/master/js):
   The API documentation explains offline mesh simplification, absolute-error
   targets, and compact indexed meshes.
 
-RoboPlay applies these principles to its own scene and worker.
-RoboPlay does not import either project's runtime.
+Centoria applies these principles to its own scene and worker.
+Centoria does not import either project's runtime.
 
 ## Changes
 

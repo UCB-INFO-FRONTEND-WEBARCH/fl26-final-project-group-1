@@ -5,9 +5,9 @@ import { SITE_BASE } from './asset_paths.js';
 export function SiteHeader({ current, children }) {
   return (
     <header className="app-header">
-      <a className="brand" href={SITE_BASE} aria-label="RoboPlay home">
+      <a className="brand" href={SITE_BASE} aria-label="Centoria home">
         <span className="brand-symbol"><Icon name="robot" size={23} /></span>
-        RoboPlay
+        Centoria
       </a>
       <nav className="header-nav" aria-label="Main navigation">
         <a href={`${SITE_BASE}#playground`} aria-current={current === 'playground' ? 'page' : undefined}>Playground</a>

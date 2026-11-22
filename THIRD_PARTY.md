@@ -35,7 +35,7 @@ The app copies measured robot motion. It does not run the repository's motion-re
 
 The default character is **NAI**, by **-T.K.-**, from the
 [Lite-Motions Space](https://huggingface.co/spaces/Berkeley-Humanoids/Lite-Motions).
-The project owner authorizes NAI use by RoboPlay visitors.
+The project owner authorizes NAI use by Centoria visitors.
 The UI displays the author and source. `src/character_asset.js` pins the model's
 URL and SHA-256. The app downloads the original file from its source only when
 Character mode is selected. The repository and Pages artifact do not contain the file.

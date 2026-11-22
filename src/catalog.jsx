@@ -104,7 +104,7 @@ function Catalog() {
       { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'roboplay-ikea-selection.json';
+    link.download = 'centoria-ikea-selection.json';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     set_notice(`Exported ${chosen.length.toLocaleString()} assets. Placement and collision geometry are assigned when importing a scene.`);
