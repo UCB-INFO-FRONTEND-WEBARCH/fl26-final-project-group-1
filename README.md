@@ -109,9 +109,11 @@ asset hosting requirements, and repository settings.
 ## Controls
 
 The site opens on a landing page. Select **Play** to enter the apartment.
-The page moves out to a solid white or dark screen, based on the theme. After all
-assets load, the map, clouds, and night lights fade in together. The camera then
-descends through three aerial stops: the Bay Area, Santa Clara, and Building K at
+The landing page preloads the Bay Area image, regional road lights, and aerial
+renderer. It does not load the simulator or closer maps. Select Play to move the
+page out to a solid white or dark screen. The map, clouds, and night lights then
+fade in together. The remaining resources load while this first view is visible.
+The camera descends through three aerial stops: the Bay Area, Santa Clara, and Building K at
 2886 Scott Boulevard. Building K stays at the center of every aerial zoom. The
 regional view uses 80% of the original scope within the available image bounds.
 The camera then moves directly to the robot's Shoulder view in the apartment.
@@ -121,7 +123,9 @@ the fully lit side-street area. Building K shows a
 wider campus view and has no cloud overlay.
 The loading screen shows only imagery and source credits. Escape cancels arrival.
 Each aerial stop holds for at least 0.85 seconds. The first hold starts after the
-reveal completes. Physics and movement inputs start after the last dive.
+reveal completes and extends until the closer maps, full road lights, furniture,
+robot, and policy are ready. Loading time counts toward this hold. Physics and
+movement inputs start after the last dive.
 Reduced-motion settings keep the holds and replace the dives with cuts.
 Select **Controls** in the game to open the navigation and telemetry panels.
 Use **Exit to site** to return to the landing page and stop the simulation.

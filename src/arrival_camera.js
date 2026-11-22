@@ -34,11 +34,10 @@ export class ArrivalCamera {
 
   update(seconds) {
     if (this.done) return;
-    // The first hold starts only after the complete aerial render is visible.
-    if (this.level === 0 && !this.ready) return;
     this.elapsed += seconds;
     if (!this.moving) {
-      if (this.elapsed < ARRIVAL_HOLD_SECONDS) return;
+      // Count visible time while loading, but keep the first view until every destination is ready.
+      if (this.elapsed < ARRIVAL_HOLD_SECONDS || (this.level === 0 && !this.ready)) return;
       this.moving = true;
       this.elapsed = 0;
     } else {

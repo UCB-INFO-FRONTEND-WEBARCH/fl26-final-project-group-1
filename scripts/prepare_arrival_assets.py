@@ -101,6 +101,17 @@ def prepare_roads():
   return roads
 
 
+def write_light_points(filename, points):
+  packed = array.array('f', (value for point in points for value in point))
+  if __import__('sys').byteorder != 'little':
+    packed.byteswap()
+  contents = packed.tobytes()
+  (OUTPUT / filename).write_bytes(contents)
+  print(f'{filename}: {len(packed) // 3:,} lights, {len(contents):,} bytes', flush=True)
+  return {'file': filename, 'count': len(packed) // 3, 'stride': 3,
+          'sha256': hashlib.sha256(contents).hexdigest()}
+
+
 def prepare_lights(roads):
   lights = {}
   for road in roads:
@@ -123,20 +134,15 @@ def prepare_lights(roads):
           lights[key] = (px, py, strength)
         remaining += spacing
       remaining -= distance
-  packed = array.array('f', (value for point in lights.values() for value in point))
-  if __import__('sys').byteorder != 'little':
-    packed.byteswap()
-  contents = packed.tobytes()
-  (OUTPUT / 'lights.bin').write_bytes(contents)
-  print(f'Lights: {len(lights):,}, {len(contents):,} bytes', flush=True)
+  complete = write_light_points('lights.bin', lights.values())
+  overview = write_light_points('overview-lights.bin', (point for point in lights.values() if point[2] >= 0.55))
   origin = mercator(*ORIGIN)
   west, south = mercator(LOCAL_ROAD_BOUNDS[1], LOCAL_ROAD_BOUNDS[0])
   east, north = mercator(LOCAL_ROAD_BOUNDS[3], LOCAL_ROAD_BOUNDS[2])
-  return {'file': 'lights.bin', 'count': len(lights), 'stride': 3,
+  return {**complete, 'overview': overview,
           'local_bounds': [west - origin[0], south - origin[1], east - origin[0], north - origin[1]],
           'layout': 'little-endian float32: Mercator x, y relative to origin, intensity',
-          'license': 'ODbL-1.0', 'source': 'https://www.openstreetmap.org/copyright',
-          'sha256': hashlib.sha256(contents).hexdigest()}
+          'license': 'ODbL-1.0', 'source': 'https://www.openstreetmap.org/copyright'}
 
 
 def main():

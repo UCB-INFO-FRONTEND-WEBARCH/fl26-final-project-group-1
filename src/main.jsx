@@ -115,10 +115,11 @@ function MiniMap({ telemetry, floor, on_destination }) {
   );
 }
 
-function Playground({ on_exit, entry_complete }) {
+function Playground({ on_exit, entry_complete, arrival_promise }) {
   const shell_ref = useRef(null);
   const viewport_ref = useRef(null);
   const view_ref = useRef(null);
+  const preview_ref = useRef(null);
   const worker_ref = useRef(null);
   const keys_ref = useRef(new Set());
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
@@ -234,11 +235,13 @@ function Playground({ on_exit, entry_complete }) {
 
   useEffect(() => {
     entry_complete_ref.current = entry_complete;
+    if (preview_ref.current) preview_ref.current.opening.entry_complete = entry_complete;
     if (view_ref.current?.arrival_opening) view_ref.current.arrival_opening.entry_complete = entry_complete;
   }, [entry_complete]);
 
   useEffect(() => {
     let view;
+    let preview;
     let worker;
     let last_ui_time = 0;
     let active = true;
@@ -267,13 +270,18 @@ function Playground({ on_exit, entry_complete }) {
       worker.postMessage({ type: 'transfer', transfer: transfer_ref.current });
     }
 
-    async function initialize_view() {
+    function reveal_arrival(opacity) {
+      shell_ref.current?.style.setProperty('--arrival-reveal', String(opacity));
+    }
+
+    async function initialize_world() {
       try {
         const { SceneView } = await import('./scene_view.js');
         if (!active) return;
-        view = new SceneView(viewport_ref.current, set_performance_stats, navigate);
+        const arrival = preview.release();
+        view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer);
         view_ref.current = view;
-        view.start_arrival(set_arrival_level, () => {
+        view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
           phase_ref.current = 'playing';
           ready_ref.current = true;
@@ -282,7 +290,7 @@ function Playground({ on_exit, entry_complete }) {
           requestAnimationFrame(() => {
             if (active) view.renderer.domElement.focus({ preventScroll: true });
           });
-        }, opacity => shell_ref.current?.style.setProperty('--arrival-reveal', String(opacity)));
+        }, reveal_arrival);
         view.arrival_opening.entry_complete = entry_complete_ref.current;
         view.load_arrival_assets().catch(exception => report_error(`Could not load the satellite arrival. ${exception.message}`));
         view.load_furniture().then(() => {
@@ -334,7 +342,19 @@ function Playground({ on_exit, entry_complete }) {
         report_error(`Could not create the 3D view. ${exception.message}`);
       }
     }
-    initialize_view();
+    async function initialize_preview() {
+      try {
+        preview = await arrival_promise;
+        if (!active) { preview.dispose(); return; }
+        preview_ref.current = preview;
+        preview.opening.entry_complete = entry_complete_ref.current;
+        preview.start(viewport_ref.current, reveal_arrival, () => { if (active) initialize_world(); });
+        await preview.loaded;
+      } catch (exception) {
+        report_error(`Could not load the satellite arrival. ${exception.message}`);
+      }
+    }
+    initialize_preview();
 
     const key_down = (event) => {
       if (phase_ref.current === 'intro' && event.code === 'Escape') {
@@ -394,6 +414,7 @@ function Playground({ on_exit, entry_complete }) {
       document.removeEventListener('visibilitychange', visibility_change);
       worker?.terminate();
       view?.dispose();
+      preview?.dispose();
     };
   }, []);
 
@@ -826,15 +847,33 @@ function Landing({ leaving, on_play, on_left }) {
 }
 
 function App() {
+  const arrival_ref = useRef(null);
   const [entered, set_entered] = useState(false);
   const [landing_visible, set_landing_visible] = useState(true);
+  function preload_arrival() {
+    if (!arrival_ref.current) {
+      arrival_ref.current = import('./arrival_preview.js').then(({ ArrivalPreview }) => new ArrivalPreview());
+      arrival_ref.current.catch(() => {});
+    }
+    return arrival_ref.current;
+  }
+  useEffect(() => {
+    preload_arrival();
+    return () => { arrival_ref.current?.then(preview => preview.dispose()).catch(() => {}); };
+  }, []);
   function exit() {
     set_entered(false);
     set_landing_visible(true);
+    arrival_ref.current = null;
+    preload_arrival();
+  }
+  function play() {
+    preload_arrival();
+    set_entered(true);
   }
   return <>
-    {entered && <Playground on_exit={exit} entry_complete={!landing_visible} />}
-    {landing_visible && <Landing leaving={entered} on_play={() => set_entered(true)} on_left={() => set_landing_visible(false)} />}
+    {entered && <Playground on_exit={exit} entry_complete={!landing_visible} arrival_promise={arrival_ref.current} />}
+    {landing_visible && <Landing leaving={entered} on_play={play} on_left={() => set_landing_visible(false)} />}
   </>;
 }
 

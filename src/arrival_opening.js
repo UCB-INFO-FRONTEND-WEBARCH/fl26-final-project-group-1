@@ -4,7 +4,7 @@ export const ARRIVAL_REVEAL_SECONDS = 1.25;
 export class ArrivalOpening {
   constructor() {
     this.entry_complete = false;
-    this.assets_ready = false;
+    this.overview_ready = false;
     this.phase = 'waiting';
     this.elapsed = 0;
     this.opacity = 0;
@@ -19,7 +19,7 @@ export class ArrivalOpening {
     }
     this.elapsed += seconds;
     if (this.phase === 'blank') {
-      if (this.elapsed < ARRIVAL_BLANK_SECONDS || !this.assets_ready) return;
+      if (this.elapsed < ARRIVAL_BLANK_SECONDS || !this.overview_ready) return;
       this.phase = 'revealing';
       this.elapsed = 0;
       return;

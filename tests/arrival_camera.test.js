@@ -13,7 +13,7 @@ function fixture(reduced_motion = false) {
   return { camera, target, origin, destination, destination_target, sequence };
 }
 
-test('loading time does not consume the first visible hold before a smooth dive', () => {
+test('the visible first view holds through a slow load and dives as soon as resources are ready', () => {
   const { camera, sequence } = fixture();
   const initial = camera.position.clone();
   sequence.update(30);
@@ -21,10 +21,7 @@ test('loading time does not consume the first visible hold before a smooth dive'
   assert.equal(sequence.moving, false);
   assert.deepEqual(camera.position, initial);
   sequence.ready = true;
-  sequence.update(ARRIVAL_HOLD_SECONDS - 0.01);
-  assert.equal(sequence.moving, false);
-  assert.deepEqual(camera.position, initial);
-  sequence.update(0.02);
+  sequence.update(1 / 60);
   assert.equal(sequence.moving, true);
   assert.deepEqual(camera.position, initial);
   sequence.update(0.3);
