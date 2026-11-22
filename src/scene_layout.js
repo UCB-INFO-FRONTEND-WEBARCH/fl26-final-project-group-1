@@ -42,7 +42,7 @@ export function make_scene_xml() {
     ).join('\n');
     return `<body name="${item.name}" pos="${item.position.join(' ')}" euler="0 0 ${item.yaw}">${geoms}</body>`;
   }).join('\n');
-  return `<mujoco model="RoboPlay IKEA apartment">
+  return `<mujoco model="Centoria IKEA apartment">
     <include file="robot.xml"/>
     <option timestep="${PHYSICS_DT}" gravity="0 0 -9.81"/>
     <asset>${meshes}</asset>

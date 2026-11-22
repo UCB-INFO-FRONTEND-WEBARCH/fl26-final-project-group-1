@@ -1,6 +1,6 @@
-# RoboPlay
+# Centoria
 
-RoboPlay is a React application for manual and automatic navigation of Berkeley
+Centoria is a React application for manual and automatic navigation of Berkeley
 Lite Pro in a furnished, two-floor apartment. The S3 SuperMimic policy controls
 34 body joints using velocity goals, body history, and a head depth camera.
 MuJoCo simulates the robot, stairs, furniture, and elevator in the browser.
@@ -20,7 +20,7 @@ The mode adds no IK, motion filtering, foot locking, or secondary animation.
 The character keeps its original proportions, so its feet can slide or intersect
 surfaces. The trained robot still supplies physics, contacts, and depth sensing.
 
-The public character is NAI by -T.K.-, from the Lite-Motions Space, with authorization for RoboPlay visitor use.
+The public character is NAI by -T.K.-, from the Lite-Motions Space, with authorization for Centoria visitor use.
 `src/character_asset.js` pins its source URL and hash. The app loads the original
 file from its host and does not include a copy in the Pages artifact.
 

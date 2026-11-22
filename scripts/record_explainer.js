@@ -28,7 +28,7 @@ for (let id = 0; id < model.ngeom; id++) {
 const rotation = new Matrix4();
 const quaternion = new Quaternion();
 const manifest = {
-  description: 'Seeded physical S3 policy runs in the RoboPlay apartment. Recorded at 10 frames/s. No pose corrections.',
+  description: 'Seeded physical S3 policy runs in the Centoria apartment. Recorded at 10 frames/s. No pose corrections.',
   source: contract.source,
   source_commit: contract.commit,
   report: contract.artifact,
