@@ -1,0 +1,56 @@
+{
+  "description": "100 control steps (2 simulated seconds) each, forward 0.5 m/s, full apartment, no planner, noise enabled; two fresh seed-1 runs and one seed-2 run",
+  "runtime": {
+    "node": "v18.19.1",
+    "platform": "linux",
+    "arch": "x64",
+    "mujoco": "3.17.0",
+    "onnxruntime_web": "1.31.1",
+    "execution_provider": "wasm",
+    "threads": 1
+  },
+  "same_seed": {
+    "pose_max_abs_error": 0,
+    "action_max_abs_error": 0
+  },
+  "changed_seed": {
+    "pose_max_abs_error": 0.0163407068617627,
+    "action_max_abs_error": 0.16027522087097168
+  },
+  "runs": [
+    {
+      "seed": 1,
+      "pose_sha256": "5f1d715d6d6275f9e39b5f5685af0d9b5fa4466ffa5b903c95ac35c130058103",
+      "position": [
+        -3.9906756718925127,
+        -3.2833177516527328,
+        0.7236034925204159
+      ],
+      "time": 2,
+      "fallen": false
+    },
+    {
+      "seed": 1,
+      "pose_sha256": "5f1d715d6d6275f9e39b5f5685af0d9b5fa4466ffa5b903c95ac35c130058103",
+      "position": [
+        -3.9906756718925127,
+        -3.2833177516527328,
+        0.7236034925204159
+      ],
+      "time": 2,
+      "fallen": false
+    },
+    {
+      "seed": 2,
+      "pose_sha256": "7d973e24542a03658f1b444d9cfec16a8303ed89760e75b40f25bcbf1346e382",
+      "position": [
+        -3.9922173021675103,
+        -3.28209416406261,
+        0.7240118861857914
+      ],
+      "time": 2,
+      "fallen": false
+    }
+  ],
+  "limits": "Same host, process, physics version, initial state and provider only; not evidence of cross-browser determinism, broad task success, or real-world transfer. The pose maximum mixes qpos units; trajectory hashes use host Float64 byte order."
+}
