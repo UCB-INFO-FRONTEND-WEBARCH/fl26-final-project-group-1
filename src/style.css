@@ -304,7 +304,7 @@ input[type='range']::-moz-range-thumb { width: 9px; height: 9px; border: 3px sol
   .scene-tag > span { display: none; }
   .camera-switch { top: 48px; left: 12px; }
   .camera-switch button { font-size: 10px; padding: 7px 9px; }
-  .render-quality { right: 13px; top: 52px; }
+  .render-quality { right: 13px; top: 93px; }
   .render-quality > select { font-size: 10px; padding: 5px 7px; }
   .render-quality { font-size: 0; gap: 0; }
   .minimap { width: 113px; left: 12px; bottom: 43px; border-radius: 12px; padding: 9px; }

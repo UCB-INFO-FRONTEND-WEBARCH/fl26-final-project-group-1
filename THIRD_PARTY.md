@@ -45,6 +45,29 @@ and prohibits redistribution and modification. The project-specific authorizatio
 does not change these restrictions for other uses. The original file and its
 embedded metadata remain unchanged.
 
+## Aerial arrival
+
+The Bay Area overview is NASA GIBS MODIS Terra corrected-reflectance imagery,
+dated July 16, 2024, retrieved through its [public WMS service](https://nasa-gibs.github.io/gibs-api-docs/access-basics/).
+The closer Santa Clara, campus, and Building K views use public-domain
+[USGS/USDA NAIP orthoimagery](https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer).
+The downloaded JPEG images are unchanged. The app applies its color grade and
+procedural cloud effect at render time.
+
+The target is Building K at 2886 Scott Boulevard. Its roof was located using
+[NVIDIA's visitor map](https://www.nvidia.com/content/dam/en-zz/Solutions/support/corp-facilities-visitor-map-2022.pdf)
+and the aerial image. This is a visual arrival location; the indoor playground
+is a separate scene and does not reproduce the real building's interior.
+
+Night lights are an artistic rendering of real road centerlines from
+© OpenStreetMap contributors, under [ODbL 1.0](https://www.openstreetmap.org/copyright).
+`public/assets/arrival/lights.bin` is the derived point database, also under
+ODbL 1.0. Its coordinate origin, binary layout, source, license, and hash are in
+the adjacent `manifest.json`. `scripts/prepare_arrival_assets.py` records the
+Overpass extraction and point-spacing rules. The arrival displays imagery and
+map credits. The night view is a stylized render of the daytime aerial images;
+it is not nighttime satellite photography.
+
 ## Runtime libraries
 
 | Library | Source | License |

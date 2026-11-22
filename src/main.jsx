@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SceneView } from './scene_view.js';
 import { command_from_keys } from './locomotion.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 import { Icon } from './icons.jsx';
@@ -9,7 +8,10 @@ import { IDLE_NAVIGATION } from './navigation.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
 import { SITE_BASE } from './asset_paths.js';
 import { CHARACTER_ASSET } from './character_asset.js';
+import { ThemeToggle } from './theme_toggle.jsx';
+import { ARRIVAL_LEVELS } from './arrival_levels.js';
 import './style.css';
+import './entry.css';
 
 const INITIAL_TELEMETRY = {
   position: SPAWN,
@@ -37,7 +39,7 @@ const MOVEMENT_KEYS = new Set([
   'ArrowLeft',
   'ArrowRight',
 ]);
-const CAMERA_MODES = ['follow', 'orbit', 'top'];
+const CAMERA_MODES = ['shoulder', 'follow', 'orbit', 'top'];
 
 function MiniMap({ telemetry, floor, on_destination }) {
   return (
@@ -113,7 +115,8 @@ function MiniMap({ telemetry, floor, on_destination }) {
   );
 }
 
-function App() {
+function Playground({ on_exit, entry_complete }) {
+  const shell_ref = useRef(null);
   const viewport_ref = useRef(null);
   const view_ref = useRef(null);
   const worker_ref = useRef(null);
@@ -122,13 +125,14 @@ function App() {
   const speed_ref = useRef(0.6);
   const transfer_ref = useRef('elevator');
   const ready_ref = useRef(false);
+  const phase_ref = useRef('intro');
+  const entry_complete_ref = useRef(entry_complete);
   const figure_request = useRef(0);
   const [telemetry, set_telemetry] = useState(INITIAL_TELEMETRY);
-  const [loading, set_loading] = useState('Starting the navigation lab');
   const [ready, set_ready] = useState(false);
   const [error, set_error] = useState('');
   const [performance_stats, set_performance_stats] = useState(null);
-  const [camera, set_camera] = useState('follow');
+  const [camera, set_camera] = useState('shoulder');
   const [render_quality, set_render_quality] = useState('performance');
   const [speed, set_speed] = useState(0.6);
   const [pressed, set_pressed] = useState(new Set());
@@ -137,6 +141,9 @@ function App() {
   const [figure, set_figure] = useState('robot');
   const [character_loading, set_character_loading] = useState(false);
   const [character_error, set_character_error] = useState('');
+  const [phase, set_phase] = useState('intro');
+  const [controls_open, set_controls_open] = useState(false);
+  const [arrival_level, set_arrival_level] = useState({ index: 0, label: ARRIVAL_LEVELS[0].label });
 
   async function change_figure(value) {
     const request = ++figure_request.current;
@@ -190,7 +197,7 @@ function App() {
   }
 
   function change_floor(floor) {
-    if (view_ref.current?.mode === 'follow') change_camera('orbit');
+    if (['follow', 'shoulder'].includes(view_ref.current?.mode)) change_camera('orbit');
     view_ref.current?.set_floor(floor);
     set_viewed_floor(floor);
   }
@@ -211,13 +218,24 @@ function App() {
   }
 
   function change_camera(mode) {
-    if (mode === 'follow') {
+    if (['follow', 'shoulder'].includes(mode)) {
       view_ref.current?.set_floor(telemetry_ref.current.floor);
       set_viewed_floor(telemetry_ref.current.floor);
     }
     view_ref.current?.set_camera(mode);
     set_camera(mode);
   }
+
+  function cycle_camera() {
+    if (!ready_ref.current) return;
+    const current = view_ref.current?.mode || 'shoulder';
+    change_camera(CAMERA_MODES[(CAMERA_MODES.indexOf(current) + 1) % CAMERA_MODES.length]);
+  }
+
+  useEffect(() => {
+    entry_complete_ref.current = entry_complete;
+    if (view_ref.current?.arrival_opening) view_ref.current.arrival_opening.entry_complete = entry_complete;
+  }, [entry_complete]);
 
   useEffect(() => {
     let view;
@@ -226,6 +244,9 @@ function App() {
     let active = true;
     let robot_ready = false;
     let furniture_ready = false;
+    let world_ready = false;
+    const previous_overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
     function report_error(message) {
       if (!active) return;
@@ -238,71 +259,90 @@ function App() {
     }
 
     function finish_loading() {
-      if (!active || !robot_ready || !furniture_ready) return;
-      ready_ref.current = true;
+      if (!active || !robot_ready || !furniture_ready || world_ready) return;
+      world_ready = true;
       set_ready(true);
-      worker.postMessage({ type: 'pause', paused: document.hidden });
+      view.set_arrival_ready();
       worker.postMessage({ type: 'speed', speed: speed_ref.current });
       worker.postMessage({ type: 'transfer', transfer: transfer_ref.current });
     }
 
-    try {
-      view = new SceneView(viewport_ref.current, set_performance_stats, navigate);
-      view_ref.current = view;
-      view.load_furniture().then(() => {
-        furniture_ready = true;
-        finish_loading();
-      }).catch((exception) => report_error(`Could not load the IKEA furniture. ${exception.message}`));
-      worker = new Worker(new URL('./simulation.worker.js', import.meta.url), { type: 'module' });
-      worker_ref.current = worker;
-      worker.onmessage = (event) => {
+    async function initialize_view() {
+      try {
+        const { SceneView } = await import('./scene_view.js');
         if (!active) return;
-        const message = event.data;
-        switch (message.type) {
-          case 'loading':
-            set_loading(message.message);
-            break;
-          case 'error':
-            report_error(message.message);
-            break;
-          case 'ready':
-            view.load_robot(message.geometries, message.character_rig);
-            robot_ready = true;
-            if (!furniture_ready) set_loading('Loading the IKEA apartment furniture');
-            finish_loading();
-            break;
-          case 'frame': {
-            view.update_frame(message.transforms, message.telemetry);
-            worker.postMessage({ type: 'frame_received', buffer: message.transforms.buffer }, [
-              message.transforms.buffer,
-            ]);
-            // A paused state can be the last worker frame. Publish it without throttling.
-            const urgent =
-              message.telemetry.navigation?.version !== telemetry_ref.current.navigation?.version ||
-              message.telemetry.paused ||
-              message.telemetry.fallen ||
-              message.telemetry.time < telemetry_ref.current.time ||
-              message.telemetry.fallen !== telemetry_ref.current.fallen ||
-              message.telemetry.paused !== telemetry_ref.current.paused;
-            telemetry_ref.current = message.telemetry;
-            const now = performance.now();
-            if (now - last_ui_time > 250 || urgent) {
-              set_telemetry(message.telemetry);
-              set_viewed_floor(view.viewed_floor);
-              last_ui_time = now;
+        view = new SceneView(viewport_ref.current, set_performance_stats, navigate);
+        view_ref.current = view;
+        view.start_arrival(set_arrival_level, () => {
+          if (!active) return;
+          phase_ref.current = 'playing';
+          ready_ref.current = true;
+          set_phase('playing');
+          worker.postMessage({ type: 'pause', paused: document.hidden });
+          requestAnimationFrame(() => {
+            if (active) view.renderer.domElement.focus({ preventScroll: true });
+          });
+        }, opacity => shell_ref.current?.style.setProperty('--arrival-reveal', String(opacity)));
+        view.arrival_opening.entry_complete = entry_complete_ref.current;
+        view.load_arrival_assets().catch(exception => report_error(`Could not load the satellite arrival. ${exception.message}`));
+        view.load_furniture().then(() => {
+          furniture_ready = true;
+          finish_loading();
+        }).catch((exception) => report_error(`Could not load the IKEA furniture. ${exception.message}`));
+        worker = new Worker(new URL('./simulation.worker.js', import.meta.url), { type: 'module' });
+        worker_ref.current = worker;
+        worker.onmessage = (event) => {
+          if (!active) return;
+          const message = event.data;
+          switch (message.type) {
+            case 'error':
+              report_error(message.message);
+              break;
+            case 'ready':
+              view.load_robot(message.geometries, message.character_rig);
+              robot_ready = true;
+              finish_loading();
+              break;
+            case 'frame': {
+              view.update_frame(message.transforms, message.telemetry);
+              worker.postMessage({ type: 'frame_received', buffer: message.transforms.buffer }, [
+                message.transforms.buffer,
+              ]);
+              // A paused state can be the last worker frame. Publish it without throttling.
+              const urgent =
+                message.telemetry.navigation?.version !== telemetry_ref.current.navigation?.version ||
+                message.telemetry.paused ||
+                message.telemetry.fallen ||
+                message.telemetry.time < telemetry_ref.current.time ||
+                message.telemetry.fallen !== telemetry_ref.current.fallen ||
+                message.telemetry.paused !== telemetry_ref.current.paused;
+              telemetry_ref.current = message.telemetry;
+              const now = performance.now();
+              if (now - last_ui_time > 250 || urgent) {
+                set_telemetry(message.telemetry);
+                set_viewed_floor(view.viewed_floor);
+                last_ui_time = now;
+              }
+              break;
             }
-            break;
           }
-        }
-      };
-      worker.onerror = (event) => {
-        report_error(event.message || 'The physics worker could not start.');
-      };
-    } catch (exception) {
-      report_error(`Could not create the 3D view. ${exception.message}`);
+        };
+        worker.onerror = (event) => {
+          report_error(event.message || 'The physics worker could not start.');
+        };
+      } catch (exception) {
+        report_error(`Could not create the 3D view. ${exception.message}`);
+      }
     }
+    initialize_view();
 
     const key_down = (event) => {
+      if (phase_ref.current === 'intro' && event.code === 'Escape') {
+        event.preventDefault();
+        on_exit();
+        return;
+      }
+      if (phase_ref.current !== 'playing') return;
       if (event.target.closest?.('[role="dialog"]')) return;
       if (
         event.target instanceof HTMLInputElement ||
@@ -324,10 +364,7 @@ function App() {
         toggle_pause();
       }
       if (event.code === 'KeyR') reset();
-      if (event.code === 'KeyC') {
-        const current = view_ref.current?.mode || 'follow';
-        change_camera(CAMERA_MODES[(CAMERA_MODES.indexOf(current) + 1) % CAMERA_MODES.length]);
-      }
+      if (event.code === 'KeyV' || event.code === 'KeyC') cycle_camera();
     };
     const key_up = (event) => {
       if (MOVEMENT_KEYS.has(event.code) && keys_ref.current.delete(event.code)) {
@@ -348,6 +385,8 @@ function App() {
     document.addEventListener('visibilitychange', visibility_change);
     return () => {
       active = false;
+      ready_ref.current = false;
+      document.body.style.overflow = previous_overflow;
       figure_request.current++;
       window.removeEventListener('keydown', key_down);
       window.removeEventListener('keyup', key_up);
@@ -385,30 +424,8 @@ function App() {
     .padStart(2, '0');
 
   return (
-    <div className="app-shell" id="top">
-      <SiteHeader current="playground">
-        <div className={`live-status ${telemetry.paused || telemetry.fallen || error ? 'inactive' : ''}`}>
-          <i />
-          {status}
-        </div>
-        <a
-          className="nav-cta"
-          href="#playground"
-          onClick={() => viewport_ref.current?.querySelector('canvas')?.focus({ preventScroll: true })}
-        >
-          Try it <span aria-hidden="true">↗</span>
-        </a>
-      </SiteHeader>
-
-      <section className="workspace-title" aria-labelledby="page-title">
-        <div className="eyebrow">The interactive robotics playground.</div>
-        <h1 id="page-title">
-          Robotics. <span>In your hands.</span>
-        </h1>
-        <p>A real walking policy. A world to explore. All in your browser.</p>
-      </section>
-
-      <div className="workspace" id="playground">
+    <div ref={shell_ref} className={`game-shell ${phase} ${controls_open ? 'controls-open' : ''}`}>
+      <div className="workspace" id="playground" inert={phase === 'intro'}>
         <main className="main-panel">
           <section className="scene-shell" aria-label="Indoor navigation simulation">
             <div className="viewport" ref={viewport_ref} />
@@ -435,6 +452,7 @@ function App() {
                   key={mode}
                   className={camera === mode ? 'selected' : ''}
                   aria-pressed={camera === mode}
+                  title={mode === 'shoulder' ? 'Over-the-shoulder view follows your heading' : undefined}
                   onClick={() => change_camera(mode)}
                 >
                   {mode === 'follow' && <Icon name="camera" size={15} />}{' '}
@@ -456,7 +474,7 @@ function App() {
                 <option value="quality">Quality</option>
               </select>
             </label>
-            {new URLSearchParams(window.location.search).has('profile') && performance_stats && (
+            {phase === 'playing' && new URLSearchParams(window.location.search).has('profile') && performance_stats && (
               <output className="performance-diagnostics" aria-label="Performance diagnostics">
                 {JSON.stringify(
                   {
@@ -476,32 +494,16 @@ function App() {
                 <b>Y</b>
                 <b>Z</b>
               </span>
-              Click a floor to walk there <span className="mouse-hint">Drag to orbit · scroll to zoom</span>
+              Click a floor to walk there <span className="mouse-hint">
+                {camera === 'shoulder' ? 'Follows your heading · scroll to zoom' : 'Drag to orbit · scroll to zoom'}
+              </span>
             </div>
             <div className="scene-zoom" role="group" aria-label="Scene zoom">
               <button aria-label="Zoom out" title="Zoom out" onClick={() => view_ref.current?.zoom(1.4)}>−</button>
               <button aria-label="Zoom in" title="Zoom in" onClick={() => view_ref.current?.zoom(1 / 1.4)}>+</button>
             </div>
 
-            {!ready && (
-              <div className="loading-overlay" role="status">
-                <div className="loading-card">
-                  {error ? <Icon name="info" size={28} /> : <span className="loader" />}
-                  <h2>{error ? 'The lab could not start' : 'Getting Lite Pro ready'}</h2>
-                  <p>{error || loading}</p>
-                  {error ? (
-                    <button className="primary-button" onClick={() => window.location.reload()}>
-                      Try again
-                    </button>
-                  ) : (
-                    <span className="loading-footnote">
-                      Physics + neural inference, running in your browser.
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-            {ready && telemetry.fallen && (
+            {phase === 'playing' && ready && telemetry.fallen && (
               <div className="fallen-banner" role="alert">
                 <Icon name="info" />
                 <span>Lite Pro lost its balance. Reset to try again.</span>
@@ -510,7 +512,7 @@ function App() {
                 </button>
               </div>
             )}
-            {ready && telemetry.paused && !telemetry.fallen && (
+            {phase === 'playing' && ready && telemetry.paused && !telemetry.fallen && (
               <div className="paused-label">
                 <Icon name="pause" size={15} /> Simulation paused
               </div>
@@ -567,7 +569,7 @@ function App() {
           </div>
         </main>
 
-        <aside className="sidebar" aria-label="Robot controls and telemetry">
+        <aside className="sidebar" id="game-controls" aria-label="Robot controls and telemetry">
           <div className="sidebar-heading">
             <span>Meet your robot</span>
             <span className="connection-dot" />
@@ -757,6 +759,33 @@ function App() {
           </div>
         </aside>
       </div>
+      {phase === 'intro' ? <>
+        <span className="arrival-announcement" role="status" aria-live="polite">{arrival_level.label}</span>
+        {error && <div className="arrival-status has-error" role="alert">
+          <h1>We could not open the world.</h1>
+          <p>{error}</p>
+          <button onClick={on_exit}>Back to site <span>↗</span></button>
+        </div>}
+        <div className="arrival-credit">
+          <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-standard-services/global-imagery-browse-services-gibs" target="_blank" rel="noreferrer">NASA GIBS</a>
+          <span> / </span><a href="https://www.usgs.gov/programs/national-geospatial-program/national-map" target="_blank" rel="noreferrer">USGS · USDA</a>
+          <span> / </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
+        </div>
+      </> : <>
+        <div className="game-bar">
+          <button className="game-camera" onClick={cycle_camera} aria-label="Cycle camera view">
+            <kbd>V</kbd> {camera === 'top' ? 'Top-down' : camera[0].toUpperCase() + camera.slice(1)}
+          </button>
+          <div className="game-menu">
+            <span className="game-status">{status}</span>
+            <ThemeToggle />
+            <button aria-expanded={controls_open} aria-controls="game-controls"
+              onClick={() => set_controls_open(!controls_open)}>{controls_open ? 'Close controls' : 'Controls'}</button>
+            <button onClick={on_exit} aria-label="Exit to site"><Icon name="close" size={18} /></button>
+          </div>
+        </div>
+        {!controls_open && <div className="game-key-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></div>}
+      </>}
     </div>
   );
 }
@@ -775,6 +804,38 @@ function ControlKey({ code, title, pressed, on_control }) {
       {code.slice(3)}
     </button>
   );
+}
+
+function Landing({ leaving, on_play, on_left }) {
+  return <div className={`entry-page ${leaving ? 'departing' : ''}`} id="top" inert={leaving}
+    onAnimationEnd={event => { if (event.target === event.currentTarget && leaving) on_left(); }}>
+    <SiteHeader current="playground">
+      <button className="nav-cta" onClick={on_play}>Play <span aria-hidden="true">↗</span></button>
+    </SiteHeader>
+    <main className="entry-content" id="playground">
+      <div className="entry-copy">
+        <div className="eyebrow">THE INTERACTIVE ROBOTICS PLAYGROUND</div>
+        <h1>Step into<br /><span>your world.</span></h1>
+        <p>A real walking policy. A world to explore.<br />All in your browser.</p>
+        <button className="entry-play" onClick={on_play}><Icon name="play" size={19} /> Play <span>↗</span></button>
+        <div className="entry-keys"><span>WASD to move</span><i /> <span>V to change view</span></div>
+      </div>
+    </main>
+    <footer className="entry-footer"><span>Real physics. Learned locomotion.</span><a href={`${SITE_BASE}how-it-works/`}>See how it works <span>↗</span></a></footer>
+  </div>;
+}
+
+function App() {
+  const [entered, set_entered] = useState(false);
+  const [landing_visible, set_landing_visible] = useState(true);
+  function exit() {
+    set_entered(false);
+    set_landing_visible(true);
+  }
+  return <>
+    {entered && <Playground on_exit={exit} entry_complete={!landing_visible} />}
+    {landing_visible && <Landing leaving={entered} on_play={() => set_entered(true)} on_left={() => set_landing_visible(false)} />}
+  </>;
 }
 
 createRoot(document.getElementById('root')).render(<App />);

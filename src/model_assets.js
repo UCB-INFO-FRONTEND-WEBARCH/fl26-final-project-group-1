@@ -16,6 +16,7 @@ export function dispose_model(model) {
   const textures = new Set();
   const skeletons = new Set();
   model.traverse((object) => {
+    if (object.isInstancedMesh) object.dispose();
     if (object.geometry) geometries.add(object.geometry);
     if (object.skeleton) skeletons.add(object.skeleton);
     for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
