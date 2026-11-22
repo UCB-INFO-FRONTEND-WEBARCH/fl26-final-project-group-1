@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ArrivalOpening, ARRIVAL_BLANK_SECONDS, ARRIVAL_REVEAL_SECONDS } from '../src/arrival_opening.js';
 
-test('ready assets cannot reveal the map while the landing UI is still leaving', () => {
+test('a ready overview cannot reveal the map while the landing UI is still leaving', () => {
   const opening = new ArrivalOpening();
-  opening.assets_ready = true;
+  opening.overview_ready = true;
   opening.update(30);
   assert.equal(opening.phase, 'waiting');
   assert.equal(opening.elapsed, 0);
@@ -16,14 +16,14 @@ test('ready assets cannot reveal the map while the landing UI is still leaving',
   assert.equal(opening.opacity, 0);
 });
 
-test('a slow load stays fully blank until the complete aerial render is ready', () => {
+test('only the initial overview gates the reveal', () => {
   const opening = new ArrivalOpening();
   opening.entry_complete = true;
   opening.update(1 / 60);
   opening.update(30);
   assert.equal(opening.phase, 'blank');
   assert.equal(opening.opacity, 0);
-  opening.assets_ready = true;
+  opening.overview_ready = true;
   opening.update(1 / 60);
   assert.equal(opening.phase, 'revealing');
   assert.equal(opening.opacity, 0);

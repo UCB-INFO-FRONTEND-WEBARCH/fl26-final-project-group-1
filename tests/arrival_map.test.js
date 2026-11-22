@@ -9,12 +9,12 @@ const base = new URL('../public/assets/arrival/', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('manifest.json', base), 'utf8'));
 
 test('aerial images and road lights match their recorded source hashes', async () => {
-  for (const asset of [...manifest.images, manifest.lights]) {
+  for (const asset of [...manifest.images, manifest.lights, manifest.lights.overview]) {
     const bytes = await readFile(new URL(asset.file, base));
     assert.equal(createHash('sha256').update(bytes).digest('hex'), asset.sha256);
     if (asset.file.endsWith('.jpg')) assert.equal(bytes.readUInt16BE(), 0xffd8);
     else {
-      assert.equal(bytes.length, manifest.lights.count * 3 * 4);
+      assert.equal(bytes.length, asset.count * 3 * 4);
       for (let index = 0; index < bytes.length; index += 12) {
         assert.ok(Number.isFinite(bytes.readFloatLE(index)) && Number.isFinite(bytes.readFloatLE(index + 4)));
         assert.ok(bytes.readFloatLE(index + 8) > 0 && bytes.readFloatLE(index + 8) <= 1);

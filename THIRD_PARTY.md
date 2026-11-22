@@ -63,8 +63,9 @@ Night lights are an artistic rendering of real road centerlines from
 © OpenStreetMap contributors, under [ODbL 1.0](https://www.openstreetmap.org/copyright).
 `public/assets/arrival/lights.bin` is the derived point database, also under
 ODbL 1.0. Its coordinate origin, binary layout, source, license, and hash are in
-the adjacent `manifest.json`. `scripts/prepare_arrival_assets.py` records the
-Overpass extraction and point-spacing rules. The arrival displays imagery and
+the adjacent `manifest.json`. `overview-lights.bin` is the regional-road subset
+preloaded for the first view and has the same license.
+`scripts/prepare_arrival_assets.py` records the Overpass extraction and point-spacing rules. The arrival displays imagery and
 map credits. The night view is a stylized render of the daytime aerial images;
 it is not nighttime satellite photography.
 

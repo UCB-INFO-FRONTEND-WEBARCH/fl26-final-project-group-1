@@ -9,8 +9,6 @@ import { ROBOT_POSE_SIZE } from './robot_assets.js';
 import { CHARACTER_ASSET } from './character_asset.js';
 import { ShoulderCamera } from './shoulder_camera.js';
 import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
-import { ArrivalMap } from './arrival_map.js';
-import { ArrivalOpening } from './arrival_opening.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
@@ -33,7 +31,7 @@ function floor_label(text, width, color = '#85858d') {
 }
 
 export class SceneView {
-  constructor(container, on_metrics, on_destination) {
+  constructor(container, on_metrics, on_destination, renderer) {
     this.container = container;
     this.on_metrics = on_metrics;
     this.on_destination = on_destination;
@@ -51,7 +49,7 @@ export class SceneView {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#f5f5f7');
     this.scene.fog = new THREE.Fog('#f5f5f7', 23, 48);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = renderer;
     this.renderer.setPixelRatio(1);
     this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -445,14 +443,16 @@ export class SceneView {
     if (mode !== 'shoulder') this.controls.update();
   }
 
-  start_arrival(on_level, on_complete, on_reveal) {
+  start_arrival(preview, on_level, on_complete, on_reveal) {
     this.set_floor(0);
     this.shoulder_camera.update(this.robot_position, this.robot_heading, 0, true);
     this.reduced_motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.arrival = new ArrivalCamera(this.camera, this.controls.target, this.robot_position,
       this.camera.position, this.controls.target, this.reduced_motion);
-    this.arrival_map = new ArrivalMap();
-    this.arrival_opening = new ArrivalOpening();
+    this.arrival.elapsed = preview.hold_seconds;
+    this.arrival_map = preview.map;
+    this.arrival_opening = preview.opening;
+    this.arrival_abort = preview.abort;
     this.arrival_map.night = this.theme === 'dark';
     this.camera.far = 1000;
     this.camera.updateProjectionMatrix();
@@ -466,14 +466,14 @@ export class SceneView {
   }
 
   async load_arrival_assets() {
-    await this.arrival_map.load(`${SITE_BASE}assets/arrival/`, this.arrival_abort.signal);
-    this.arrival_opening.assets_ready = Boolean(this.arrival_world_ready);
+    await this.arrival_map.load_details(`${SITE_BASE}assets/arrival/`, this.arrival_abort.signal);
+    this.arrival.ready = Boolean(this.arrival_world_ready);
     this.needs_render = true;
   }
 
   set_arrival_ready() {
     this.arrival_world_ready = true;
-    this.arrival_opening.assets_ready = this.arrival_map.ready;
+    this.arrival.ready = this.arrival_map.details_ready;
   }
 
   finish_arrival() {
@@ -600,7 +600,6 @@ export class SceneView {
     let camera_changed;
     if (this.arrival) {
       if (this.arrival_opening.phase === 'complete') {
-        this.arrival.ready = true;
         this.arrival.update(seconds);
       } else {
         const previous_opacity = this.arrival_opening.opacity;

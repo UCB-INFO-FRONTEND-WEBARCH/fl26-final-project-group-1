@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { dispose_model } from './model_assets.js';
 import { satellite_frame } from './arrival_geography.js';
 
 const QUAD_VERTEX = `varying vec2 vUv;
@@ -11,6 +10,7 @@ uniform vec3 uBounds[4];
 uniform vec2 uCenter;
 uniform vec2 uSpan;
 uniform float uNight;
+uniform float uDetail;
 varying vec2 vUv;
 vec4 sample_map(sampler2D image, vec3 bounds, vec2 world) {
   vec2 uv = (world - bounds.xy) / bounds.z + 0.5;
@@ -20,9 +20,11 @@ vec4 sample_map(sampler2D image, vec3 bounds, vec2 world) {
 void main() {
   vec2 world = uCenter + (vUv - 0.5) * uSpan;
   vec3 color = sample_map(uImages[0], uBounds[0], world).rgb;
-  vec4 detail = sample_map(uImages[1], uBounds[1], world); color = mix(color, detail.rgb, detail.a);
-  detail = sample_map(uImages[2], uBounds[2], world); color = mix(color, detail.rgb, detail.a);
-  detail = sample_map(uImages[3], uBounds[3], world); color = mix(color, detail.rgb, detail.a);
+  if (uDetail > 0.0) {
+    vec4 detail = sample_map(uImages[1], uBounds[1], world); color = mix(color, detail.rgb, detail.a * uDetail);
+    detail = sample_map(uImages[2], uBounds[2], world); color = mix(color, detail.rgb, detail.a * uDetail);
+    detail = sample_map(uImages[3], uBounds[3], world); color = mix(color, detail.rgb, detail.a * uDetail);
+  }
   float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
   vec3 day = mix(color, vec3(gray) * vec3(0.94, 1.0, 1.07), 0.14);
   vec3 night = color * vec3(0.095, 0.15, 0.28) + gray * vec3(0.008, 0.012, 0.025);
@@ -31,12 +33,13 @@ void main() {
 
 const LIGHT_VERTEX = `
 uniform float uPixelsPerMeter;
+uniform float uDetail;
 varying float vStrength;
 varying float vVisibility;
 void main() {
   vStrength = position.z;
   // Reveal local roads only when their lights can resolve into separate points.
-  float local_visibility = smoothstep(0.02, 0.08, uPixelsPerMeter);
+  float local_visibility = smoothstep(0.02, 0.08, uPixelsPerMeter) * uDetail;
   vVisibility = mix(local_visibility, 1.0, step(0.55, vStrength)) * min(1.0, uPixelsPerMeter * 25.0);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, 0.0, 1.0);
   gl_PointSize = clamp((10.0 + vStrength * 10.0) * uPixelsPerMeter, 3.0, 15.0);
@@ -135,12 +138,13 @@ export class ArrivalMap {
     this.time = 0;
     this.night = false;
     this.ready = false;
+    this.details_ready = false;
     this.textures = [];
     this.geometry = new THREE.PlaneGeometry(2, 2);
     this.map_material = new THREE.ShaderMaterial({
       vertexShader: QUAD_VERTEX, fragmentShader: MAP_FRAGMENT, depthTest: false, depthWrite: false,
       uniforms: { uImages: { value: [] }, uBounds: { value: [] }, uCenter: { value: new THREE.Vector2() },
-        uSpan: { value: new THREE.Vector2() }, uNight: { value: 0 } },
+        uSpan: { value: new THREE.Vector2() }, uNight: { value: 0 }, uDetail: { value: 0 } },
     });
     this.scene.add(new THREE.Mesh(this.geometry, this.map_material));
     this.cloud_material = new THREE.ShaderMaterial({
@@ -154,37 +158,57 @@ export class ArrivalMap {
     this.composite.add(new THREE.Mesh(this.geometry, this.cloud_material));
   }
 
-  async load(base, signal) {
+  async load_texture(base, index, signal) {
+    const image = this.manifest.images[index];
+    const response = await fetch(`${base}${image.file}`, { signal });
+    if (!response.ok) throw new Error(`The ${image.label} image could not load.`);
+    const bitmap = await createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
+    if (signal.aborted) { bitmap.close(); signal.throwIfAborted(); }
+    const texture = new THREE.Texture(bitmap);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    this.textures[index] = texture;
+  }
+
+  async load_lights(base, file, signal) {
+    const response = await fetch(`${base}${file}`, { signal });
+    if (!response.ok) throw new Error('The road lighting could not load.');
+    const positions = new Float32Array(await response.arrayBuffer());
+    signal.throwIfAborted();
+    return new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  }
+
+  async load_overview(base, signal) {
     const response = await fetch(`${base}manifest.json`, { signal });
     if (!response.ok) throw new Error('The satellite map could not load.');
     this.manifest = await response.json();
-    await Promise.all(this.manifest.images.map(async (image, index) => {
-      const response = await fetch(`${base}${image.file}`, { signal });
-      if (!response.ok) throw new Error(`The ${image.label} image could not load.`);
-      const bitmap = await createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
-      if (signal.aborted) { bitmap.close(); signal.throwIfAborted(); }
-      const texture = new THREE.Texture(bitmap);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.needsUpdate = true;
-      this.textures[index] = texture;
-    }));
-    const lights_response = await fetch(`${base}${this.manifest.lights.file}`, { signal });
-    if (!lights_response.ok) throw new Error('The road lighting could not load.');
-    const positions = new Float32Array(await lights_response.arrayBuffer());
-    signal.throwIfAborted();
-    const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const [, geometry] = await Promise.all([
+      this.load_texture(base, 0, signal), this.load_lights(base, this.manifest.lights.overview.file, signal),
+    ]);
     this.light_material = new THREE.ShaderMaterial({
       vertexShader: LIGHT_VERTEX, fragmentShader: LIGHT_FRAGMENT, transparent: true,
       blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
-      uniforms: { uPixelsPerMeter: { value: 1 } },
+      uniforms: { uPixelsPerMeter: { value: 1 }, uDetail: { value: 0 } },
     });
     this.lights = new THREE.Points(geometry, this.light_material);
     this.lights.frustumCulled = false;
     this.lights.renderOrder = 1;
     this.scene.add(this.lights);
-    this.map_material.uniforms.uImages.value = this.textures;
+    // Valid overview samplers keep the shader warm before detail textures arrive.
+    this.map_material.uniforms.uImages.value = Array(4).fill(this.textures[0]);
     this.map_material.uniforms.uBounds.value = this.manifest.images.map(image => new THREE.Vector3(...image.center, image.extent));
     this.ready = true;
+  }
+
+  async load_details(base, signal) {
+    const [, , , geometry] = await Promise.all([
+      ...[1, 2, 3].map(index => this.load_texture(base, index, signal)),
+      this.load_lights(base, this.manifest.lights.file, signal),
+    ]);
+    this.lights.geometry.dispose();
+    this.lights.geometry = geometry;
+    this.map_material.uniforms.uImages.value = this.textures;
+    this.details_ready = true;
   }
 
   render(renderer, scene, camera, arrival, seconds) {
@@ -199,8 +223,10 @@ export class ArrivalMap {
     uniforms.uCenter.value.set(...frame.center);
     uniforms.uSpan.value.set(frame.span * aspect, frame.span);
     uniforms.uNight.value = this.night ? 1 : 0;
+    uniforms.uDetail.value = this.details_ready ? (arrival.level === 0 ? smooth(progress) : 1) : 0;
     this.lights.visible = this.night;
     this.light_material.uniforms.uPixelsPerMeter.value = this.size.y / frame.span;
+    this.light_material.uniforms.uDetail.value = uniforms.uDetail.value;
     this.camera.left = -frame.span * aspect / 2;
     this.camera.right = frame.span * aspect / 2;
     this.camera.top = frame.span / 2;
@@ -226,8 +252,11 @@ export class ArrivalMap {
   }
 
   dispose() {
-    dispose_model(this.scene);
-    dispose_model(this.composite);
+    this.geometry.dispose();
+    this.map_material.dispose();
+    this.cloud_material.dispose();
+    this.lights?.geometry.dispose();
+    this.light_material?.dispose();
     for (const texture of this.textures) {
       texture?.source.data.close();
       texture?.dispose();

@@ -19,6 +19,13 @@
     "file": "lights.bin",
     "count": 272751,
     "stride": 3,
+    "sha256": "ef48c0039da1ffac5fcd1fedbb07446573980228d50f666b40159c168ae44c38",
+    "overview": {
+      "file": "overview-lights.bin",
+      "count": 128713,
+      "stride": 3,
+      "sha256": "90516debc111c24bf76e280a4965bcbb60289fa753fd80fae5fc082de6e5bb00"
+    },
     "local_bounds": [
       -6738.168777717277,
       -7530.7342993263155,
@@ -27,8 +34,7 @@
     ],
     "layout": "little-endian float32: Mercator x, y relative to origin, intensity",
     "license": "ODbL-1.0",
-    "source": "https://www.openstreetmap.org/copyright",
-    "sha256": "ef48c0039da1ffac5fcd1fedbb07446573980228d50f666b40159c168ae44c38"
+    "source": "https://www.openstreetmap.org/copyright"
   },
   "imagery_credit": "NASA GIBS / USGS / USDA \u00b7 \u00a9 OpenStreetMap contributors",
   "imagery_source": "https://www.usgs.gov/programs/national-geospatial-program/national-map",
