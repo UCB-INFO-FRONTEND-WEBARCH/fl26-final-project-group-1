@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from './icons.jsx';
 import { SITE_BASE } from './asset_paths.js';
+import { ThemeToggle } from './theme_toggle.jsx';
 
 export function SiteHeader({ current, children }) {
   return (
@@ -14,6 +15,7 @@ export function SiteHeader({ current, children }) {
         <a href={`${SITE_BASE}catalog/`} aria-current={current === 'catalog' ? 'page' : undefined}>Asset library</a>
         <a href={`${SITE_BASE}how-it-works/`} aria-current={current === 'how-it-works' ? 'page' : undefined}>How it works</a>
       </nav>
+      <ThemeToggle />
       {children}
     </header>
   );

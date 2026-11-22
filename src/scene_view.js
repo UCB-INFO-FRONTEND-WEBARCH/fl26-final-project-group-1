@@ -4,9 +4,14 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ConvexGeometry } from 'three/addons/geometries/ConvexGeometry.js';
 import { create_model_loader, dispose_model } from './model_assets.js';
-import { IKEA_BASE, model_path } from './asset_paths.js';
+import { SITE_BASE, IKEA_BASE, model_path } from './asset_paths.js';
 import { ROBOT_POSE_SIZE } from './robot_assets.js';
 import { CHARACTER_ASSET } from './character_asset.js';
+import { ShoulderCamera } from './shoulder_camera.js';
+import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
+import { ArrivalMap } from './arrival_map.js';
+import { ArrivalOpening } from './arrival_opening.js';
+import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 
@@ -38,6 +43,7 @@ export class SceneView {
     this.quality = 'performance';
     this.furniture_abort = new AbortController();
     this.character_abort = new AbortController();
+    this.arrival_abort = new AbortController();
     this.appearance = this.requested_appearance = 'robot';
     this.latest_robot_pose = new Float32Array(ROBOT_POSE_SIZE);
     this.has_robot_pose = false;
@@ -64,11 +70,13 @@ export class SceneView {
     this.controls.minDistance = 1.8;
     this.controls.maxDistance = 28;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
+    this.shoulder_camera = new ShoulderCamera(this.camera, this.controls.target);
     this.robot_position = new THREE.Vector3(...SPAWN);
+    this.robot_heading = 0;
     this.last_follow_position = this.robot_position.clone();
     this.robot_meshes = [];
     this.follow_delta = new THREE.Vector3();
-    this.mode = 'follow';
+    this.mode = 'shoulder';
     this.trail_count = 0;
     this.trail_positions = new Float32Array(1500 * 3);
     const trail_geometry = new THREE.BufferGeometry();
@@ -79,12 +87,23 @@ export class SceneView {
     this.trail.frustumCulled = false;
     this.scene.add(this.trail);
     this.build_room();
+    this.theme_handler = () => this.set_theme(get_theme());
+    this.theme_handler();
+    window.addEventListener(THEME_EVENT, this.theme_handler);
     this.install_picking();
-    this.set_camera('follow');
+    this.set_camera('shoulder');
+    this.wheel_handler = event => {
+      if (this.mode !== 'shoulder') return;
+      event.preventDefault();
+      const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? container.clientHeight : 1);
+      this.zoom(Math.exp(THREE.MathUtils.clamp(pixels * 0.001, -1, 1)));
+    };
+    this.renderer.domElement.addEventListener('wheel', this.wheel_handler, { passive: false });
     this.resize_observer = new ResizeObserver(() => this.resize());
     this.resize_observer.observe(container);
     this.resize();
     this.last_fps_time = performance.now();
+    this.last_render_time = this.last_fps_time;
     this.renderer.setAnimationLoop(time => this.render(time));
     this.visibility_handler = () => {
       this.renderer.setAnimationLoop(document.hidden ? null : time => this.render(time));
@@ -96,12 +115,23 @@ export class SceneView {
   }
 
   build_room() {
+    const camera_boxes = [
+      ...[0, 1].flatMap(floor => SCENE_WALLS.map(box => ({
+        center: [box.center[0], box.center[1], box.center[2] + floor * FLOOR_HEIGHT], size: box.size,
+      }))),
+      ...upper_slabs(), ...STAIR_BOXES, ...SHAFT_BOXES,
+    ];
+    for (const box of camera_boxes) {
+      this.shoulder_camera.add_obstacle(new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(...box.center), new THREE.Vector3(...box.size)));
+    }
     this.floor_groups = [new THREE.Group(), new THREE.Group()];
     this.floor_surfaces = [];
     this.furniture_shadows = [];
     this.viewed_floor = 0;
     this.scene.add(...this.floor_groups);
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#b0b3bb', 2));
+    this.ambient_light = new THREE.HemisphereLight('#ffffff', '#b0b3bb', 2);
+    this.scene.add(this.ambient_light);
     const sunlight = new THREE.DirectionalLight('#ffffff', 2);
     this.sunlight = sunlight;
     sunlight.position.set(-3, -6, 14);
@@ -243,6 +273,7 @@ export class SceneView {
         group.rotation.z = item.yaw;
         group.add(upright.clone(true));
         group.updateMatrixWorld(true);
+        this.shoulder_camera.add_obstacle(new THREE.Box3().setFromObject(group));
         group.traverse((object) => {
           object.matrixAutoUpdate = false;
           if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; }
@@ -259,7 +290,7 @@ export class SceneView {
     const generator = new THREE.PMREMGenerator(this.renderer);
     this.environment = generator.fromScene(room, 0.04);
     this.scene.environment = this.environment.texture;
-    this.scene.environmentIntensity = 0.55;
+    this.scene.environmentIntensity = this.theme === 'dark' ? 0.25 : 0.55;
     room.dispose();
     generator.dispose();
     if (new URLSearchParams(location.search).has('collisions')) {
@@ -340,9 +371,10 @@ export class SceneView {
     this.needs_render = true;
     this.paused = telemetry.paused || telemetry.fallen;
     this.robot_position.set(...telemetry.position);
+    this.robot_heading = telemetry.heading;
     this.current_floor = telemetry.floor || 0;
     this.lift_moving = telemetry.elevator?.moving || false;
-    if (this.mode === 'follow' && this.viewed_floor !== this.current_floor) this.set_floor(this.current_floor);
+    if ((this.mode === 'follow' || this.mode === 'shoulder') && this.viewed_floor !== this.current_floor) this.set_floor(this.current_floor);
     for (let index = 0; index < this.robot_meshes.length; index++) {
       const t = transforms.subarray(index * 12, index * 12 + 12);
       this.robot_meshes[index].matrix.set(t[3], t[4], t[5], t[0], t[6], t[7], t[8], t[1],
@@ -367,6 +399,7 @@ export class SceneView {
     }
     this.set_navigation(telemetry.navigation);
     if (telemetry.time < 0.02) {
+      this.shoulder_camera.initialized = false;
       this.trail_count = 0;
       this.trail.geometry.setDrawRange(0, 0);
     }
@@ -388,8 +421,17 @@ export class SceneView {
   set_camera(mode) {
     this.needs_render = true;
     this.mode = mode;
+    // Flush any orbit inertia before a preset takes control of the camera.
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = true;
+    this.controls.enabled = mode !== 'shoulder';
+    this.camera.fov = mode === 'shoulder' ? 52 : 44;
+    this.camera.updateProjectionMatrix();
     const z = this.viewed_floor === 'all' ? 1.65 : this.viewed_floor * FLOOR_HEIGHT;
-    if (mode === 'follow') {
+    if (mode === 'shoulder') {
+      this.shoulder_camera.update(this.robot_position, this.robot_heading, 0, true);
+    } else if (mode === 'follow') {
       this.camera.position.copy(this.robot_position).add(new THREE.Vector3(-5.3, -6.3, 5));
       this.controls.target.copy(this.robot_position).add(new THREE.Vector3(0.7, 0.2, -0.2));
     } else if (mode === 'top') {
@@ -400,12 +442,56 @@ export class SceneView {
       this.controls.target.set(-2.5, 0, z + 0.1);
     }
     this.last_follow_position.copy(this.robot_position);
-    this.controls.update();
+    if (mode !== 'shoulder') this.controls.update();
+  }
+
+  start_arrival(on_level, on_complete, on_reveal) {
+    this.set_floor(0);
+    this.shoulder_camera.update(this.robot_position, this.robot_heading, 0, true);
+    this.reduced_motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.arrival = new ArrivalCamera(this.camera, this.controls.target, this.robot_position,
+      this.camera.position, this.controls.target, this.reduced_motion);
+    this.arrival_map = new ArrivalMap();
+    this.arrival_opening = new ArrivalOpening();
+    this.arrival_map.night = this.theme === 'dark';
+    this.camera.far = 1000;
+    this.camera.updateProjectionMatrix();
+    this.mode = 'arrival';
+    this.controls.enabled = false;
+    this.on_arrival_level = on_level;
+    this.on_arrival_complete = on_complete;
+    this.on_arrival_reveal = on_reveal;
+    this.arrival_level = 0;
+    this.needs_render = true;
+  }
+
+  async load_arrival_assets() {
+    await this.arrival_map.load(`${SITE_BASE}assets/arrival/`, this.arrival_abort.signal);
+    this.arrival_opening.assets_ready = Boolean(this.arrival_world_ready);
+    this.needs_render = true;
+  }
+
+  set_arrival_ready() {
+    this.arrival_world_ready = true;
+    this.arrival_opening.assets_ready = this.arrival_map.ready;
+  }
+
+  finish_arrival() {
+    this.arrival_map.dispose();
+    this.arrival_map = this.arrival = this.arrival_opening = null;
+    this.camera.up.set(0, 0, 1);
+    this.camera.far = 100;
+    this.set_camera('shoulder');
+    this.on_arrival_complete();
   }
 
   zoom(factor) {
-    this.camera.position.sub(this.controls.target).multiplyScalar(factor).add(this.controls.target);
-    this.controls.update();
+    if (this.arrival) return;
+    if (this.mode === 'shoulder') this.shoulder_camera.zoom(factor);
+    else {
+      this.camera.position.sub(this.controls.target).multiplyScalar(factor).add(this.controls.target);
+      this.controls.update();
+    }
     this.needs_render = true;
   }
 
@@ -419,7 +505,7 @@ export class SceneView {
       material.opacity = material.transparent ? 0.3 : 1;
       material.depthWrite = !material.transparent;
     }
-    if (this.camera && this.mode !== 'follow') this.set_camera(this.mode);
+    if (this.camera && this.mode !== 'follow' && this.mode !== 'shoulder') this.set_camera(this.mode);
     this.renderer.shadowMap.needsUpdate = this.renderer.shadowMap.enabled;
     this.needs_render = true;
   }
@@ -448,7 +534,7 @@ export class SceneView {
     const up = event => {
       const click = press;
       press = null;
-      if (!click || click.id !== event.pointerId || event.button !== 0) return;
+      if (this.arrival || !click || click.id !== event.pointerId || event.button !== 0) return;
       const bounds = canvas.getBoundingClientRect();
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - bounds.left) / bounds.width * 2 - 1,
         1 - (event.clientY - bounds.top) / bounds.height * 2), this.camera);
@@ -487,8 +573,23 @@ export class SceneView {
     this.resize();
   }
 
+  set_theme(theme) {
+    this.theme = theme;
+    const night = theme === 'dark';
+    this.scene.background.set(night ? '#111925' : '#f5f5f7');
+    this.scene.fog.color.copy(this.scene.background);
+    this.ambient_light.intensity = night ? 0.85 : 2;
+    this.sunlight.intensity = night ? 0.9 : 2;
+    this.sunlight.color.set(night ? '#a8bdde' : '#ffffff');
+    this.scene.environmentIntensity = night ? 0.25 : 0.55;
+    if (this.arrival_map) this.arrival_map.night = night;
+    this.needs_render = true;
+  }
+
   render(time) {
     const started = performance.now();
+    const seconds = Math.max(0, Math.min((time - this.last_render_time) / 1000, 0.1));
+    this.last_render_time = time;
     if (this.mode === 'follow') {
       const delta = this.follow_delta.copy(this.robot_position).sub(this.last_follow_position);
       if (!this.vertical_motion) delta.z = 0;
@@ -496,9 +597,30 @@ export class SceneView {
       this.controls.target.add(delta);
       this.last_follow_position.copy(this.robot_position);
     }
-    const camera_changed = this.controls.update();
+    let camera_changed;
+    if (this.arrival) {
+      if (this.arrival_opening.phase === 'complete') {
+        this.arrival.ready = true;
+        this.arrival.update(seconds);
+      } else {
+        const previous_opacity = this.arrival_opening.opacity;
+        this.arrival_opening.update(seconds);
+        if (previous_opacity !== this.arrival_opening.opacity) this.on_arrival_reveal(this.arrival_opening.opacity);
+      }
+      if (this.arrival.level !== this.arrival_level && !this.arrival.done) {
+        this.arrival_level = this.arrival.level;
+        this.on_arrival_level({ index: this.arrival.level, label: ARRIVAL_LEVELS[this.arrival.level].label });
+      }
+      if (this.arrival.done) this.finish_arrival();
+      camera_changed = true;
+    } else {
+      camera_changed = this.mode === 'shoulder'
+        ? this.shoulder_camera.update(this.robot_position, this.robot_heading, seconds)
+        : this.controls.update();
+    }
     if (document.hidden || (this.paused && !this.needs_render && !camera_changed)) return;
-    this.renderer.render(this.scene, this.camera);
+    if (this.arrival_map) this.arrival_map.render(this.renderer, this.scene, this.camera, this.arrival, this.reduced_motion ? 0 : seconds);
+    else this.renderer.render(this.scene, this.camera);
     this.needs_render = false;
     this.render_samples.push(performance.now() - started);
     if (time - this.last_fps_time > 700) {
@@ -520,10 +642,14 @@ export class SceneView {
     this.disposed = true;
     this.furniture_abort.abort();
     this.character_abort.abort();
+    this.arrival_abort.abort();
+    this.arrival_map?.dispose();
+    window.removeEventListener(THEME_EVENT, this.theme_handler);
     document.removeEventListener('visibilitychange', this.visibility_handler);
     this.resize_observer.disconnect();
     this.renderer.setAnimationLoop(null);
     this.controls.dispose();
+    this.renderer.domElement.removeEventListener('wheel', this.wheel_handler);
     this.remove_picking();
     this.sunlight.shadow.map?.dispose();
     dispose_model(this.scene);

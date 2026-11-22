@@ -108,6 +108,31 @@ asset hosting requirements, and repository settings.
 
 ## Controls
 
+The site opens on a landing page. Select **Play** to enter the apartment.
+The page moves out to a solid white or dark screen, based on the theme. After all
+assets load, the map, clouds, and night lights fade in together. The camera then
+descends through three aerial stops: the Bay Area, Santa Clara, and Building K at
+2886 Scott Boulevard. Building K stays at the center of every aerial zoom. The
+regional view uses 80% of the original scope within the available image bounds.
+The camera then moves directly to the robot's Shoulder view in the apartment.
+Clouds share the map's world coordinates, so they pan and zoom together. Layered
+wind curls their edges and makes them billow between dives. Santa Clara frames
+the fully lit side-street area. Building K shows a
+wider campus view and has no cloud overlay.
+The loading screen shows only imagery and source credits. Escape cancels arrival.
+Each aerial stop holds for at least 0.85 seconds. The first hold starts after the
+reveal completes. Physics and movement inputs start after the last dive.
+Reduced-motion settings keep the holds and replace the dives with cuts.
+Select **Controls** in the game to open the navigation and telemetry panels.
+Use **Exit to site** to return to the landing page and stop the simulation.
+The sun/moon button switches the site theme. Light mode uses daytime imagery;
+dark mode uses a blue night grade with stylized street lights following
+OpenStreetMap roads. The initial theme follows the system; a manual choice is saved.
+The arrival uses bundled NASA GIBS and USGS/USDA images, with no runtime map API key.
+`python3 scripts/prepare_arrival_assets.py` downloads the images and prepares the
+compact light geometry. Source URLs, coordinates, licenses, and hashes are in
+`public/assets/arrival/manifest.json`.
+
 Click open floor to walk there automatically. Select **Upper** to choose an
 upstairs destination. Choose **Elevator** or **Stairs · experimental** for the
 cross-floor route. Clicking a step selects a stair destination. **Building** shows
@@ -123,14 +148,21 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Q / E | Strafe left / right |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
-| C | Cycle follow / orbit / top-down cameras |
-| Mouse drag / right-drag / scroll | Orbit / pan / zoom |
+| V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
+| Mouse drag / right-drag / scroll | Orbit / pan / zoom in Follow and Orbit; scroll to zoom in Shoulder |
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
 The speed slider sets forward and backward speed from 0.2 to 0.8 m/s.
 Backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
 When you release a movement input, the controller requests zero velocity.
 The policy continues to balance the robot, which can still take small steps or drift.
+
+**Shoulder** is the default camera. It follows closely behind the figure's right
+shoulder and turns with its heading. Position and heading ease smoothly; walls and
+furniture shorten the camera distance. Scroll or use +/− to change its distance.
+It works with both Robot and Character and follows stairs and elevator travel.
+Select Follow, Orbit, or Top-down for a wider view. Selecting another floor switches
+to Orbit; selecting Shoulder returns to the figure's current floor.
 
 When the window loses focus, the application clears held inputs.
 When you hide the page, the application pauses physics.
