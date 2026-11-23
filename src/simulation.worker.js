@@ -1,3 +1,4 @@
+import { HAS_ELEVATOR } from './world.js';
 import load_mujoco from '@mujoco/mujoco';
 import mujoco_wasm_url from '@mujoco/mujoco/mujoco.wasm?url';
 import * as ort from 'onnxruntime-web/wasm';
@@ -129,7 +130,7 @@ async function initialize() {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
   });
-  report_loading('Preparing floor routes and elevator controls');
+  report_loading(HAS_ELEVATOR?'Preparing floor routes and elevator controls':'Preparing Hephaestus floor routes and stairs');
   simulation = new Simulation(mujoco, model, session, make_navigation_maps());
   simulation.paused = true;
 

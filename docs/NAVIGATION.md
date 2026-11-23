@@ -1,5 +1,29 @@
 # Click-to-move navigation
 
+The default map is now Hephaestus Tower. **Apartment** and **Mezzanine** select
+the two playable levels, 3.60 m apart; **Building** shows the tower exterior.
+There is no apartment elevator. The original L stair uses twenty 18 cm risers,
+29 cm going, a 90° turn, and a 1.30 m flight width. Its learned-policy traversal
+remains experimental; physical completion has not been validated.
+
+The planner uses the actual nonrectangular floor triangles and mezzanine void,
+eroded by the same planning/tracking clearance radii described below. Source
+furniture and closed doors remain obstacles. Cross-floor routes follow the
+three-dimensional stair polyline in both directions, including its turn.
+The velocity follower still drives the unchanged walking policy.
+
+New-map tests cover valid floor masks, aisle and reading-nook reachability,
+furniture rejection, upper-floor voids, stair route construction, and no lift.
+Real MuJoCo/ONNX tests cover supporting surfaces, standing, manual walking,
+automatic aisle travel, pause, and reset. See [map integration](HEPHAESTUS.md).
+
+## Earlier demo fixture
+
+The remaining details and the complete stair/lift transfer regression describe
+the earlier demo selected with `VITE_PLAYGROUND_MAP=demo`. They are retained
+to document and test the original controller and connector behavior.
+
+
 Click open floor in the scene or the floor plan to choose a destination.
 Use **Ground** and **Upper** to choose a floor, or **Building** to see both levels.
 Choose **Elevator** or **Stairs · experimental** under **Cross-floor route**.

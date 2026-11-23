@@ -1,3 +1,5 @@
+import { IS_HEPHAESTUS, MAP } from './world.js';
+import { point_in_ring } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS } from './scene_layout.js';
 import { BUILDING_BOUNDS, FLOOR_HEIGHT, STAIRS, SHAFT_BOXES } from './building.js';
 
@@ -69,7 +71,7 @@ class MinHeap {
 }
 
 export class NavigationMap {
-  constructor(polygons, bounds = BUILDING_BOUNDS, resolution = 0.1, radius = 0.42, tracking_radius = Math.max(0, radius - 0.12)) {
+  constructor(polygons, bounds = BUILDING_BOUNDS, resolution = 0.1, radius = 0.42, tracking_radius = Math.max(0, radius - 0.12), floor_areas = null) {
     this.bounds = bounds;
     this.resolution = resolution;
     this.width = Math.ceil((bounds[1] - bounds[0]) / resolution);
@@ -80,6 +82,11 @@ export class NavigationMap {
     const tracking_margin = tracking_radius + resolution * Math.SQRT1_2;
     for (let index = 0; index < this.blocked.length; index++) {
       const [x, y] = this.point(index);
+      if(floor_areas) {
+        const inside=areas=>areas.some(p=>point_in_ring([x,y],p[0])&&!p.slice(1).some(h=>point_in_ring([x,y],h)));
+        if(!inside(floor_areas.planning))this.blocked[index]=1;
+        if(!inside(floor_areas.tracking))this.tracking_blocked[index]=1;
+      }
       if (Math.min(x - bounds[0], bounds[1] - x, y - bounds[2], bounds[3] - y) < margin) this.blocked[index] = 1;
       if (Math.min(x - bounds[0], bounds[1] - x, y - bounds[2], bounds[3] - y) < tracking_margin) this.tracking_blocked[index] = 1;
     }
@@ -203,6 +210,8 @@ export class NavigationMap {
 }
 
 export function make_navigation_maps() {
+  if(IS_HEPHAESTUS) return [0,1].map(floor=>new NavigationMap(
+    [],MAP.bounds,.1,.52,.3,MAP.floor_areas[floor]));
   const boxes = [...SCENE_WALLS, ...SHAFT_BOXES];
   const common = boxes.map(box => rectangle([box.center[0] - box.size[0] / 2, box.center[0] + box.size[0] / 2,
     box.center[1] - box.size[1] / 2, box.center[1] + box.size[1] / 2]));

@@ -1,4 +1,5 @@
-import { ELEVATOR, FLOOR_HEIGHT, FLOOR_NAMES, STANDING_HEIGHT, STAIRS, STAIR_PATH, STAIR_BOXES, floor_of, on_stairs, stair_height } from './building.js';
+import { IS_HEPHAESTUS, DEFAULT_TRANSFER } from './world.js';
+import { ELEVATOR, FLOOR_HEIGHT, FLOOR_NAMES, STANDING_HEIGHT, STAIRS, STAIR_PATH, STAIR_BOXES, floor_of, on_stairs, stair_height, stair_projection } from './building.js';
 
 export const IDLE_NAVIGATION = { version: 0, status: 'idle', message: 'Click an open spot on either floor.',
   path: [], goal: null, remaining: 0, planning_ms: 0 };
@@ -16,6 +17,12 @@ export function hold_position(position, target, heading, speed_limit = 0.12) {
 }
 
 function stair_segment(from, to) {
+  if(IS_HEPHAESTUS) {
+    const a=stair_projection(from).progress,b=stair_projection(to).progress;
+    let middle=STAIR_PATH.filter(p=>{const t=stair_projection(p).progress;return t>Math.min(a,b)+.001&&t<Math.max(a,b)-.001;});
+    if(b<a) middle.reverse();
+    return {type:'stairs',path:[[...from],...middle.map(p=>[...p]),[...to]]};
+  }
   const direction = Math.sign(to[1] - from[1]);
   const between = STAIR_PATH.filter(point => (point[1] - from[1]) * direction > 0 && (to[1] - point[1]) * direction > 0);
   if (direction < 0) between.reverse();
@@ -42,7 +49,7 @@ export class Navigation {
     this.maps = maps;
     this.elevator = elevator;
     this.speed = 0.6;
-    this.transfer = 'elevator';
+    this.transfer = DEFAULT_TRANSFER;
     this.state = { ...IDLE_NAVIGATION };
     this.segments = [];
   }
@@ -64,10 +71,14 @@ export class Navigation {
     const stair_goal = on_stairs(goal) || (goal.length === 4 && on_stairs(goal, 0.12));
     if (goal.length === 4 && !stair_goal) { this.fail('Choose a point on the stairway.', null); return; }
     if (stair_goal) {
+      if (IS_HEPHAESTUS) {
+        const p=stair_projection(goal).point;goal=[p[0],p[1],Math.round(p[2]/FLOOR_HEIGHT),stair_height(p)];
+      } else {
       const step = STAIR_BOXES[Math.round(stair_height(goal) * STAIRS.steps / FLOOR_HEIGHT) - 1];
       goal = [STAIRS.center_x, step.center[1], Math.round(step.size[2] / FLOOR_HEIGHT), step.size[2]];
+      }
     }
-    if (this.elevator.moving && this.elevator.occupied(position)) {
+    if (this.elevator?.moving && this.elevator.occupied(position)) {
       this.fail('Wait for the elevator to arrive before choosing another destination.', goal); return;
     }
     const floor = floor_of(position);
@@ -90,7 +101,7 @@ export class Navigation {
     } else if (start_on_stairs) {
       this.segments = [stair_segment(surface, landing(destination_floor)), walk(landing(destination_floor), goal, destination_floor)];
     } else if (floor === destination_floor) this.segments = [walk(position, goal, floor)];
-    else if (this.transfer === 'stairs') {
+    else if (!this.elevator || this.transfer === 'stairs') {
       this.segments = [{ ...walk(position, landing(floor), floor), stair_approach: true },
         stair_segment(landing(floor), landing(destination_floor)), walk(landing(destination_floor), goal, destination_floor)];
     }
@@ -172,6 +183,7 @@ export class Navigation {
     return steer(position, target, heading, this.speed);
   }
   follow_stairs(position, heading, time, path) {
+    if(IS_HEPHAESTUS) return this.follow_native_stairs(position,heading,time,path);
     this.state.status = 'walking';
     this.state.message = 'Walking on the stairs with depth perception.';
     const height = position[2] - STANDING_HEIGHT;
@@ -200,5 +212,19 @@ export class Navigation {
     const pace = Math.min(this.speed, 0.6, distance(position, finish) * 0.9);
     return [pace * (on_stairs(position) ? 1 : alignment * alignment), 0,
       clamp(2 * error + 1.5 * direction * (position[0] - STAIRS.center_x), 0.5)];
+  }
+  follow_native_stairs(position,heading,time,path) {
+    this.state.status='walking';this.state.message='Walking the Hephaestus stair route · experimental.';
+    const finish=path.at(-1),height=position[2]-STANDING_HEIGHT;
+    if(distance(position,finish)<.2&&Math.abs(height-finish[2])<.2){this.next(time);return [0,0,0];}
+    const progress=stair_projection(position);
+    if(on_stairs(position)&&progress.distance>.52){this.fail('The robot left the stair route. Reset or choose another destination.');return [0,0,0];}
+    const direction=Math.sign(stair_projection(finish).progress-stair_projection(path[0]).progress);
+    while(this.waypoint<path.length-1 && (distance(position,path[this.waypoint])<.20 || direction*(progress.progress-stair_projection(path[this.waypoint]).progress)>.04))this.waypoint++;
+    const target=path[this.waypoint],remaining=distance(position,target)+path_length(path.slice(this.waypoint));
+    this.state.remaining=remaining+this.segments.slice(this.index+1).reduce((n,s)=>n+(s.path?path_length(s.path):0),0);
+    if(remaining<this.best_remaining-.05){this.best_remaining=remaining;this.last_progress=time;}
+    if(time-this.last_progress>12){this.fail('The policy could not complete this stair route. Press R to reset.');return [0,0,0];}
+    return steer(position,target,heading,this.speed,.3);
   }
 }

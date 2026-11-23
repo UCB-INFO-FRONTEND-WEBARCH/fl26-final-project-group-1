@@ -1,0 +1,99 @@
+{
+  "id": "hephaestus-v20",
+  "name": "Hephaestus Tower",
+  "source": "output/CHU2_Hephaestus_Tower_main_room_v20.blend",
+  "source_sha256": "884a527e1530fcbd9d5fb5b65fd26ab2838131fdf682cf8d7d32bfc4f4856848",
+  "origin": [
+    -2.799999952316284,
+    13.9350004196167,
+    3.0299999713897705
+  ],
+  "units": "metres",
+  "context_bounds": [
+    [
+      -71.34000303491416,
+      -51.07500282472575,
+      -146.11001419466174
+    ],
+    [
+      59.940002258003005,
+      32.20500125882563,
+      5.675000116786752
+    ]
+  ],
+  "files": [
+    {
+      "file": "brick_color.png",
+      "bytes": 19384,
+      "sha256": "57cf768dbd1105dada22d880757af4709ec3e235e3aad0b495827e2d04718c72"
+    },
+    {
+      "file": "brick_height.png",
+      "bytes": 18120,
+      "sha256": "686d7add6bac364419fe10f445ff691195800e7ad5e0e31b89c610e0377ce825"
+    },
+    {
+      "file": "context.glb",
+      "bytes": 9977516,
+      "sha256": "bd6a51cad6eaf1314239ba914cbd302be9eee31cb7bfc228d3177c0592778ff2"
+    },
+    {
+      "file": "lower.glb",
+      "bytes": 22363800,
+      "sha256": "081d2762bb80ea3498056e7e830e074a9d32afd1306e2bfa84e8ae99c502ec0f"
+    },
+    {
+      "file": "oak_color.png",
+      "bytes": 247628,
+      "sha256": "c2cddf4c3c758f724b6654cee5e42f164f4eb8adbd18161a51346aef47af447a"
+    },
+    {
+      "file": "oak_height.png",
+      "bytes": 14050,
+      "sha256": "a98cc778f1c8ee8bcd2f9959a71fc3c772415ff33298629d2839aa2262388d1c"
+    },
+    {
+      "file": "roof.glb",
+      "bytes": 15708,
+      "sha256": "d2e21da99552b216a7c6597a142f63a465fa07ba077d62e7e8c1cab2d337059c"
+    },
+    {
+      "file": "t10.glb",
+      "bytes": 85988,
+      "sha256": "2bd3f5f9cc99d1b5517d6a55a77cb0b8f73c0a1475f4aa40a404646c305fe9f8"
+    },
+    {
+      "file": "t11.glb",
+      "bytes": 189380,
+      "sha256": "f337a169d1ba6933428ff3bf944a56e10d0937df1fc7896d85cebb3028f7eb9a"
+    },
+    {
+      "file": "t12.glb",
+      "bytes": 54948,
+      "sha256": "f1c1fb3fdf9bec7c90aef8dfd67c7d59a5e3d7093263a21da455af8f3f4ffdc4"
+    },
+    {
+      "file": "upper.glb",
+      "bytes": 6970432,
+      "sha256": "7f2eacf33f6f5a3035fc8d4d6c69be6830529a736f71b08e2ce5faa527fad103"
+    }
+  ],
+  "limits": [
+    "Playable roof apartment and mezzanine. Full tower facade and roof complex are visual context; lobby and other storeys are not navigable in this migration.",
+    "Render-only LOD and portable PBR approximations; source Blender file unchanged.",
+    "Fixed furniture, closed source doors. PAX controls remain in Blender; web furniture articulation is not added.",
+    "Original 180 mm risers are preserved. Learned-policy stair travel remains experimental."
+  ],
+  "collision_detail": {
+    "original_bodies": 16283,
+    "runtime_bodies": 4216,
+    "omitted": {
+      "Nonstructural finish detail; substrate retained": 820,
+      "Sub-contact-scale hardware": 10920
+    },
+    "furniture_method": "15mm CoACD target with connected components; hardware below contact scale omitted. Glazing uses one convex source-object envelope.",
+    "fallbacks": [
+      "mesh_8365e27e4aa42c91.fallback.json"
+    ]
+  }
+}

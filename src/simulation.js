@@ -1,4 +1,4 @@
-import { SPAWN } from './scene_layout.js';
+import { SPAWN, SPAWN_YAW } from './scene_layout.js';
 import { PHYSICS_DT, CONTROL_DECIMATION, heading_from_quaternion } from './locomotion.js';
 import { validate_model } from './robot_assets.js';
 import { LiteProPolicy } from './lite_pro_policy.js';
@@ -29,7 +29,7 @@ export class Simulation {
     this.reset_requested = true;
   }
 
-  reset(start = SPAWN, yaw = 0) {
+  reset(start = SPAWN, yaw = SPAWN_YAW) {
     this.policy.reset(start, yaw);
     this.step_count = 0;
     this.distance = 0;

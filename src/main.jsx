@@ -1,3 +1,4 @@
+import { IS_HEPHAESTUS, MAP, HAS_ELEVATOR, DEFAULT_TRANSFER, MAP_SIZE, MAP_TITLE } from './world.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { command_from_keys } from './locomotion.js';
@@ -5,7 +6,7 @@ import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } fr
 import { Icon } from './icons.jsx';
 import { SiteHeader } from './site_header.jsx';
 import { IDLE_NAVIGATION } from './navigation.js';
-import { FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
+import { FLOOR_NAMES, FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
 import { SITE_BASE } from './asset_paths.js';
 import { CHARACTER_ASSET } from './character_asset.js';
 import { ThemeToggle } from './theme_toggle.jsx';
@@ -46,18 +47,18 @@ function MiniMap({ telemetry, floor, on_destination }) {
     <div className="minimap">
       <div className="map-heading">
         <span>
-          <span className="tiny-square" /> Floor plan
+          <span className="tiny-square" /> {MAP_TITLE}
         </span>
-        <span>{floor === 0 ? 'Ground' : 'Upper'} · 19 × 14 m</span>
+        <span>{FLOOR_NAMES[floor]} · {MAP_SIZE}</span>
       </div>
-      <svg viewBox="-12.5 -7.5 20 15" aria-label="Floor plan: click an open spot to set a destination" role="img"
+      <svg viewBox={`${BUILDING_BOUNDS[0]-.5} ${-BUILDING_BOUNDS[3]-.5} ${BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]+1} ${BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]+1}`} aria-label="Floor plan: click an open spot to set a destination" role="img"
         onClick={event => {
           const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(event.currentTarget.getScreenCTM().inverse());
           on_destination([point.x, -point.y, floor]);
         }}>
-        <rect x={BUILDING_BOUNDS[0]} y={BUILDING_BOUNDS[2]} width="19" height="14" rx="0.1" fill="#f3f4f6" />
+        <rect x={BUILDING_BOUNDS[0]} y={-BUILDING_BOUNDS[3]} width={BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]} height={BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]} rx="0.1" fill="#f3f4f6" />
         <g transform="scale(1,-1)">
-          {SCENE_WALLS.map((box) => (
+          {!IS_HEPHAESTUS && SCENE_WALLS.map((box) => (
             <rect
               key={box.name}
               x={box.center[0] - box.size[0] / 2}
@@ -67,10 +68,16 @@ function MiniMap({ telemetry, floor, on_destination }) {
               fill="#92959d"
             />
           ))}
-          <rect className="map-stairs" x={STAIRS.opening[0]} y={STAIRS.opening[2]} width={STAIRS.opening[1] - STAIRS.opening[0]} height={STAIRS.opening[3] - STAIRS.opening[2]} fill="#b7bdc6">
+          {IS_HEPHAESTUS && <>
+            {MAP.floor_polygons[floor].map((p,i)=><polygon key={`floor-${i}`} points={p.map(v=>v.join(',')).join(' ')} fill="#e8e4da"/>)}
+            {MAP.floor_holes[floor].map((p,i)=><polygon key={`hole-${i}`} points={p.map(v=>v.join(',')).join(' ')} fill="#f3f4f6"/>)}
+            {MAP.obstacle_areas[floor].map((rings,i)=><path key={`obstacle-${i}`} d={rings.map(r=>'M'+r.map(v=>v.join(',')).join('L')+'Z').join(' ')} fillRule="evenodd" fill="#a4b2b4"/>)}
+            {MAP.stair_regions.map(([l,r,b,t],i)=><rect key={`stairs-${i}`} x={l} y={b} width={r-l} height={t-b} fill="#b7bdc6"/>)}
+          </>}
+          {!IS_HEPHAESTUS && <rect className="map-stairs" x={STAIRS.opening[0]} y={STAIRS.opening[2]} width={STAIRS.opening[1] - STAIRS.opening[0]} height={STAIRS.opening[3] - STAIRS.opening[2]} fill="#b7bdc6">
             <title>Stairway — click to attempt climbing</title>
-          </rect>
-          <rect x={ELEVATOR.center[0] - 0.85} y={ELEVATOR.center[1] - 0.85} width="1.7" height="1.7" fill="#b1ccec" />
+          </rect>}
+          {HAS_ELEVATOR && <rect x={ELEVATOR.center[0] - 0.85} y={ELEVATOR.center[1] - 0.85} width="1.7" height="1.7" fill="#b1ccec" />}
           {SCENE_FURNITURE.filter(item => Math.floor((item.position[2] + 0.01) / FLOOR_HEIGHT) === floor).map((item) => (
             <rect key={item.name}
               transform={`translate(${item.position[0]},${item.position[1]}) rotate(${item.yaw * 180 / Math.PI})`}
@@ -124,7 +131,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const keys_ref = useRef(new Set());
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
   const speed_ref = useRef(0.6);
-  const transfer_ref = useRef('elevator');
+  const transfer_ref = useRef(DEFAULT_TRANSFER);
   const ready_ref = useRef(false);
   const phase_ref = useRef('intro');
   const entry_complete_ref = useRef(entry_complete);
@@ -138,7 +145,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const [speed, set_speed] = useState(0.6);
   const [pressed, set_pressed] = useState(new Set());
   const [viewed_floor, set_viewed_floor] = useState(0);
-  const [transfer, set_transfer] = useState('elevator');
+  const [transfer, set_transfer] = useState(DEFAULT_TRANSFER);
   const [figure, set_figure] = useState('robot');
   const [character_loading, set_character_loading] = useState(false);
   const [character_error, set_character_error] = useState('');
@@ -464,7 +471,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             <div className="floor-switch" role="group" aria-label="Floor view">
               {[0, 1, 'all'].map(floor => <button key={floor} aria-pressed={viewed_floor === floor}
                 className={viewed_floor === floor ? 'selected' : ''} onClick={() => change_floor(floor)}>
-                {floor === 'all' ? 'Building' : floor === 0 ? 'Ground' : 'Upper'}
+                {floor === 'all' ? 'Building' : FLOOR_NAMES[floor]}
               </button>)}
             </div>
             <div className="camera-switch" role="group" aria-label="Camera view">
@@ -615,10 +622,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
 
           <section className="navigation-section">
             <div className="section-title"><h3>Click. Go explore.</h3><span>Automatic</span></div>
-            <p className="section-description">Choose open floor in the scene or floor plan. Select Upper to go upstairs.</p>
+            <p className="section-description">{IS_HEPHAESTUS ? 'Explore the Hephaestus apartment. Select Mezzanine to choose an upstairs destination.' : 'Choose open floor in the scene or floor plan. Select Upper to go upstairs.'}</p>
             <label className="transfer-choice">Cross-floor route
               <select aria-label="Cross-floor route" value={transfer} onChange={event => change_transfer(event.target.value)}>
-                <option value="elevator">Elevator</option>
+                {HAS_ELEVATOR && <option value="elevator">Elevator</option>}
                 <option value="stairs">Stairs · experimental</option>
               </select>
             </label>

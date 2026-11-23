@@ -1,3 +1,5 @@
+import {load_native_finishes,apply_native_finishes} from './native_finishes.js';
+import { IS_HEPHAESTUS, MAP } from './world.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -48,7 +50,7 @@ export class SceneView {
     this.disposed = false;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#f5f5f7');
-    this.scene.fog = new THREE.Fog('#f5f5f7', 23, 48);
+    this.scene.fog = new THREE.Fog('#f5f5f7', IS_HEPHAESTUS ? 60 : 23, IS_HEPHAESTUS ? 180 : 48);
     this.renderer = renderer;
     this.renderer.setPixelRatio(1);
     this.renderer.shadowMap.enabled = false;
@@ -66,7 +68,7 @@ export class SceneView {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
     this.controls.minDistance = 1.8;
-    this.controls.maxDistance = 28;
+    this.controls.maxDistance = IS_HEPHAESTUS ? 70 : 28;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
     this.shoulder_camera = new ShoulderCamera(this.camera, this.controls.target);
     this.robot_position = new THREE.Vector3(...SPAWN);
@@ -113,6 +115,7 @@ export class SceneView {
   }
 
   build_room() {
+    if (IS_HEPHAESTUS) return this.build_native_room();
     const camera_boxes = [
       ...[0, 1].flatMap(floor => SCENE_WALLS.map(box => ({
         center: [box.center[0], box.center[1], box.center[2] + floor * FLOOR_HEIGHT], size: box.size,
@@ -238,6 +241,7 @@ export class SceneView {
   }
 
   async load_furniture() {
+    if (IS_HEPHAESTUS) return this.load_native_map();
     const { loader, draco } = create_model_loader();
     const signal = this.furniture_abort.signal;
     const results = await Promise.allSettled(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
@@ -306,6 +310,90 @@ export class SceneView {
     }
     this.renderer.shadowMap.needsUpdate = this.renderer.shadowMap.enabled;
     this.needs_render = true;
+  }
+
+
+  build_native_room() {
+    this.floor_groups=[new THREE.Group(),new THREE.Group()];this.scene.add(...this.floor_groups);
+    this.map_context=new THREE.Group();this.map_roof=new THREE.Group();this.scene.add(this.map_context,this.map_roof);
+    this.floor_surfaces=[];this.furniture_shadows=[];this.viewed_floor=0;this.native_clip_materials=[];
+    this.ambient_light=new THREE.HemisphereLight('#fff8ed','#aeb8bb',2);this.scene.add(this.ambient_light);
+    this.sunlight=new THREE.DirectionalLight('#fff7e8',2);this.sunlight.position.set(0,-10,20);this.sunlight.castShadow=true;
+    Object.assign(this.sunlight.shadow.camera,{left:-30,right:22,bottom:-15,top:15,near:.5,far:80});this.scene.add(this.sunlight);
+    const invisible=new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+    const triangle_mesh=(triangles,z)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(triangles.flatMap(t=>t.flatMap(p=>[p[0],p[1],p[2]??z])),3));g.computeVertexNormals();return new THREE.Mesh(g,invisible);};
+    for(let floor=0;floor<2;floor++){
+      const surface=triangle_mesh(MAP.floor_triangles[floor],floor*FLOOR_HEIGHT);surface.userData.floor=floor;
+      this.floor_groups[floor].add(surface);this.floor_surfaces.push(surface);
+    }
+    this.stair_mesh=triangle_mesh(MAP.steps.flatMap(s=>s.polygon.slice(1,-1).map((p,i)=>[s.polygon[0],p,s.polygon[i+2]].map(v=>[v[0],v[1],s.height]))),0);this.scene.add(this.stair_mesh);
+    for(const box of MAP.camera_boxes)this.shoulder_camera.add_obstacle(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(...box.center),new THREE.Vector3(...box.size)));
+    this.lift_group=new THREE.Group();this.lift_deck=new THREE.Mesh(new THREE.BufferGeometry(),invisible);this.lift_front=new THREE.Group();this.lift_gates=[];this.lift_open_floor=-1;
+    this.robot_marker=new THREE.Mesh(new THREE.RingGeometry(.37,.39,48),new THREE.MeshBasicMaterial({color:'#0071e3',transparent:true,opacity:.7}));
+    this.robot_shadow=new THREE.Mesh(new THREE.CircleGeometry(.32,32),new THREE.MeshBasicMaterial({color:'#333333',transparent:true,opacity:.12,depthWrite:false}));
+    this.scene.add(this.robot_marker,this.robot_shadow);
+    this.route=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:'#0071e3',depthTest:false}));
+    this.destination=new THREE.Mesh(new THREE.RingGeometry(.15,.22,32),new THREE.MeshBasicMaterial({color:'#0071e3',depthTest:false,side:THREE.DoubleSide}));
+    this.route.visible=this.destination.visible=false;this.route.frustumCulled=false;this.scene.add(this.route,this.destination);this.navigation_version=-1;
+    this.renderer.localClippingEnabled=true;
+  }
+
+  async load_native_map() {
+    const {loader,draco}=create_model_loader(),signal=this.furniture_abort.signal;
+    try {
+      const finishes=await load_native_finishes(signal);
+      const files=[{file:'lower.glb',layer:'lower'},{file:'upper.glb',layer:'upper'},{file:'roof.glb',layer:'roof'},{file:'context.glb',layer:'context'}];
+      const loaded=await Promise.allSettled(files.map(async file=>{
+        const response=await fetch(`${SITE_BASE}assets/hephaestus/${file.file}`,{signal});
+        if(!response.ok)throw new Error(`Could not load Hephaestus ${file.layer} (HTTP ${response.status}).`);
+        const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
+        if(signal.aborted){dispose_model(gltf.scene);return;}
+        const upright=new THREE.Group();upright.rotation.x=Math.PI/2;upright.add(gltf.scene);apply_native_finishes(upright,finishes);
+        gltf.scene.traverse(o=>{
+          if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;
+          // Only architectural cutaways are clipped; source furniture stays whole.
+          let owner=o;while(owner&&!owner.userData.map_role)owner=owner.parent;
+          if(['architecture','glass'].includes(owner?.userData.map_role)){
+            o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();
+            const mats=Array.isArray(o.material)?o.material:[o.material];
+            for(const m of mats)this.native_clip_materials.push({material:m,floor:file.layer==='upper'?1:0});
+          }
+        });
+        const parent=file.layer==='context'?this.map_context:file.layer==='roof'?this.map_roof:this.floor_groups[file.layer==='upper'?1:0];parent.add(upright);
+      }));
+      const failed=loaded.find(r=>r.status==='rejected');if(failed)throw failed.reason;
+      // Lightweight procedural-plant exports retain their authored placements.
+      for(const key of [...new Set(MAP.plants.map(p=>p.key))]) {
+        const response=await fetch(`${SITE_BASE}assets/hephaestus/${key}.glb`,{signal});if(!response.ok)throw new Error(`Could not load plant ${key}.`);
+        const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
+        if(signal.aborted){dispose_model(gltf.scene);signal.throwIfAborted();}
+        const placements=MAP.plants.filter(p=>p.key===key),upright=new THREE.Matrix4().makeRotationX(Math.PI/2);
+        gltf.scene.updateMatrixWorld(true);
+        gltf.scene.traverse(mesh=>{
+          if(!mesh.isMesh)return;
+          const instanced=new THREE.InstancedMesh(mesh.geometry,mesh.material,placements.length);
+          for(let i=0;i<placements.length;i++){
+            const world=new THREE.Matrix4().fromArray(placements[i].matrix.flat()).transpose();
+            instanced.setMatrixAt(i,world.multiply(upright).multiply(mesh.matrixWorld));
+          }
+          instanced.instanceMatrix.needsUpdate=true;instanced.computeBoundingSphere();instanced.castShadow=instanced.receiveShadow=true;this.map_context.add(instanced);
+        });
+      }
+      if(signal.aborted)return;
+      const room=new RoomEnvironment(),generator=new THREE.PMREMGenerator(this.renderer);this.environment=generator.fromScene(room,.04);this.scene.environment=this.environment.texture;this.scene.environmentIntensity=this.theme==='dark'?.25:.55;room.dispose();generator.dispose();
+      this.map_context_low=new THREE.Box3().setFromObject(this.map_context).min.z;
+      this.apply_native_view();this.renderer.shadowMap.needsUpdate=true;this.needs_render=true;
+    } finally {draco.dispose();}
+  }
+
+  apply_native_view() {
+    if(!IS_HEPHAESTUS)return;
+    const interior=['shoulder','follow','arrival'].includes(this.mode);
+    for(let floor=0;floor<2;floor++)this.floor_groups[floor].visible=interior||this.viewed_floor==='all'||this.viewed_floor===floor;
+    this.map_roof.visible=interior||this.viewed_floor==='all';
+    for(const {material,floor} of this.native_clip_materials){
+      material.clippingPlanes=(interior||this.viewed_floor==='all')?[]:[new THREE.Plane(new THREE.Vector3(0,0,-1),floor*FLOOR_HEIGHT+1.15)];material.needsUpdate=true;
+    }
   }
 
   load_robot(geometries, rig) {
@@ -386,7 +474,7 @@ export class SceneView {
     const on_lift = Math.abs(telemetry.position[0] - ELEVATOR.center[0]) < 0.8 && Math.abs(telemetry.position[1] - ELEVATOR.center[1]) < 0.8;
     this.vertical_motion = this.lift_moving || on_stairs(telemetry.position);
     const surface = on_lift ? (telemetry.elevator?.height || 0) : on_stairs(telemetry.position) ? stair_height(telemetry.position) : this.current_floor * FLOOR_HEIGHT;
-    this.robot_marker.position.set(telemetry.position[0], telemetry.position[1], surface + 0.025);
+    this.robot_marker.position.set(telemetry.position[0],telemetry.position[1],surface+(IS_HEPHAESTUS?.06:.025));
     this.robot_marker.rotation.z = telemetry.heading;
     this.robot_shadow.position.set(telemetry.position[0], telemetry.position[1], surface + 0.016);
     if (telemetry.elevator) {
@@ -426,6 +514,7 @@ export class SceneView {
     this.controls.enabled = mode !== 'shoulder';
     this.camera.fov = mode === 'shoulder' ? 52 : 44;
     this.camera.updateProjectionMatrix();
+    this.apply_native_view();
     const z = this.viewed_floor === 'all' ? 1.65 : this.viewed_floor * FLOOR_HEIGHT;
     if (mode === 'shoulder') {
       this.shoulder_camera.update(this.robot_position, this.robot_heading, 0, true);
@@ -433,11 +522,18 @@ export class SceneView {
       this.camera.position.copy(this.robot_position).add(new THREE.Vector3(-5.3, -6.3, 5));
       this.controls.target.copy(this.robot_position).add(new THREE.Vector3(0.7, 0.2, -0.2));
     } else if (mode === 'top') {
-      this.camera.position.set(-2.5, -0.01, 24 + z);
-      this.controls.target.set(-2.5, 0, z);
+      this.camera.position.set(IS_HEPHAESTUS?-4:-2.5,-.01,(IS_HEPHAESTUS?43:24)+z);
+      this.controls.target.set(IS_HEPHAESTUS?-4:-2.5,0,z);
     } else {
-      this.camera.position.set(-13, -15, 12 + z);
-      this.controls.target.set(-2.5, 0, z + 0.1);
+      this.camera.position.set(...(IS_HEPHAESTUS?[18,-23,23+z]:[-13,-15,12+z]));
+      this.controls.target.set(IS_HEPHAESTUS?-5:-2.5,0,z+.1);
+    }
+    if(IS_HEPHAESTUS){
+      const building=this.viewed_floor==='all'&&!['shoulder','follow'].includes(mode);
+      this.controls.maxDistance=building?500:70;this.camera.far=building?700:300;
+      this.scene.fog.near=building?400:60;this.scene.fog.far=building?1500:180;
+      if(building){const middle=(this.map_context_low??-146)*.45;this.controls.target.set(-5,0,middle);this.camera.position.set(180,-220,100);}
+      this.camera.updateProjectionMatrix();
     }
     this.last_follow_position.copy(this.robot_position);
     if (mode !== 'shoulder') this.controls.update();
@@ -480,7 +576,7 @@ export class SceneView {
     this.arrival_map.dispose();
     this.arrival_map = this.arrival = this.arrival_opening = null;
     this.camera.up.set(0, 0, 1);
-    this.camera.far = 100;
+    this.camera.far = IS_HEPHAESTUS ? 300 : 100;
     this.set_camera('shoulder');
     this.on_arrival_complete();
   }
@@ -498,7 +594,8 @@ export class SceneView {
   set_floor(floor) {
     this.viewed_floor = floor;
     this.update_figure_visibility();
-    for (let level = 0; level < 2; level++) {
+    if(IS_HEPHAESTUS)this.apply_native_view();
+    for (let level = 0; !IS_HEPHAESTUS && level < 2; level++) {
       this.floor_groups[level].visible = floor === 'all' || floor === level;
       const material = this.floor_surfaces[level].material;
       material.transparent = floor === 'all' && level === 1;

@@ -3,7 +3,11 @@
 Centoria is a React application for manual and automatic navigation of Berkeley
 Lite Pro in a furnished, two-floor apartment. The S3 SuperMimic policy controls
 34 body joints using velocity goals, body history, and a head depth camera.
-MuJoCo simulates the robot, stairs, furniture, and elevator in the browser.
+MuJoCo simulates the robot, stairs, and furniture in the browser. The default
+playground is the furnished Hephaestus Tower roof apartment and mezzanine,
+exported from the calibrated V20 Blender project. The surrounding highrise is
+visible in Building view. See [map integration](docs/HEPHAESTUS.md) for provenance,
+dimensions, export details, and limits.
 
 WASD keys send velocity commands to the policy.
 The keyboard handler does not translate the robot or play a walking animation.
@@ -26,7 +30,7 @@ file from its host and does not include a copy in the Pages artifact.
 
 ## Run locally
 
-Use Node.js 18.19+ and npm. Use a recent desktop browser with WebGL 2 and
+Use Node.js 24+ and npm. Use a recent desktop browser with WebGL 2 and
 WebAssembly SIMD support, such as Chrome, Edge, or Firefox.
 
 ```bash
@@ -38,7 +42,8 @@ Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
 The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
 the local server. The application runs without a Python server, API key, GPU,
 external inference endpoint, or cross-origin isolation headers.
-The first page load transfers approximately 40 MB of uncompressed robot and runtime assets.
+The first page load transfers approximately 40 MB of uncompressed robot and runtime assets plus 40 MB
+of bundled room models and finish textures.
 The browser can cache these assets for later loads.
 
 ### How it works
@@ -86,9 +91,11 @@ Save assets with **+**, review **Saved**, then export a JSON selection manifest.
 Selections persist in this browser. Exports retain article IDs, source URLs,
 checksums, local paths, and product dimensions. Models use metres and Y up.
 Exporting a selection does not insert it into the playground. Its apartment uses
-the fixed IKEA placements in `src/furniture_layout.js`.
+the fixed Hephaestus scene exported from Blender. The earlier demo placements
+remain in `src/furniture_layout.js` for regression tests.
 
-The furnished playground uses the imported collection in local development.
+The Hephaestus playground includes its own optimized scene GLBs. The earlier
+demo playground uses the imported collection in local development.
 For static hosting, run `python3 scripts/prepare_huggingface.py` and serve the
 prepared collection from `local_assets/huggingface/` at `assets/ikea/` under the
 site base path, or use the public Hugging Face dataset described in the deployment guide.
@@ -137,12 +144,13 @@ The arrival uses bundled NASA GIBS and USGS/USDA images, with no runtime map API
 compact light geometry. Source URLs, coordinates, licenses, and hashes are in
 `public/assets/arrival/manifest.json`.
 
-Click open floor to walk there automatically. Select **Upper** to choose an
-upstairs destination. Choose **Elevator** or **Stairs · experimental** for the
-cross-floor route. Clicking a step selects a stair destination. **Building** shows
-both floors. WASD or **Escape** cancels automatic navigation. Pause preserves the
+Click open floor to walk there automatically. Select **Mezzanine** to choose an
+upstairs destination. **Stairs · experimental** follows the original L stair;
+this apartment has no elevator. Clicking a step selects a stair destination.
+**Building** frames the full tower exterior. Orbit and Top-down cut away the
+selected floor's walls for inspection. WASD or **Escape** cancels automatic navigation. Pause preserves the
 route. Stair routes are enabled with the current walking policy and may fall or
-stall; press R to reset. Stairs and the elevator have separate approaches.
+stall; press R to reset. Closed doors and solid furniture remain obstacles.
 See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limits.
 
 | Input | Action |
@@ -164,7 +172,7 @@ The policy continues to balance the robot, which can still take small steps or d
 **Shoulder** is the default camera. It follows closely behind the figure's right
 shoulder and turns with its heading. Position and heading ease smoothly; walls and
 furniture shorten the camera distance. Scroll or use +/− to change its distance.
-It works with both Robot and Character and follows stairs and elevator travel.
+It works with both Robot and Character and follows stair travel.
 Select Follow, Orbit, or Top-down for a wider view. Selecting another floor switches
 to Orbit; selecting Shoulder returns to the figure's current floor.
 
@@ -174,23 +182,24 @@ Select Resume to continue.
 
 ## Scene and robot
 
-- Two 19 × 14 m floors, with living room, kitchen, study, a stairwell, and an elevator.
-- Nineteen IKEA placements use twelve original models: KIVIK seating, LACK and
-  TORNVIKEN tables, BESTÅ and HEMNES storage, KNOXHULT cabinets, a LAGAN refrigerator,
-  a MICKE desk, a MARKUS chair, BILLY shelves, a TILLREDA cooktop, and an ELLOVEN stand.
-- Models retain their original materials and metre scale. Rendering and physics
-  share their floor position, orientation, and conversion from Y up to Z up.
-  The renderer shortens visible walls for a cutaway view. Physics retains their full 2.7 m collision height.
+- The nonrectangular apartment slab spans 37.68 × 18.06 m; the mezzanine is 3.60 m above it.
+- Original V20 placements and metre scale: six blue sofas in two U arrangements,
+  four LISTERBY tables, PAX wardrobes, workspaces, kitchen, and perimeter furnishings.
+- IKEA-derived and existing Tripo assets retain their source materials, with
+  portable PBR approximations and render LODs. Native oak and brick finishes are
+  baked from the Blender material graphs. Plants use 330 authored instances.
+- Physics keeps full-height construction, glazing barriers, stair solids, and
+  compound furniture contacts. Orbit/Top-down only shorten the rendered walls.
 - Berkeley Lite Pro: 34 controlled joints, including the waist, arms, and neck; fingers are fixed.
 - The model, contacts, joint inertias, gains, and motor torque–speed envelopes match the upstream browser export.
-- The floors are 2.64 m apart. Twenty-four solid treads have an 11 cm rise, 45 cm run, and 2.2 m width.
+- The L stair has twenty 18 cm risers, 29 cm going, a 90° turn, and a 1.30 m flight width.
 - Live robot-frame commands, actual speed, world position, heading, base height,
   simulation time, distance, rendering FPS, and real-time factor.
 - The perceptive policy handles walking and stair motion. Theta* supplies the global route.
   Falls stop the simulation and leave Reset available; the policy does not perform get-up recovery.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
-Cross-floor routes use the physical lift or attempt the stair path. The asset library uses
+Cross-floor routes attempt the original stair path. The asset library uses
 the complete catalog hosted on Hugging Face. Challenge scores and history remain
 future work.
 
@@ -201,25 +210,21 @@ meshes generated with CoACD. MuJoCo uses convex shapes for mesh contacts; a sing
 object hull would fill gaps under desks and between legs.
 See the [MuJoCo collision documentation](https://mujoco.readthedocs.io/en/stable/computation.html).
 
-`src/furniture_assets.js` stores the generated hull vertices, original model
-dimensions, grounding origin, and source SHA-256 hashes. The preparation uses
-a 10 mm concavity target and at most 32 hulls per model. This is an approximation
-for navigation contacts, with separate surfaces for tabletops, legs, and shelves.
-The renderer checks model dimensions before enabling movement. Physics stays
-paused until all furniture visuals and the robot are ready.
+`src/hephaestus_physics.js` stores 4,216 source-derived convex bodies. Exact floor
+triangles preserve the mezzanine void; 15 mm CoACD furniture decomposition keeps
+leg gaps. Tiny hardware and nonstructural finish contacts are omitted; the
+underlying construction remains. A recorded connected-component hull fallback
+covers one failed ALEX template. These are fixed contact approximations, not
+articulated furniture or a structural engineering model.
 
-The checked-in collision data lets headless physics checks run without the GLBs.
-To regenerate it, use Python 3.12+ and Node.js:
+`src/hephaestus_data.js` stores source provenance, checksums, actual floor
+footprints, stair routes, camera obstacles, and clearance-eroded navigation areas.
+Rendering and physics share the same metric origin. The source Blender file is
+unchanged. [Map integration](docs/HEPHAESTUS.md) describes regeneration and limits.
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r scripts/requirements-furniture.txt
-.venv/bin/python scripts/prepare_furniture.py
-```
-
-The preparation reads the placements from `src/furniture_layout.js`. It caches
-results in `local_assets/ikea/collisions/`, keyed by source hash and settings.
-Add `?collisions=1` to the playground URL to inspect the hulls as blue wireframes.
+The earlier 19 × 14 m demo, its elevator, and its original collision preparation
+remain available as a regression fixture. Run `VITE_PLAYGROUND_MAP=demo npm run dev`
+to inspect it. Its export scripts and external IKEA host are unchanged.
 
 ## Performance
 
@@ -267,7 +272,7 @@ Lite Pro: the joint layout and policy contract differ. The active app loads only
 ## Verification
 
 ```bash
-npm test                 # Catalog, furniture layout, controller contract, and render assets
+npm test                 # Original demo regressions plus Hephaestus assets/layout/navigation
 npm run test:simulation  # Real bundled MuJoCo WASM + ONNX runtime; no Python needed
 npm run build
 ```
@@ -276,14 +281,22 @@ The simulation regression uses the same controller as the browser worker. It che
 manual locomotion, wall and furniture contacts, compound collision ray probes, pause,
 reset, fall detection, and invalid policy output. Automatic routes cover doorways,
 furniture avoidance, elevator transfers, stair ascent/descent, and holding after arrival.
-The upstream comparison runs before those scenarios.
+The upstream comparison runs before those scenarios. Those original transfer
+regressions run on the explicit demo fixture. The additional Hephaestus run
+checks real floor/table/glazing rays, the mezzanine void, standing and walking on
+the carpet, automatic central-aisle travel, pause, and reset. Physical completion
+of the new 18 cm L stair has not been established; it remains experimental.
 
 ## Repository layout
 
 ```text
 src/main.jsx                  React controls, telemetry, minimap, and input
 src/scene_view.js              Three.js scene and camera
-src/scene_layout.js            Shared apartment geometry and MJCF generation
+src/scene_layout.js            Shared world geometry and MJCF generation
+src/world.js                   Default map selection and explicit demo fallback
+src/hephaestus_data.js         Generated source metadata, floor masks, and asset hashes
+src/hephaestus_physics.js      Generated convex contacts, worker-only bundle
+public/assets/hephaestus/      Optimized room/tower GLBs and native finish bakes
 src/lite_pro_policy.js         S3 depth, history, observation, and motor control
 src/policy_constants.js        Generated constants from the pinned export
 src/locomotion.js              Timing, joint names, keyboard commands, and heading

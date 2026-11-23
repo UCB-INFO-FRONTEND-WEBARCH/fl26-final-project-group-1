@@ -95,7 +95,8 @@ The asset browser adapts the catalog draft supplied in
 prepared catalog rows, categories, cached photos, and original GLB files.
 Product source URLs and model checksums remain in exported selection manifests.
 The archive records [IKEA Browser](https://github.com/shish/blender-ikea-browser/)
-as the collection tool. No model or photo from this collection is tracked in Git.
+as the collection tool. The catalog collection itself remains external. Selected derived models in the
+Hephaestus scene are bundled as described below.
 
 `scripts/prepare_furniture.py` derives compound convex collision meshes from
 twelve selected GLBs with [CoACD](https://github.com/SarahWeiii/CoACD) (MIT).
@@ -103,6 +104,25 @@ The generated data in `src/furniture_assets.js` records each original file hash.
 `src/furniture_layout.js` defines the apartment placements. Models retain their
 original materials and metre scale. The renderer converts their Y up coordinates
 to the same Z up frame as the collision meshes.
+
+## Hephaestus Tower scene
+
+`public/assets/hephaestus/` contains optimized exports of the project owner's
+calibrated V20 Hephaestus Tower Blender scene. Its manifest pins the source file,
+SHA-256, metre origin, output hashes, and limitations. The original Minecraft map
+informed the layout; these exports contain the rebuilt Blender geometry, not
+Minecraft textures or a Minecraft runtime.
+
+Furniture includes previously downloaded IKEA models and the owner's existing
+Tripo-generated replacements, including KIVIK-inspired seating. IKEA product names
+identify the source/design references; they do not imply endorsement or a blanket
+open-source license. Native construction, procedural plants, and baked oak/brick
+finishes come from the authored scene. No new paid assets were generated for this
+integration. These derived exports do not broaden the underlying asset rights.
+
+The map uses meshoptimizer's MIT-licensed meshopt decoder from the installed
+Three.js package. Collision preparation uses CoACD (MIT), NumPy, SciPy, trimesh,
+and Shapely offline. See [map integration](docs/HEPHAESTUS.md) for export details.
 
 ## Fonts
 

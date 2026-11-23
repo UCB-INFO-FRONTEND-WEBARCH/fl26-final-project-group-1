@@ -1,3 +1,4 @@
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import draco_module_url from 'three/addons/libs/draco/gltf/draco_wasm_wrapper.js?url';
@@ -7,7 +8,7 @@ export function create_model_loader() {
   const draco = new DRACOLoader();
   draco.setDecoderPath({ js: draco_module_url, wasm: draco_wasm_url });
   draco.setWorkerLimit(1);
-  return { draco, loader: new GLTFLoader().setDRACOLoader(draco) };
+  return { draco, loader: new GLTFLoader().setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder) };
 }
 
 export function dispose_model(model) {
