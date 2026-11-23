@@ -1,3 +1,5 @@
+import {NavigationOverlay} from './navigation_overlay.js';
+import {configure_native_materials,freeze_native_transforms,plant_cells} from './native_render.js';
 import {load_native_finishes,apply_native_finishes} from './native_finishes.js';
 import { IS_HEPHAESTUS, MAP } from './world.js';
 import * as THREE from 'three';
@@ -13,7 +15,7 @@ import { ShoulderCamera } from './shoulder_camera.js';
 import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
-import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
+import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPAWN_YAW } from './scene_layout.js';
 
 function floor_label(text, width, color = '#85858d') {
   const canvas = document.createElement('canvas');
@@ -72,7 +74,7 @@ export class SceneView {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
     this.shoulder_camera = new ShoulderCamera(this.camera, this.controls.target);
     this.robot_position = new THREE.Vector3(...SPAWN);
-    this.robot_heading = 0;
+    this.robot_heading = SPAWN_YAW;
     this.last_follow_position = this.robot_position.clone();
     this.robot_meshes = [];
     this.follow_delta = new THREE.Vector3();
@@ -83,8 +85,9 @@ export class SceneView {
     trail_geometry.setAttribute('position', new THREE.BufferAttribute(this.trail_positions, 3).setUsage(THREE.DynamicDrawUsage));
     trail_geometry.setDrawRange(0, 0);
     this.trail = new THREE.Line(trail_geometry,
-      new THREE.LineBasicMaterial({ color: '#0071e3', transparent: true, opacity: 0.5 }));
+      new THREE.LineBasicMaterial({ color: '#0071e3', transparent: true, opacity: 0.5, depthTest: false, depthWrite: false }));
     this.trail.frustumCulled = false;
+    this.trail.renderOrder = 9999;
     this.scene.add(this.trail);
     this.build_room();
     this.theme_handler = () => this.set_theme(get_theme());
@@ -229,14 +232,8 @@ export class SceneView {
       new THREE.MeshBasicMaterial({ color: '#0071e3', transparent: true, opacity: 0.7 }));
     this.robot_shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.75), shadow_material);
     this.scene.add(this.robot_marker, this.robot_shadow);
-    this.route = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#0071e3', depthTest: false }));
-    this.destination = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.22, 32),
-      new THREE.MeshBasicMaterial({ color: '#0071e3', depthTest: false, side: THREE.DoubleSide }));
-    this.destination.visible = false;
-    this.route.frustumCulled = false;
-    this.route.visible = false;
-    this.scene.add(this.route, this.destination);
-    this.navigation_version = -1;
+    this.navigation_overlay = new NavigationOverlay();
+    this.scene.add(this.navigation_overlay);
     this.set_floor(0);
   }
 
@@ -316,11 +313,12 @@ export class SceneView {
   build_native_room() {
     this.floor_groups=[new THREE.Group(),new THREE.Group()];this.scene.add(...this.floor_groups);
     this.map_context=new THREE.Group();this.map_roof=new THREE.Group();this.scene.add(this.map_context,this.map_roof);
-    this.floor_surfaces=[];this.furniture_shadows=[];this.viewed_floor=0;this.native_clip_materials=[];
+    this.floor_surfaces=[];this.furniture_shadows=[];this.viewed_floor=0;this.native_clip_materials=[];this.native_context_bands=[];this.native_furniture_groups=[];
+    this.plant_cells=new THREE.Group();this.plant_overview=new THREE.Group();this.map_context.add(this.plant_cells,this.plant_overview);
     this.ambient_light=new THREE.HemisphereLight('#fff8ed','#aeb8bb',2);this.scene.add(this.ambient_light);
     this.sunlight=new THREE.DirectionalLight('#fff7e8',2);this.sunlight.position.set(0,-10,20);this.sunlight.castShadow=true;
     Object.assign(this.sunlight.shadow.camera,{left:-30,right:22,bottom:-15,top:15,near:.5,far:80});this.scene.add(this.sunlight);
-    const invisible=new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+    const invisible=new THREE.MeshBasicMaterial({visible:false,side:THREE.DoubleSide});
     const triangle_mesh=(triangles,z)=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(triangles.flatMap(t=>t.flatMap(p=>[p[0],p[1],p[2]??z])),3));g.computeVertexNormals();return new THREE.Mesh(g,invisible);};
     for(let floor=0;floor<2;floor++){
       const surface=triangle_mesh(MAP.floor_triangles[floor],floor*FLOOR_HEIGHT);surface.userData.floor=floor;
@@ -332,9 +330,8 @@ export class SceneView {
     this.robot_marker=new THREE.Mesh(new THREE.RingGeometry(.37,.39,48),new THREE.MeshBasicMaterial({color:'#0071e3',transparent:true,opacity:.7}));
     this.robot_shadow=new THREE.Mesh(new THREE.CircleGeometry(.32,32),new THREE.MeshBasicMaterial({color:'#333333',transparent:true,opacity:.12,depthWrite:false}));
     this.scene.add(this.robot_marker,this.robot_shadow);
-    this.route=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:'#0071e3',depthTest:false}));
-    this.destination=new THREE.Mesh(new THREE.RingGeometry(.15,.22,32),new THREE.MeshBasicMaterial({color:'#0071e3',depthTest:false,side:THREE.DoubleSide}));
-    this.route.visible=this.destination.visible=false;this.route.frustumCulled=false;this.scene.add(this.route,this.destination);this.navigation_version=-1;
+    this.navigation_overlay = new NavigationOverlay();
+    this.scene.add(this.navigation_overlay);
     this.renderer.localClippingEnabled=true;
   }
 
@@ -349,17 +346,26 @@ export class SceneView {
         const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
         if(signal.aborted){dispose_model(gltf.scene);return;}
         const upright=new THREE.Group();upright.rotation.x=Math.PI/2;upright.add(gltf.scene);apply_native_finishes(upright,finishes);
+        const clipped = new Map();
         gltf.scene.traverse(o=>{
+          if(o.userData.context_band)this.native_context_bands.push(o);
+          if(o.userData.map_role==='furniture')this.native_furniture_groups.push(o);
           if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;
           // Only architectural cutaways are clipped; source furniture stays whole.
           let owner=o;while(owner&&!owner.userData.map_role)owner=owner.parent;
           if(['architecture','glass'].includes(owner?.userData.map_role)){
-            o.material=Array.isArray(o.material)?o.material.map(m=>m.clone()):o.material.clone();
+            const clone = material => {
+              if (!clipped.has(material)) clipped.set(material, material.clone());
+              return clipped.get(material);
+            };
+            o.material=Array.isArray(o.material)?o.material.map(clone):clone(o.material);
             const mats=Array.isArray(o.material)?o.material:[o.material];
             for(const m of mats)this.native_clip_materials.push({material:m,floor:file.layer==='upper'?1:0});
           }
         });
         const parent=file.layer==='context'?this.map_context:file.layer==='roof'?this.map_roof:this.floor_groups[file.layer==='upper'?1:0];parent.add(upright);
+        configure_native_materials(upright,this.quality==='performance');
+        freeze_native_transforms(upright);
       }));
       const failed=loaded.find(r=>r.status==='rejected');if(failed)throw failed.reason;
       // Lightweight procedural-plant exports retain their authored placements.
@@ -367,21 +373,25 @@ export class SceneView {
         const response=await fetch(`${SITE_BASE}assets/hephaestus/${key}.glb`,{signal});if(!response.ok)throw new Error(`Could not load plant ${key}.`);
         const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
         if(signal.aborted){dispose_model(gltf.scene);signal.throwIfAborted();}
-        const placements=MAP.plants.filter(p=>p.key===key),upright=new THREE.Matrix4().makeRotationX(Math.PI/2);
+        const all_placements=MAP.plants.filter(p=>p.key===key),cells=plant_cells(all_placements),upright=new THREE.Matrix4().makeRotationX(Math.PI/2);
         gltf.scene.updateMatrixWorld(true);
         gltf.scene.traverse(mesh=>{
           if(!mesh.isMesh)return;
+          for(const [parent,batches] of [[this.plant_cells,cells],[this.plant_overview,[all_placements]]])for(const placements of batches){
           const instanced=new THREE.InstancedMesh(mesh.geometry,mesh.material,placements.length);
           for(let i=0;i<placements.length;i++){
             const world=new THREE.Matrix4().fromArray(placements[i].matrix.flat()).transpose();
             instanced.setMatrixAt(i,world.multiply(upright).multiply(mesh.matrixWorld));
           }
-          instanced.instanceMatrix.needsUpdate=true;instanced.computeBoundingSphere();instanced.castShadow=instanced.receiveShadow=true;this.map_context.add(instanced);
+          instanced.instanceMatrix.needsUpdate=true;instanced.computeBoundingSphere();instanced.castShadow=instanced.receiveShadow=true;parent.add(instanced);
+          }
         });
       }
       if(signal.aborted)return;
       const room=new RoomEnvironment(),generator=new THREE.PMREMGenerator(this.renderer);this.environment=generator.fromScene(room,.04);this.scene.environment=this.environment.texture;this.scene.environmentIntensity=this.theme==='dark'?.25:.55;room.dispose();generator.dispose();
       this.map_context_low=new THREE.Box3().setFromObject(this.map_context).min.z;
+      configure_native_materials(this.map_context,this.quality==='performance');
+      freeze_native_transforms(this.map_context);
       this.apply_native_view();this.renderer.shadowMap.needsUpdate=true;this.needs_render=true;
     } finally {draco.dispose();}
   }
@@ -389,6 +399,10 @@ export class SceneView {
   apply_native_view() {
     if(!IS_HEPHAESTUS)return;
     const interior=['shoulder','follow','arrival'].includes(this.mode);
+    const building=this.viewed_floor==='all';
+    this.plant_cells.visible=!building;this.plant_overview.visible=building;
+    for(const detail of this.native_furniture_groups)detail.visible=!building||this.quality==='quality';
+    for(const cell of this.native_context_bands)cell.visible=cell.userData.context_band==='roof'||this.viewed_floor==='all';
     for(let floor=0;floor<2;floor++)this.floor_groups[floor].visible=interior||this.viewed_floor==='all'||this.viewed_floor===floor;
     this.map_roof.visible=interior||this.viewed_floor==='all';
     for(const {material,floor} of this.native_clip_materials){
@@ -484,6 +498,7 @@ export class SceneView {
       for (let floor = 0; floor < 2; floor++) this.lift_gates[floor].visible = this.lift_open_floor !== floor;
     }
     this.set_navigation(telemetry.navigation);
+    if (this.arrival && this.arrival_world_ready && !this.arrival_destination_ready) this.prepare_arrival_destination();
     if (telemetry.time < 0.02) {
       this.shoulder_camera.initialized = false;
       this.trail_count = 0;
@@ -497,7 +512,7 @@ export class SceneView {
         this.trail_positions.copyWithin(0, 3);
         this.trail_count--;
       }
-      this.trail_positions.set([x, y, surface + 0.02], this.trail_count * 3);
+      this.trail_positions.set([x, y, surface + (IS_HEPHAESTUS ? .065 : .02)], this.trail_count * 3);
       this.trail_count++;
       this.trail.geometry.getAttribute('position').needsUpdate = true;
       this.trail.geometry.setDrawRange(0, this.trail_count);
@@ -563,21 +578,47 @@ export class SceneView {
 
   async load_arrival_assets() {
     await this.arrival_map.load_details(`${SITE_BASE}assets/arrival/`, this.arrival_abort.signal);
-    this.arrival.ready = Boolean(this.arrival_world_ready);
+    this.refresh_arrival_ready();
     this.needs_render = true;
   }
 
-  set_arrival_ready() {
+  async set_arrival_ready() {
     this.arrival_world_ready = true;
-    this.arrival.ready = this.arrival_map.details_ready;
+    this.prepare_arrival_destination();
+    // Compile PBR programs while the overview is still holding, before the
+    // last zoom reveals the room. KHR_parallel_shader_compile is used if present.
+    await this.renderer.compileAsync(this.scene,this.camera);
+    if(this.disposed||!this.arrival)return;
+    this.arrival_shaders_ready=true;
+    this.refresh_arrival_ready();
+  }
+
+  refresh_arrival_ready() {
+    if(this.disposed||!this.arrival)return;
+    this.arrival.ready=Boolean(this.arrival_destination_ready&&this.arrival_shaders_ready&&this.arrival_map.details_ready);
+  }
+
+  prepare_arrival_destination() {
+    if (!this.has_robot_pose || this.arrival_destination_ready) return;
+    const position = this.camera.position.clone(), rotation = this.camera.quaternion.clone();
+    const target = this.controls.target.clone(), up = this.camera.up.clone();
+    this.camera.up.set(0, 0, 1);
+    this.shoulder_camera.update(this.robot_position, this.robot_heading, 0, true);
+    this.arrival.set_destination(this.camera.position, this.controls.target);
+    this.camera.position.copy(position);this.camera.quaternion.copy(rotation);
+    this.controls.target.copy(target);this.camera.up.copy(up);
+    this.arrival_destination_ready = true;
+    this.refresh_arrival_ready();
   }
 
   finish_arrival() {
+    const position=this.camera.position.clone(),rotation=this.camera.quaternion.clone();
     this.arrival_map.dispose();
     this.arrival_map = this.arrival = this.arrival_opening = null;
     this.camera.up.set(0, 0, 1);
     this.camera.far = IS_HEPHAESTUS ? 300 : 100;
     this.set_camera('shoulder');
+    this.arrival_handoff={position_m:position.distanceTo(this.camera.position),angle_degrees:THREE.MathUtils.radToDeg(rotation.angleTo(this.camera.quaternion))};
     this.on_arrival_complete();
   }
 
@@ -608,15 +649,7 @@ export class SceneView {
   }
 
   set_navigation(navigation) {
-    if (!navigation || navigation.version === this.navigation_version) return;
-    this.navigation_version = navigation.version;
-    this.route.geometry.dispose();
-    this.route.geometry = new THREE.BufferGeometry().setFromPoints(navigation.path.map(point => new THREE.Vector3(point[0], point[1], point[2] + 0.045)));
-    this.route.visible = navigation.path.length > 1;
-    this.destination.visible = Boolean(navigation.goal);
-    if (navigation.goal) this.destination.position.set(navigation.goal[0], navigation.goal[1], (navigation.goal[3] ?? navigation.goal[2] * FLOOR_HEIGHT) + 0.05);
-    this.destination.material.color.set(navigation.status === 'arrived' ? '#30a46c' : navigation.status === 'blocked' ? '#d56b36' : '#0071e3');
-    this.needs_render = true;
+    if (this.navigation_overlay.update(navigation)) this.needs_render = true;
   }
 
   install_picking() {
@@ -663,6 +696,10 @@ export class SceneView {
 
   set_quality(quality) {
     this.quality = quality;
+    if(IS_HEPHAESTUS){
+      for(const root of [...this.floor_groups,this.map_roof,this.map_context])configure_native_materials(root,quality==='performance');
+      this.apply_native_view();
+    }
     for (const shadow of this.furniture_shadows) shadow.visible = quality === 'performance';
     this.renderer.shadowMap.enabled = quality === 'quality';
     // The room is static. Compute its shadow once. The robot uses the contact shadow.
@@ -728,6 +765,7 @@ export class SceneView {
         triangles: this.renderer.info.render.triangles,
         draw_calls: this.renderer.info.render.calls,
         pixel_ratio: this.renderer.getPixelRatio(),
+        arrival_handoff: this.arrival_handoff,
       });
       this.render_samples = [];
       this.last_fps_time = time;

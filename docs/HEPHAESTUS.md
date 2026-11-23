@@ -39,7 +39,11 @@ reused; no new generation credits were spent. See [third-party notes](../THIRD_P
   330 authored instances with instanced rendering.
 - The large scene GLBs use meshopt compression, 16-bit position quantization,
   static role batching, render LODs, and embedded image maps capped at 1024 pixels.
-  Models plus four native finish tiles total 39,956,954 bytes (38.11 MiB).
+  Models plus four native finish tiles total 39,957,586 bytes (38.11 MiB).
+  The complete lower facade is a separate context band, visible in Building
+  view. Plants use 8 m culling batches indoors and shared overview batches in
+  Building view. Fast Building view omits interior furniture; Quality restores it.
+  No additional mesh simplification is used in this pass.
 - Oak albedo/height tiles cover 3.60 × 1.80 m; brick tiles cover 0.96 × 1.20 m.
   Both are baked from the original Blender graphs and use world-space UVs.
   Other unsupported procedural shaders retain authored diffuse finishes.
@@ -51,6 +55,8 @@ reused; no new generation credits were spent. See [third-party notes](../THIRD_P
   Furniture uses connected-component CoACD at a 15 mm target. One failed ALEX
   template uses recorded conservative convex component hulls. Glazing retains
   source-object barrier envelopes. These are fixed contact approximations.
+  Runtime geoms are grouped into fixed 4 m spatial bodies for faster head-camera
+  ray rejection. Their surfaces, transforms, and contact settings are unchanged.
 - Theta* receives floor polygons eroded by 0.52 m planning / 0.30 m tracking radii
   plus half a 10 cm cell diagonal, minus inflated obstacles. Render geometry,
   physics, and navigation share one source transform.
@@ -92,7 +98,9 @@ python scripts/hephaestus/prepare_centoria_map_v21.py
 ```
 
 Run `compact_centoria_glb_v21.py INPUT OUTPUT` on each raw lower/upper/context GLB,
-then gltfpack 1.3.0 on each compacted output with `-cc -ke -kn -vp 16`, writing the
+then `python scripts/hephaestus/split_context_glb.py COMPACTED_CONTEXT CONTEXT_BANDS`
+on the compacted context only. Run gltfpack 1.3.0 on the compacted lower/upper
+and split context with `-cc -ke -kn -vp 16`, writing the
 final files into `public/assets/hephaestus/`. Compress the raw roof GLB with the
 same gltfpack settings as well, then run
 `python scripts/hephaestus/finalize_centoria_map_v21.py` to update the source-derived
@@ -102,12 +110,15 @@ repairs named UV references to the retained UV layer. It preserves valid texture
 
 ## Validation
 
-`npm test` runs 40 original demo tests and four Hephaestus asset/layout/navigation
-tests. `npm run test:simulation` first checks unchanged upstream controller parity,
+`npm test` runs 44 shared/demo tests and four Hephaestus asset/layout/navigation
+tests, including route rendering, material restoration, and camera handoff.
+`npm run test:simulation` first checks unchanged upstream controller parity,
 then the original full demo regressions (including lift and physical straight
 stairs), then the new-map real MuJoCo/ONNX checks. The latter probe carpet,
 table, glazing, upper slab, and mezzanine void, and exercise idle balance,
 manual aisle locomotion, automatic aisle arrival, pause, and reset.
+It also compares the grouped and flat physics models' raw depth rays at twelve
+poses. See [performance measurements](PERFORMANCE.md) for reproduction and limits.
 
 All seven exported GLBs passed Khronos glTF Validator with zero errors. Normal
 maps without authored tangents retain generated-tangent warnings. Browser QA

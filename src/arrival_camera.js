@@ -20,6 +20,14 @@ export class ArrivalCamera {
     this.apply(0);
   }
 
+  set_destination(position, target) {
+    // Resolve after the first robot pose and room colliders load, then freeze
+    // the endpoint throughout the final dive.
+    if (this.done || (this.level === ARRIVAL_LEVELS.length - 1 && this.moving)) return;
+    this.points.at(-1).position.copy(position);
+    this.points.at(-1).target.copy(target);
+  }
+
   apply(progress) {
     const from = this.points[this.level];
     const to = this.points[this.level + 1];

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ArrivalCamera, ARRIVAL_LEVELS, ARRIVAL_HOLD_SECONDS } from '../src/arrival_camera.js';
+import { ShoulderCamera } from '../src/shoulder_camera.js';
 
 function fixture(reduced_motion = false) {
   const camera = new THREE.PerspectiveCamera();
@@ -66,4 +67,24 @@ test('reduced motion keeps the altitude holds and uses cuts instead of dives', (
     assert.equal(sequence.level, level + 1);
   }
   assert.equal(sequence.done, true);
+});
+
+test('a late robot heading and loaded colliders resolve the final pose without a handoff jump', () => {
+  const {camera, target, sequence} = fixture();
+  const pose = new THREE.Vector3(2.7, 0, .79858);
+  const shoulder = new ShoulderCamera(camera, target);
+  shoulder.add_obstacle(new THREE.Box3(new THREE.Vector3(4.5, -.5, 0), new THREE.Vector3(4.7, .5, 3)));
+  camera.up.set(0, 0, 1);
+  shoulder.update(pose, Math.PI, 0, true);
+  const expected_position=camera.position.clone(),expected_target=target.clone(),expected_rotation=camera.quaternion.clone();
+  sequence.set_destination(expected_position, expected_target);
+  sequence.ready=true;
+  while(!sequence.done)sequence.update(1/120);
+  assert(camera.position.distanceTo(expected_position)<1e-9);
+  assert(target.distanceTo(expected_target)<1e-9);
+  assert(camera.quaternion.angleTo(expected_rotation)<1e-7);
+  // The live shoulder camera takes over at the same measured pose and heading.
+  shoulder.update(pose, Math.PI, 0, true);
+  assert(camera.position.distanceTo(expected_position)<1e-9);
+  assert(camera.quaternion.angleTo(expected_rotation)<1e-7);
 });

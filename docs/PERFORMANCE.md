@@ -1,5 +1,66 @@
 # Browser performance
 
+## Hephaestus Tower / Lite Pro
+
+The default V20 room was measured before and after the navigation, arrival, and
+performance fixes in the same in-app browser at 1280 × 720, Fast graphics,
+Shoulder camera near the reset position, after loading and shader compilation.
+These are representative short samples, not GPU timings or cross-device promises.
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| CPU frame submission, mean | 6.18 ms | ~2.1 ms |
+| CPU frame submission, p95 | 6.5 ms | ~2.3–2.8 ms |
+| Submitted triangles, including extra passes | 6.03 million | 2.50 million |
+| Draw calls | 435 | 324–325 |
+| FPS | 60 | 60 |
+| Browser physics real-time factor | 0.62× | ~1.00× |
+| Pixel ratio | 1.0 | 1.0 |
+
+Fast approximates physical glass with one alpha pass and renders double-sided
+transparency once. Quality restores the source transmission and material flags.
+Static transforms are frozen. All 330 plants retain their authored transforms,
+using local 8 m instance batches indoors and shared overview batches in Building
+view. The lower facade renders only in Building view. Fast Building view omits
+interior furniture; Quality restores it. Room dimensions, colors, finishes,
+collision surfaces, and the source Blender file are unchanged.
+
+The dominant worker cost was depth ray casting against 4,216 world-body geoms.
+Grouping the same geoms into fixed 4 m bodies gives MuJoCo useful body bounds;
+its ray implementation rejects bodies outside the ray before testing their
+geoms. See the [MuJoCo ray implementation](https://github.com/google-deepmind/mujoco/blob/main/src/engine/engine_ray.c).
+There are still 4,326 total geoms, including the robot. All 1,296 raw sensor rays
+match the flat reference exactly at twelve test poses. Seeded benchmark final
+poses also match before and after.
+
+The standalone benchmark uses Node 24.22.1, one WASM inference thread, seed 7,
+warm-up, and 200 control cycles per scenario. It runs uncapped, without rendering:
+
+| Headless measurement | Before | After |
+| --- | ---: | ---: |
+| Idle control cycle | 29.95 ms | 13.96 ms |
+| Idle depth sensing | 26.85 ms | 10.49 ms |
+| Walking control cycle | 30.34 ms | 14.62 ms |
+| Walking depth sensing | 27.52 ms | 11.42 ms |
+| Walking real-time factor | 0.66× | 1.37× |
+
+To reproduce, stop other simulations and run:
+
+```bash
+node scripts/profile_hephaestus.js --output=local_assets/hephaestus/profile-after.json
+# Recreate the old flat static hierarchy from the same source data:
+node --input-type=module -e "import {writeFileSync} from 'node:fs'; import {make_scene_xml} from './src/scene_layout.js'; writeFileSync('local_assets/hephaestus/flat.xml', make_scene_xml({spatial_cells:false}));"
+node scripts/profile_hephaestus.js --xml=local_assets/hephaestus/flat.xml --output=local_assets/hephaestus/profile-before.json
+```
+
+The browser caps simulation at real time. Its `?profile=1` panel measures CPU
+camera/update/render submission with `performance.now()`, not GPU execution.
+Paused views redraw only when needed, so their displayed FPS is not comparable.
+The panel also reports the measured final arrival handoff position and angle.
+The tested handoff error is below 10⁻⁹ m and 0.000003°.
+
+## Historical G1 measurements
+
 These are historical measurements of the earlier Unitree G1 implementation. The
 active Lite Pro renderer uses 6,196 triangles (about 148 KiB); its depth sensor and
 physics retain the upstream model. New policy details are in [POLICY.md](POLICY.md).

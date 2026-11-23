@@ -1,4 +1,5 @@
 import { HEPHAESTUS_PHYSICS } from './hephaestus_physics.js';
+import { static_world_xml } from './static_scene.js';
 import { IS_HEPHAESTUS, MAP } from './world.js';
 import { PHYSICS_DT } from './locomotion.js';
 import { SCENE_FURNITURE as DEMO_FURNITURE } from './furniture_layout.js';
@@ -35,10 +36,10 @@ export const ROOM_LABELS = IS_HEPHAESTUS ? MAP.rooms : [
   { name: 'STUDY', position: [3.7, 2.5], number: '03' },
 ];
 
-export function make_scene_xml() {
+export function make_scene_xml({ spatial_cells = true } = {}) {
   if (IS_HEPHAESTUS) {
     const meshes=HEPHAESTUS_PHYSICS.map(p=>`<mesh name="${p.name}" vertex="${p.vertices.flat().join(' ')}"/>`).join('\n');
-    const geoms=HEPHAESTUS_PHYSICS.map(p=>`<geom name="${p.name}" type="mesh" mesh="${p.name}" group="0" density="0" friction="0.9 0.005 0.0001" margin="0"/>`).join('\n');
+    const geoms=spatial_cells ? static_world_xml(HEPHAESTUS_PHYSICS) : HEPHAESTUS_PHYSICS.map(p=>`<geom name="${p.name}" type="mesh" mesh="${p.name}" group="0" density="0" friction="0.9 0.005 0.0001" margin="0"/>`).join('\n');
     return `<mujoco model="Hephaestus Tower V20"><include file="robot.xml"/><option timestep="${PHYSICS_DT}" gravity="0 0 -9.81"/><asset>${meshes}</asset><worldbody>${geoms}</worldbody></mujoco>`;
   }
   const walls = [0, 1].flatMap(floor => SCENE_WALLS.map(wall => box_xml({ ...wall,

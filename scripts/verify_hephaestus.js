@@ -27,6 +27,21 @@ ort.env.wasm.numThreads=1;ort.env.wasm.wasmPaths={wasm:new URL('../node_modules/
 const session=await ort.InferenceSession.create(new Uint8Array(await readFile(new URL('policy.onnx',base))),{executionProviders:['wasm']});
 let seed=1;const random=()=>{seed=(Math.imul(1664525,seed)+1013904223)>>>0;return seed/4294967296;};
 const maps=make_navigation_maps(),sim=new Simulation(mujoco,model,session,maps,random);const initial_pose=Array.from(sim.state.qpos.slice(0,7));const results={};
+// Spatial body bounds must accelerate the existing surfaces, never simplify
+// what the trained head camera sees. Compare all 1,296 rays at twelve poses.
+mujoco.FS.writeFile('/robot/flat_reference.xml',make_scene_xml({spatial_cells:false}));
+const reference_model=mujoco.MjModel.from_xml_path('/robot/flat_reference.xml');
+assert.equal(reference_model.ngeom,model.ngeom);
+const reference=new Simulation(mujoco,reference_model,session,null,random);
+let depth_error=0;
+for(const position of [SPAWN,[9,-3.7,.73],[-15,-2,4.33]])for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+ sim.reset(position,yaw);reference.reset(position,yaw);
+ const actual=sim.policy.cast_depth(),expected=reference.policy.cast_depth();
+ for(let i=0;i<actual.length;i++)depth_error=Math.max(depth_error,Math.abs(actual[i]-expected[i]));
+}
+assert(depth_error<1e-9,`Spatial grouping changed policy depth: ${depth_error}`);
+reference.dispose();reference_model.delete();sim.reset();
+console.log('Hephaestus: spatial depth parity',depth_error);
 async function run(name,seconds,command,start=SPAWN,yaw=SPAWN_YAW){
  sim.reset(start,yaw);sim.command=command;let min=Infinity;const begin=performance.now();
  for(let i=0;i<seconds/PHYSICS_DT;i++){await sim.advance(1);min=Math.min(min,sim.state.qpos[2]);if(sim.fallen)break;}
@@ -40,4 +55,4 @@ assert(max_tracking_y<.65,`Automatic route left central aisle: ${max_tracking_y}
 assert(!sim.fallen,'Automatic aisle route fell');assert.equal(sim.navigation.state.status,'arrived',sim.navigation.state.message);results.automatic_aisle=sim.telemetry();
 // Pause and reset must still work with a no-lift model and a source-normalized spawn.
 sim.paused=true;const before=Array.from(sim.state.qpos);assert.equal(await sim.advance(20),0);assert.deepEqual(Array.from(sim.state.qpos),before);sim.paused=false;sim.reset();assert.deepEqual(Array.from(sim.state.qpos.slice(0,7)),initial_pose);assert.equal(sim.elevator,null);
-const report={status:'PASS',map:MAP.id,source_sha256:MAP.source_sha256,geom_count:model.ngeom,ray_checks:{carpet,void_ray,table,glass,upper},results,limits:MAP.limits};await mkdir(new URL('../local_assets/hephaestus/',import.meta.url),{recursive:true});await writeFile(new URL('../local_assets/hephaestus/verification.json',import.meta.url),JSON.stringify(report,null,2));console.log('HEPHAESTUS_PHYSICS_PASS',model.ngeom);sim.dispose();model.delete();await session.release();
+const report={status:'PASS',map:MAP.id,source_sha256:MAP.source_sha256,geom_count:model.ngeom,body_count:model.nbody,spatial_depth_max_error:depth_error,ray_checks:{carpet,void_ray,table,glass,upper},results,limits:MAP.limits};await mkdir(new URL('../local_assets/hephaestus/',import.meta.url),{recursive:true});await writeFile(new URL('../local_assets/hephaestus/verification.json',import.meta.url),JSON.stringify(report,null,2));console.log('HEPHAESTUS_PHYSICS_PASS',model.ngeom);sim.dispose();model.delete();await session.release();

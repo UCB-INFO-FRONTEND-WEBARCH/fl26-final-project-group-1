@@ -34,8 +34,8 @@
     },
     {
       "file": "context.glb",
-      "bytes": 9977516,
-      "sha256": "bd6a51cad6eaf1314239ba914cbd302be9eee31cb7bfc228d3177c0592778ff2"
+      "bytes": 9978148,
+      "sha256": "aa635f77fd9def89796f91d3f133d6464cada7c3e77352f7fd5237038f9991b3"
     },
     {
       "file": "lower.glb",
@@ -95,5 +95,10 @@
     "fallbacks": [
       "mesh_8365e27e4aa42c91.fallback.json"
     ]
+  },
+  "render_detail": {
+    "context_bands": "Roof context always available; lower tower facade shown in Building view",
+    "triangle_partition": "Source attributes preserved; no additional simplification",
+    "plants": "330 authored placements in 8m culling cells; shared overview batches in Building view"
   }
 }

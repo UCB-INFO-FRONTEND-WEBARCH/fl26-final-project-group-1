@@ -272,7 +272,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       if (!active || !robot_ready || !furniture_ready || world_ready) return;
       world_ready = true;
       set_ready(true);
-      view.set_arrival_ready();
+      view.set_arrival_ready().catch(exception=>report_error(`Could not prepare the room. ${exception.message}`));
       worker.postMessage({ type: 'speed', speed: speed_ref.current });
       worker.postMessage({ type: 'transfer', transfer: transfer_ref.current });
     }

@@ -123,7 +123,8 @@ fade in together. The remaining resources load while this first view is visible.
 The camera descends through three aerial stops: the Bay Area, Santa Clara, and Building K at
 2886 Scott Boulevard. Building K stays at the center of every aerial zoom. The
 regional view uses 80% of the original scope within the available image bounds.
-The camera then moves directly to the robot's Shoulder view in the apartment.
+The camera then moves directly to the robot's Shoulder view in the apartment,
+using its actual spawn heading and the loaded room's camera blockers.
 Clouds share the map's world coordinates, so they pan and zoom together. Layered
 wind curls their edges and makes them billow between dives. Santa Clara frames
 the fully lit side-street area. Building K shows a
@@ -131,8 +132,8 @@ wider campus view and has no cloud overlay.
 The loading screen shows only imagery and source credits. Escape cancels arrival.
 Each aerial stop holds for at least 0.85 seconds. The first hold starts after the
 reveal completes and extends until the closer maps, full road lights, furniture,
-robot, and policy are ready. Loading time counts toward this hold. Physics and
-movement inputs start after the last dive.
+robot, policy, and compiled room shaders are ready. Loading time counts toward
+this hold. Physics and movement inputs start after the last dive.
 Reduced-motion settings keep the holds and replace the dives with cuts.
 Select **Controls** in the game to open the navigation and telemetry panels.
 Use **Exit to site** to return to the landing page and stop the simulation.
@@ -149,8 +150,9 @@ upstairs destination. **Stairs · experimental** follows the original L stair;
 this apartment has no elevator. Clicking a step selects a stair destination.
 **Building** frames the full tower exterior. Orbit and Top-down cut away the
 selected floor's walls for inspection. WASD or **Escape** cancels automatic navigation. Pause preserves the
-route. Stair routes are enabled with the current walking policy and may fall or
-stall; press R to reset. Closed doors and solid furniture remain obstacles.
+route. A blue route with a white outline and destination ring stays visible
+over carpets and glazing in every camera view. Stair routes are enabled with the
+current walking policy and may fall or stall; press R to reset. Closed doors and solid furniture remain obstacles.
 See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limits.
 
 | Input | Action |
@@ -231,7 +233,10 @@ to inspect it. Its export scripts and external IKEA host are unchanged.
 The page defaults to **Graphics → Fast**. The render-only Lite Pro mesh has
 6,196 triangles and uses about 148 KiB, compared with 100,996 triangles in the
 upstream model. Camera rays and physics keep the upstream meshes and contacts.
-**Quality** adds static shadows and increases the allowed render resolution.
+**Quality** adds static shadows, restores physical glass transmission and distant
+interior furniture, and increases the allowed render resolution.
+Fast uses one-pass glass, local plant batches, and view-dependent tower context.
+The unchanged collision geoms are grouped spatially to accelerate depth rays.
 
 Physics and inference run in a worker. Poses are sent at most 50 times per second,
 with one outstanding message and a reused transfer buffer. React updates telemetry
@@ -240,7 +245,8 @@ Repeated IKEA models share geometry and materials. Furniture collision decomposi
 runs offline. No training code or GPU service runs in the website.
 
 Add `?profile=1` for live render diagnostics. [Performance notes](docs/PERFORMANCE.md)
-retain the earlier G1 optimization measurements; they are historical, not Lite Pro benchmarks.
+include the current Hephaestus/Lite Pro before-and-after measurements and benchmark
+commands. The earlier G1 measurements remain separately labeled as historical.
 
 ## Policy and simulation
 
