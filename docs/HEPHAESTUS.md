@@ -93,7 +93,8 @@ python scripts/hephaestus/prepare_centoria_map_v21.py
 
 Run `compact_centoria_glb_v21.py INPUT OUTPUT` on each raw lower/upper/context GLB,
 then gltfpack 1.3.0 on each compacted output with `-cc -ke -kn -vp 16`, writing the
-final files into `public/assets/hephaestus/`. Copy the raw roof GLB there, then run
+final files into `public/assets/hephaestus/`. Compress the raw roof GLB with the
+same gltfpack settings as well, then run
 `python scripts/hephaestus/finalize_centoria_map_v21.py` to update the source-derived
 masks, physics module, plant prototypes, and checksummed manifest together.
 Compaction promotes converted WebP textures to standard JPEG/PNG bindings and
