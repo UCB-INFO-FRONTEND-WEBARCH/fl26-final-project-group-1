@@ -473,6 +473,12 @@ export class SceneView {
     this.robot_position.set(...telemetry.position);
     this.robot_heading = telemetry.heading;
     this.current_floor = telemetry.floor || 0;
+    const teleported = telemetry.teleports !== undefined && telemetry.teleports !== (this.teleports || 0);
+    this.teleports = telemetry.teleports || 0;
+    if (teleported) {
+      this.set_floor(this.current_floor);
+      this.set_camera(this.mode);
+    }
     this.lift_moving = telemetry.elevator?.moving || false;
     if ((this.mode === 'follow' || this.mode === 'shoulder') && this.viewed_floor !== this.current_floor) this.set_floor(this.current_floor);
     for (let index = 0; index < this.robot_meshes.length; index++) {
@@ -499,7 +505,7 @@ export class SceneView {
     }
     this.set_navigation(telemetry.navigation);
     if (this.arrival && this.arrival_world_ready && !this.arrival_destination_ready) this.prepare_arrival_destination();
-    if (telemetry.time < 0.02) {
+    if (telemetry.time < 0.02 || teleported) {
       this.shoulder_camera.initialized = false;
       this.trail_count = 0;
       this.trail.geometry.setDrawRange(0, 0);

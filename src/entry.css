@@ -30,7 +30,6 @@
 .game-shell .scene-zoom, .game-shell .session-toolbar, .game-shell .character-status,
 .game-shell .workspace-note, .game-shell .sidebar { display: none; }
 .game-shell .paused-label { top: 24px; }
-.game-shell .fallen-banner { top: 80px; }
 .arrival-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .arrival-status { position: absolute; z-index: 2; bottom: 38px; left: 40px; max-width: min(450px, calc(100% - 80px)); color: #fff; text-shadow: 0 1px 12px #304f6e38; }
 .arrival-status h1 { font-size: clamp(28px, 4vw, 46px); line-height: 1.1; letter-spacing: -1.5px; margin: 15px 0 8px; font-weight: 500; }
@@ -48,6 +47,19 @@
 .game-bar .game-camera { display: flex; align-items: center; gap: 10px; }
 .game-camera kbd { font: 9px var(--mono); border: 1px solid #cbd6df; border-radius: 5px; padding: 3px 5px; }
 .game-menu { display: flex; gap: 7px; align-items: center; }
+.teleport-grab { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 1px solid #e5cf9f; border-radius: 9px; color: #a77013; background: #fff5de; cursor: grab; touch-action: none; }
+.teleport-grab:active, .map-robot:active { cursor: grabbing; }
+.map-robot { cursor: grab; touch-action: none; }
+.teleport-target { pointer-events: none; }
+.map-heading > span:nth-child(2) { display: none; }
+.game-shell.teleport-open .minimap { display: block; z-index: 4; width: min(420px, calc(100vw - 40px)); left: 20px; bottom: 64px; padding: 16px; }
+.game-shell.teleport-open .minimap > svg { height: 220px; touch-action: none; }
+.game-shell.teleport-open .map-heading > span:nth-child(2) { display: block; }
+.teleport-floor-switch { display: flex; gap: 5px; margin-top: 12px; }
+.teleport-floor-switch button { padding: 7px 12px; border: 1px solid #dce2e8; border-radius: 18px; color: #66788a; background: transparent; font-size: 11px; }
+.teleport-floor-switch button[aria-pressed='true'] { color: #0071e3; background: #e9f3ff; border-color: #c8ddf4; }
+.teleport-floor-switch .teleport-close { display: grid; place-items: center; margin-left: auto; padding: 6px; }
+.teleport-tools p { margin: 10px 0 0; color: #78899b; font-size: 10px; white-space: normal; }
 .game-menu button:last-child { padding: 10px; }
 .game-status { color: #7b8995; font-size: 10px; margin-right: 8px; }
 .game-key-hint { display: flex; gap: 28px; position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); color: #81909e; font-size: 10px; white-space: nowrap; pointer-events: none; }

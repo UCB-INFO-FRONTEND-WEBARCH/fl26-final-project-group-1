@@ -27,6 +27,7 @@ const INITIAL_TELEMETRY = {
   policy: 'walk',
   falls: 0,
   getups: 0,
+  teleports: 0,
   inference_ms: 0,
   simulation_rate: 1,
   floor: 0,
@@ -47,7 +48,40 @@ const MOVEMENT_KEYS = new Set([
 ]);
 const CAMERA_MODES = ['shoulder', 'follow', 'orbit', 'top'];
 
-function MiniMap({ telemetry, floor, on_destination }) {
+function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode, children }) {
+  const svg_ref = useRef(null);
+  const drag_ref = useRef(null);
+  const [drop_point, set_drop_point] = useState(null);
+
+  function map_point(event) {
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(svg_ref.current.getScreenCTM().inverse());
+    return [point.x, -point.y, floor];
+  }
+  function drop_target(event) {
+    const bounds = svg_ref.current.getBoundingClientRect();
+    return event.clientX >= bounds.left && event.clientX <= bounds.right &&
+      event.clientY >= bounds.top && event.clientY <= bounds.bottom ? map_point(event) : null;
+  }
+  function start_drag(event) {
+    if (event.button !== 0 || drag_ref.current !== null) return;
+    event.stopPropagation();
+    event.preventDefault();
+    drag_ref.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function drag(event) {
+    if (drag_ref.current === event.pointerId) set_drop_point(drop_target(event));
+  }
+  function finish_drag(event, cancelled = false) {
+    if (drag_ref.current !== event.pointerId) return;
+    const target = cancelled ? null : drop_target(event);
+    drag_ref.current = null;
+    set_drop_point(null);
+    if (target) on_teleport(target);
+  }
+  const drag_handlers = { onPointerDown: start_drag, onPointerMove: drag, onPointerUp: finish_drag,
+    onPointerCancel: event => finish_drag(event, true), onLostPointerCapture: event => finish_drag(event, true),
+    onClick: event => event.stopPropagation() };
   return (
     <div className="minimap">
       <div className="map-heading">
@@ -55,11 +89,13 @@ function MiniMap({ telemetry, floor, on_destination }) {
           <span className="tiny-square" /> {MAP_TITLE}
         </span>
         <span>{FLOOR_NAMES[floor]} · {MAP_SIZE}</span>
+        <button className="teleport-grab" aria-label="Grab robot to teleport" title="Drag the robot onto open floor"
+          {...drag_handlers}><Icon name="robot" size={19} /></button>
       </div>
-      <svg viewBox={`${BUILDING_BOUNDS[0]-.5} ${-BUILDING_BOUNDS[3]-.5} ${BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]+1} ${BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]+1}`} aria-label="Floor plan: click an open spot to set a destination" role="img"
+      {children}
+      <svg ref={svg_ref} viewBox={`${BUILDING_BOUNDS[0]-.5} ${-BUILDING_BOUNDS[3]-.5} ${BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]+1} ${BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]+1}`} aria-label="Floor plan: click an open spot to set a destination" role="img"
         onClick={event => {
-          const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(event.currentTarget.getScreenCTM().inverse());
-          on_destination([point.x, -point.y, floor]);
+          on_destination(map_point(event));
         }}>
         <rect x={BUILDING_BOUNDS[0]} y={-BUILDING_BOUNDS[3]} width={BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]} height={BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]} rx="0.1" fill="#f3f4f6" />
         <g transform="scale(1,-1)">
@@ -99,12 +135,16 @@ function MiniMap({ telemetry, floor, on_destination }) {
           })}
           {telemetry.navigation?.goal && (telemetry.navigation.goal[2] === floor || on_stairs(telemetry.navigation.goal)) &&
             <circle cx={telemetry.navigation.goal[0]} cy={telemetry.navigation.goal[1]} r="0.2" fill="#0071e3" />}
-          <g opacity={telemetry.floor === floor ? 1 : 0.2}
+          <g className="map-robot" opacity={telemetry.floor === floor ? 1 : 0.2} {...drag_handlers}
             transform={`translate(${telemetry.position[0]},${telemetry.position[1]}) rotate(${(telemetry.heading * 180) / Math.PI})`}
           >
             <circle r="0.4" fill="#dcecff" stroke="#0071e3" strokeWidth="0.07" />
             <path d="M.65 0 .07 .22 .07 -.22Z" fill="#0071e3" />
           </g>
+          {drop_point && <g className="teleport-target" transform={`translate(${drop_point[0]},${drop_point[1]})`}>
+            <circle r="0.55" fill="#0071e330" stroke="#0071e3" strokeWidth="0.09" />
+            <path d="M-.2 0H.2M0 -.2V.2" stroke="#0071e3" strokeWidth="0.08" />
+          </g>}
         </g>
         {ROOM_LABELS.map((room) => (
           <text
@@ -121,7 +161,7 @@ function MiniMap({ telemetry, floor, on_destination }) {
         ))}
       </svg>
       <div className="map-legend">
-        <i /> Berkeley Lite Pro <span>Click to go</span>
+        <i /> Berkeley Lite Pro <span>{teleport_mode ? 'Drop to teleport' : 'Click to go'}</span>
       </div>
     </div>
   );
@@ -134,6 +174,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const preview_ref = useRef(null);
   const worker_ref = useRef(null);
   const keys_ref = useRef(new Set());
+  const shift_ref = useRef(false);
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
   const speed_ref = useRef(0.6);
   const transfer_ref = useRef(DEFAULT_TRANSFER);
@@ -156,6 +197,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const [character_error, set_character_error] = useState('');
   const [phase, set_phase] = useState('intro');
   const [controls_open, set_controls_open] = useState(false);
+  const [teleport_open, set_teleport_open] = useState(false);
+  const [teleport_floor, set_teleport_floor] = useState(0);
+  const [teleport_message, set_teleport_message] = useState('Drag the robot onto open floor, or click a spot.');
   const [arrival_level, set_arrival_level] = useState({ index: 0, label: ARRIVAL_LEVELS[0].label });
 
   async function change_figure(value) {
@@ -180,7 +224,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     if (!ready_ref.current) return;
     worker_ref.current?.postMessage({
       type: 'command',
-      command: command_from_keys(keys_ref.current, speed_ref.current),
+      command: command_from_keys(keys_ref.current, speed_ref.current, shift_ref.current),
     });
     set_pressed(new Set(keys_ref.current));
   }
@@ -188,8 +232,15 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   function release_keys() {
     const held = keys_ref.current.size > 0;
     keys_ref.current.clear();
+    shift_ref.current = false;
     if (held) send_command();
     else set_pressed(new Set());
+  }
+
+  function change_shift(held) {
+    if (shift_ref.current === held) return;
+    shift_ref.current = held;
+    if (keys_ref.current.size) send_command();
   }
 
   function navigate(goal) {
@@ -206,7 +257,25 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   }
 
   function cancel_navigation() {
+    set_teleport_open(false);
     worker_ref.current?.postMessage({ type: 'cancel_navigation' });
+  }
+
+  function teleport(goal) {
+    if (!ready_ref.current) return;
+    release_keys();
+    set_teleport_floor(goal[2]);
+    set_teleport_open(true);
+    set_controls_open(false);
+    set_teleport_message('Placing robot…');
+    worker_ref.current?.postMessage({ type: 'teleport', goal });
+  }
+
+  function open_teleport() {
+    set_teleport_floor(telemetry_ref.current.floor);
+    set_teleport_message('Drag the robot onto open floor, or click a spot.');
+    set_teleport_open(!teleport_open);
+    set_controls_open(false);
   }
 
   function change_floor(floor) {
@@ -226,6 +295,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
 
   function reset() {
     release_keys();
+    set_teleport_open(false);
     worker_ref.current?.postMessage({ type: 'reset' });
     viewport_ref.current?.querySelector('canvas')?.focus();
   }
@@ -315,6 +385,13 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           if (!active) return;
           const message = event.data;
           switch (message.type) {
+            case 'teleport_result':
+              if (message.ok) {
+                set_teleport_open(false);
+                set_viewed_floor(message.floor);
+                set_teleport_message('Robot placed.');
+              } else set_teleport_message('That spot is blocked. Choose open floor.');
+              break;
             case 'error':
               report_error(message.message);
               break;
@@ -337,6 +414,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 message.telemetry.fallen !== telemetry_ref.current.fallen ||
                 message.telemetry.mode !== telemetry_ref.current.mode ||
                 message.telemetry.policy !== telemetry_ref.current.policy ||
+                message.telemetry.teleports !== telemetry_ref.current.teleports ||
                 message.telemetry.paused !== telemetry_ref.current.paused;
               telemetry_ref.current = message.telemetry;
               const now = performance.now();
@@ -385,9 +463,14 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         event.target.isContentEditable
       )
         return;
+      if (event.key === 'Shift') {
+        change_shift(event.shiftKey);
+        return;
+      }
       if (MOVEMENT_KEYS.has(event.code)) {
         event.preventDefault();
         if (keys_ref.current.has(event.code)) return;
+        shift_ref.current = event.shiftKey;
         keys_ref.current.add(event.code);
         send_command();
       }
@@ -401,8 +484,13 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       if (event.code === 'KeyV' || event.code === 'KeyC') cycle_camera();
     };
     const key_up = (event) => {
+      if (event.key === 'Shift') {
+        change_shift(event.shiftKey);
+        return;
+      }
       if (MOVEMENT_KEYS.has(event.code) && keys_ref.current.delete(event.code)) {
         event.preventDefault();
+        shift_ref.current = event.shiftKey;
         send_command();
       }
     };
@@ -435,6 +523,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   function control_key(code, down, event) {
     event.preventDefault();
     if (down) {
+      shift_ref.current = event.shiftKey;
       event.currentTarget.setPointerCapture(event.pointerId);
       keys_ref.current.add(code);
     } else keys_ref.current.delete(code);
@@ -461,7 +550,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     .padStart(2, '0');
 
   return (
-    <div ref={shell_ref} className={`game-shell ${phase} ${controls_open ? 'controls-open' : ''}`}>
+    <div ref={shell_ref} className={`game-shell ${phase} ${controls_open ? 'controls-open' : ''} ${teleport_open ? 'teleport-open' : ''}`}>
       <div className="workspace" id="playground" inert={phase === 'intro'}>
         <main className="main-panel">
           <section className="scene-shell" aria-label="Indoor navigation simulation">
@@ -524,7 +613,19 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 )}
               </output>
             )}
-            {ready && <MiniMap telemetry={telemetry} floor={viewed_floor === 'all' ? telemetry.floor : viewed_floor} on_destination={navigate} />}
+            {ready && <MiniMap telemetry={telemetry}
+              floor={teleport_open ? teleport_floor : viewed_floor === 'all' ? telemetry.floor : viewed_floor}
+              on_destination={teleport_open ? teleport : navigate} on_teleport={teleport} teleport_mode={teleport_open}>
+              {teleport_open && <div className="teleport-tools">
+                <div className="teleport-floor-switch" role="group" aria-label="Teleport floor">
+                  {FLOOR_NAMES.map((name, floor) => <button key={floor} aria-pressed={teleport_floor === floor}
+                    onClick={() => set_teleport_floor(floor)}>{name}</button>)}
+                  <button className="teleport-close" aria-label="Close teleport map" onClick={() => set_teleport_open(false)}>
+                    <Icon name="close" size={14} /></button>
+                </div>
+                <p role="status">{teleport_message}</p>
+              </div>}
+            </MiniMap>}
             <div className="viewport-caption">
               <span className="axis-label">
                 <b>X</b>
@@ -540,26 +641,6 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               <button aria-label="Zoom in" title="Zoom in" onClick={() => view_ref.current?.zoom(1 / 1.4)}>+</button>
             </div>
 
-            {phase === 'playing' && ready && telemetry.fallen && (
-              <div className="fallen-banner" role="alert">
-                <Icon name="info" />
-                <span>The simulation became unstable. Reset to try again.</span>
-                <button onClick={reset}>
-                  Reset robot <kbd>R</kbd>
-                </button>
-              </div>
-            )}
-            {phase === 'playing' && ready && !telemetry.fallen && telemetry.mode !== 'walk' && (
-              <div className="fallen-banner" role="status">
-                <Icon name="info" />
-                <span>{telemetry.mode === 'falling'
-                  ? 'Lite Pro fell. It gets up once it comes to rest.'
-                  : `Getting up from ${telemetry.policy === 'getup_prone' ? 'its front' : 'its back'}. Walking resumes once it stands.`}</span>
-                <button onClick={reset}>
-                  Reset robot <kbd>R</kbd>
-                </button>
-              </div>
-            )}
             {phase === 'playing' && ready && telemetry.paused && !telemetry.fallen && (
               <div className="paused-label">
                 <Icon name="pause" size={15} /> Simulation paused
@@ -619,54 +700,32 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
 
         <aside className="sidebar" id="game-controls" aria-label="Robot controls and telemetry">
           <div className="sidebar-heading">
-            <span>Meet your robot</span>
+            <span>Controls</span>
             <span className="connection-dot" />
-          </div>
-          <div className="robot-card">
-            <div className="robot-icon">
-              <Icon name="robot" size={34} />
-            </div>
-            <div>
-              <span className="eyebrow">Berkeley Humanoids</span>
-              <h2>
-                Lite Pro <span>Humanoid</span>
-              </h2>
-              <p>34 actuated body joints</p>
-            </div>
-          </div>
-          <div className="policy-tag">
-            <i />
-            {ready ? 'Learned walking and get-up' : 'Loading policies'}
-            <span>Fluctlight PPO</span>
           </div>
 
           <section className="navigation-section">
-            <div className="section-title"><h3>Click. Go explore.</h3><span>Automatic</span></div>
-            <p className="section-description">{IS_HEPHAESTUS ? 'Explore the Hephaestus apartment. Select Mezzanine to choose an upstairs destination.' : 'Choose open floor in the scene or floor plan. Select Upper to go upstairs.'}</p>
-            <label className="transfer-choice">Cross-floor route
+            <div className="section-title"><h3>Navigate</h3><span>Click the floor</span></div>
+            {HAS_ELEVATOR && <label className="transfer-choice">Between floors
               <select aria-label="Cross-floor route" value={transfer} onChange={event => change_transfer(event.target.value)}>
-                {HAS_ELEVATOR && <option value="elevator">Elevator</option>}
+                <option value="elevator">Elevator</option>
                 <option value="stairs">Stairs · experimental</option>
               </select>
-            </label>
+            </label>}
             <div className={`navigation-status ${telemetry.navigation?.status || 'idle'}`} role="status" aria-label="Navigation status">
-              {telemetry.paused && ['walking', 'waiting', 'riding'].includes(telemetry.navigation?.status) ? 'Paused · route saved. Resume to continue.' : telemetry.navigation?.message || IDLE_NAVIGATION.message}
-              {telemetry.navigation?.remaining > 0 && <span>{telemetry.navigation.remaining.toFixed(1)} m to walk</span>}
+              {telemetry.paused && ['walking', 'waiting', 'riding'].includes(telemetry.navigation?.status) ? 'Paused · route saved' : telemetry.navigation?.message || IDLE_NAVIGATION.message}
+              {telemetry.navigation?.remaining > 0 && <span>{telemetry.navigation.remaining.toFixed(1)} m remaining</span>}
             </div>
             <button className="stop-navigation" onClick={cancel_navigation}
               disabled={!['walking', 'waiting', 'riding', 'arrived'].includes(telemetry.navigation?.status)}>
-              {telemetry.navigation?.status === 'arrived' ? 'Clear route' : 'Stop navigation'} <kbd>ESC</kbd></button>
-            <p className="navigation-footnote">{transfer === 'stairs'
-              ? 'An elevation map guides stair walking. Descents usually work; climbs are experimental. After a fall, Lite Pro gets up by itself.'
-              : 'Select Stairs or click a step to try the stairway.'}</p>
+              {telemetry.navigation?.status === 'arrived' ? 'Clear route' : 'Stop'} <kbd>ESC</kbd></button>
           </section>
 
           <section className="control-section">
             <div className="section-title">
-              <h3>Make your move.</h3>
-              <span>Manual</span>
+              <h3>Move</h3>
+              <span><kbd>Shift</kbd> 2× speed</span>
             </div>
-            <p className="section-description">Hold a key to move. Release to stand.</p>
             <div className="keyboard" aria-label="Movement controls">
               {CONTROL_KEYS.map((row, index) => (
                 <div className="key-row" key={index}>
@@ -685,19 +744,19 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             <div className="key-explanations">
               <span>
                 <kbd>W</kbd>
-                <kbd>S</kbd> Forward / back
+                <kbd>S</kbd> Move
               </span>
               <span>
                 <kbd>A</kbd>
-                <kbd>D</kbd> Turn left / right
+                <kbd>D</kbd> Turn
               </span>
               <span>
                 <kbd>Q</kbd>
-                <kbd>E</kbd> Strafe left / right
+                <kbd>E</kbd> Strafe
               </span>
             </div>
             <div className="speed-label">
-              <label htmlFor="walking-speed">Walking speed</label>
+              <label htmlFor="walking-speed">Speed</label>
               <output htmlFor="walking-speed">
                 {speed.toFixed(2)} <span>m/s</span>
               </output>
@@ -717,30 +776,15 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 if (keys_ref.current.size) send_command();
               }}
             />
-            <div className="range-labels">
-              <span>Careful</span>
-              <span>Brisk</span>
-            </div>
           </section>
 
-          <section className="telemetry-section">
-            <div className="section-title">
-              <h3>Live telemetry</h3>
-              <span className="telemetry-pulse">●</span>
-            </div>
-            <div className="speed-readout">
-              <output aria-label="Actual robot speed">{telemetry.speed.toFixed(2)}</output>
-              <span>
-                m/s<small>ACTUAL SPEED</small>
-              </span>
-              <div className="speed-spark">
-                <span style={{ height: `${12 + Math.min(telemetry.speed, 1) * 30}px` }} />
-                <span style={{ height: `${18 + Math.min(telemetry.speed, 1) * 21}px` }} />
-                <span style={{ height: `${9 + Math.min(telemetry.speed, 1) * 34}px` }} />
-                <span style={{ height: `${22 + Math.min(telemetry.speed, 1) * 16}px` }} />
-              </div>
-            </div>
+          <details className="telemetry-section">
+            <summary>Telemetry</summary>
             <div className="telemetry-rows">
+              <div>
+                <span>Speed</span>
+                <output aria-label="Actual robot speed">{telemetry.speed.toFixed(2)} <small>m/s</small></output>
+              </div>
               <div>
                 <span>
                   Position <small>X / Y</small>
@@ -767,9 +811,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 <output aria-label="Active policy">{POLICY_LABELS[telemetry.policy] ?? 'Holding still'}</output>
               </div>
             </div>
-            <div className="command-heading">
-              VELOCITY COMMAND <span>ROBOT FRAME</span>
-            </div>
+            <div className="command-heading">Command · robot frame</div>
             <div className="command-readout">
               {['vₓ', 'vᵧ', 'ω'].map((label, index) => (
                 <div key={label}>
@@ -779,36 +821,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 </div>
               ))}
             </div>
-          </section>
+          </details>
 
-          <div className="policy-summary">
-            <div>
-              <Icon name="info" size={16} />
-              <strong>You lead. It finds its footing.</strong>
-            </div>
-            <p>Pick a destination or use your keys. Neural networks handle balance, every step, and getting up after a fall.</p>
-            <div className="policy-flow">
-              <span>544 obs + map</span>
-              <span>→</span>
-              <strong>CNN + MLP</strong>
-              <span>→</span>
-              <span>34 actions</span>
-            </div>
-            <a className="text-button" href={`${SITE_BASE}how-it-works/`}>
-              How it works <span>↗</span>
-            </a>
-          </div>
-          <div className="runtime-meta">
-            <span>
-              POLICY <b>50 Hz</b>
-            </span>
-            <span>
-              PHYSICS <b>200 Hz</b>
-            </span>
-            <span>
-              RTF <b>{telemetry.simulation_rate.toFixed(2)}×</b>
-            </span>
-          </div>
+          <a className="text-button" href={`${SITE_BASE}how-it-works/`}>
+            How it works <span>↗</span>
+          </a>
         </aside>
       </div>
       {phase === 'intro' ? <>
@@ -831,12 +848,13 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           <div className="game-menu">
             <span className="game-status">{status}</span>
             <ThemeToggle />
+            <button aria-expanded={teleport_open} title="Place the robot on either floor" onClick={open_teleport}>Teleport</button>
             <button aria-expanded={controls_open} aria-controls="game-controls"
               onClick={() => set_controls_open(!controls_open)}>{controls_open ? 'Close controls' : 'Controls'}</button>
             <button onClick={on_exit} aria-label="Exit to site"><Icon name="close" size={18} /></button>
           </div>
         </div>
-        {!controls_open && <div className="game-key-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></div>}
+        {!controls_open && <div className="game-key-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span><span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></div>}
       </>}
     </div>
   );
