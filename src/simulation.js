@@ -5,6 +5,7 @@ import { RobotController, MODE } from './robot_controller.js';
 import { Elevator } from './elevator.js';
 import { Navigation, hold_position } from './navigation.js';
 import { ELEVATOR, STANDING_HEIGHT, floor_of } from './building.js';
+import { teleport_position } from './teleport.js';
 
 const OBJ_GEOM = 5;
 // mjtWarning: MuJoCo resets a state with a bad position, velocity or acceleration and counts it here.
@@ -27,6 +28,7 @@ export class Simulation {
     this.elevator = mujoco.mj_name2id(model, 3, 'lift_joint') >= 0 ? new Elevator(mujoco, model) : null;
     this.navigation = navigation_maps ? new Navigation(navigation_maps, this.elevator) : null;
     this.paused = false;
+    this.teleports = 0;
     this.reset();
   }
 
@@ -35,6 +37,7 @@ export class Simulation {
   get mode() { return this.controller.mode; }
 
   request_reset() {
+    this.teleport_requested = null;
     this.navigation?.cancel();
     this.command = [0, 0, 0];
     this.paused = false;
@@ -63,9 +66,41 @@ export class Simulation {
     this.distance = 0;
     this.fallen = false; // the simulation diverged; only a reset continues
     this.reset_requested = false;
+    this.teleport_requested = null;
     this.elevator?.reset();
     this.elevator?.advance(this.state, 0);
     this.navigation?.cancel();
+  }
+
+  request_teleport(goal) {
+    const position = teleport_position(goal, this.navigation?.maps);
+    if (!position) return false;
+    this.teleport_requested = { position, floor: goal[2], yaw: heading_from_quaternion(this.state.qpos) };
+    this.reset_requested = false;
+    this.command = [0, 0, 0];
+    this.navigation.cancel();
+    return true;
+  }
+
+  teleport() {
+    const target = this.teleport_requested;
+    if (!target) return null;
+    const time = this.state.time;
+    const lift = this.elevator && [this.state.qpos[this.elevator.position_index], this.state.qvel[this.elevator.velocity_index]];
+    this.place(target.position, Number.isFinite(target.yaw) ? target.yaw : SPAWN_YAW);
+    this.state.time = time;
+    if (lift) {
+      this.state.qpos[this.elevator.position_index] = lift[0];
+      this.state.qvel[this.elevator.velocity_index] = lift[1];
+      this.elevator.advance(this.state, 0);
+      this.mujoco.mj_forward(this.model, this.state);
+    }
+    this.controller.reset();
+    this.command = [0, 0, 0];
+    this.fallen = false;
+    this.teleport_requested = null;
+    this.teleports++;
+    return target;
   }
 
   /** The walking command for this control step: the route, a hold in a moving lift, or the manual command. */
@@ -87,7 +122,7 @@ export class Simulation {
   async advance(steps) {
     let completed = 0;
     const step_dt = PHYSICS_DT * CONTROL_DECIMATION;
-    while (completed < steps && !this.paused && !this.fallen && !this.reset_requested) {
+    while (completed < steps && !this.paused && !this.fallen && !this.reset_requested && !this.teleport_requested) {
       if (this.step_count % CONTROL_DECIMATION === 0) {
         // Observations read the state after the last physics step, as mjlab's forward() before sensing does.
         this.mujoco.mj_forward(this.model, this.state);
@@ -140,6 +175,7 @@ export class Simulation {
       distance: this.distance,
       paused: this.paused,
       fallen: this.fallen,
+      teleports: this.teleports,
       ...this.controller.telemetry(),
       inference_ms: this.controller.inference_ms,
       floor: floor_of(this.state.qpos),

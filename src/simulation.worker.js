@@ -81,6 +81,14 @@ async function pump() {
       rate_step = 0;
       force_frame = true;
     }
+    if (simulation.teleport_requested) {
+      const target = simulation.teleport();
+      pending_goal = null;
+      accumulated = 0;
+      last_frame_step = -1;
+      force_frame = true;
+      self.postMessage({ type: 'teleport_result', ok: true, floor: target.floor });
+    }
     if (pending_goal && simulation.accepts_commands) {
       simulation.navigation.set_goal(simulation.state.qpos, pending_goal, simulation.step_count * PHYSICS_DT);
       pending_goal = null;
@@ -158,15 +166,22 @@ self.onmessage = (event) => {
   const message = event.data;
   switch (message.type) {
     case 'command':
+      simulation.teleport_requested = null;
       pending_goal = null;
       simulation.navigation.cancel();
       simulation.command = simulation.accepts_commands ? message.command : [0, 0, 0];
       force_frame = true;
       break;
     case 'goal':
+      simulation.teleport_requested = null;
       pending_goal = message.goal;
       break;
+    case 'teleport':
+      if (simulation.request_teleport(message.goal)) pending_goal = null;
+      else self.postMessage({ type: 'teleport_result', ok: false });
+      break;
     case 'cancel_navigation':
+      simulation.teleport_requested = null;
       pending_goal = null;
       simulation.navigation.cancel();
       simulation.command = [0, 0, 0];

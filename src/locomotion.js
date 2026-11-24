@@ -6,11 +6,13 @@ export const NUM_ACTIONS = POLICY.joint_names.length;
 export const DEFAULT_ANGLES = POLICY.default_joint_pos;
 export const JOINT_NAMES = POLICY.joint_names.map(name => `robot/${name}`);
 
-export function command_from_keys(keys, speed = 0.6) {
+export function command_from_keys(keys, speed = 0.6, boost = false) {
   const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
   const turn = Number(keys.has('KeyA') || keys.has('ArrowLeft')) - Number(keys.has('KeyD') || keys.has('ArrowRight'));
   const lateral = Number(keys.has('KeyQ')) - Number(keys.has('KeyE'));
-  return [forward * (forward < 0 ? Math.min(speed, 0.4) : speed), lateral * Math.min(speed, 0.3), turn * 0.7];
+  const multiplier = boost ? 2 : 1;
+  return [forward * (forward < 0 ? Math.min(speed, 0.4) : speed), lateral * Math.min(speed, 0.3), turn * 0.7]
+    .map(value => value * multiplier);
 }
 
 export function heading_from_quaternion(qpos) {

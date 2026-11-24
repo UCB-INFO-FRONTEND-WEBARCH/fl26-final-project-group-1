@@ -18,6 +18,18 @@ test('keyboard commands stay within the walking range', () => {
   assert.deepEqual(command_from_keys(new Set(['ArrowUp', 'ArrowLeft']), 0.8), [0.8, 0, 0.7]);
 });
 
+test('Shift doubles manual commands after normal caps and restores them on release', () => {
+  for (const speed of [0.2, 0.6, 0.8]) {
+    for (const codes of [['KeyW'], ['KeyS', 'KeyA'], ['KeyD', 'KeyE'], ['ArrowUp', 'ArrowLeft'], []]) {
+      const keys = new Set(codes);
+      const normal = command_from_keys(keys, speed);
+      assert.deepEqual(command_from_keys(keys, speed, true), normal.map(value => value * 2));
+      assert.deepEqual(command_from_keys(keys, speed, false), normal);
+    }
+  }
+  assert.deepEqual(command_from_keys(new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD']), 0.6, true), [0, 0, 0]);
+});
+
 test('the bundled policies match the manifest and share one robot', async () => {
   const manifest = await json('manifest.json');
   for (const item of manifest.files) {

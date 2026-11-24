@@ -8,6 +8,7 @@ import {make_navigation_maps} from '../../src/path_planner.js';
 import {Navigation} from '../../src/navigation.js';
 import {FLOOR_HEIGHT,STAIRS,STAIR_PATH,on_stairs,stair_height,stair_projection} from '../../src/building.js';
 import {make_scene_xml,SPAWN} from '../../src/scene_layout.js';
+import {teleport_position} from '../../src/teleport.js';
 
 test('default map retains V20 metric provenance and declares its real connectors',()=>{
  assert.equal(IS_HEPHAESTUS,true);assert.equal(HAS_ELEVATOR,false);assert.equal(MAP.units,'metres');
@@ -58,4 +59,11 @@ test('the L stair is height-aware in both directions and never creates an elevat
  nav.set_goal([-15,-2,4.33],[2.7,0,0],0);assert.equal(nav.state.status,'walking',nav.state.message);
  const down=nav.segments[1].path;assert.equal(down[0][2],3.6);assert.equal(down.at(-1)[2],0);assert(down.slice(1).every((p,i)=>p[2]<=down[i][2]));
  for(const p of STAIR_PATH.slice(1,-1)){assert(on_stairs(p,.2));assert(Number.isFinite(stair_height(p)));assert(stair_projection(p).distance<1e-6);}
+});
+
+test('teleport can reach the mezzanine while rejecting the open void and real sofa footprints', () => {
+ const maps = make_navigation_maps();
+ assert.deepEqual(teleport_position([-15, -2, 1], maps), [-15, -2, FLOOR_HEIGHT + 0.73]);
+ assert.equal(teleport_position([0, 0, 1], maps), null);
+ assert.equal(teleport_position([0, 2.735, 0], maps), null);
 });

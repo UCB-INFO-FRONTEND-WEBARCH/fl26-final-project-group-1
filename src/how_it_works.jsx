@@ -345,7 +345,7 @@ function PlaygroundControls() {
     <summary>Playground controls and recovery <span aria-hidden="true">+</span></summary>
     <div><dl>
       <div><dt>Choose a goal</dt><dd>Click open floor in the scene or floor plan. Select Upper to choose an upstairs goal.</dd></div>
-      <div><dt>Move manually</dt><dd>Hold W/S to move forward or backward. Hold A/D to turn. Hold Q/E to move sideways. Arrow keys also drive.</dd></div>
+      <div><dt>Move manually</dt><dd>Hold W/S to move forward or backward. Hold A/D to turn. Hold Q/E to move sideways. Hold Shift for twice the command speed. Arrow keys also drive.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>

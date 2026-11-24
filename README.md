@@ -165,6 +165,8 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | W / S or ↑ / ↓ | Walk forward / backward |
 | A / D or ← / → | Turn left / right |
 | Q / E | Strafe left / right |
+| Shift + movement key | Double movement and turning commands while held |
+| Teleport | Drag the robot onto open floor in the map, or click a destination |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
 | V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
@@ -173,6 +175,10 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 
 The speed slider sets forward and backward speed from 0.2 to 0.8 m/s.
 Backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
+Shift doubles these manual command values after the normal caps. Pressing Shift alone does not cancel a route.
+Open **Teleport** and select a floor to move the robot directly, including to the mezzanine.
+Drag the robot icon or its map marker onto an open spot. You can also click the map.
+Teleport clears the route, velocity, and policy memory, preserves pause state, and rejects blocked floor or voids.
 When you release a movement input, the controller requests zero velocity.
 The policy continues to balance the robot, which can still take small steps or drift.
 
