@@ -29,7 +29,8 @@
 .ex-stage-label small { font: 9px var(--mono); color: #657284; }
 .ex-depth-card { position: absolute; bottom: 26px; right: 24px; width: 167px; padding: 13px; border: 1px solid #ffffff; border-radius: 14px; background: #ffffffdb; box-shadow: 0 4px 20px #23344808; }
 .ex-depth-card > span { font: 7px var(--mono); letter-spacing: 1px; color: #8793a3; }
-.ex-depth-card canvas { width: 100%; aspect-ratio: 32 / 18; image-rendering: pixelated; display: block; margin: 10px 0; background: #111; border-radius: 4px; }
+.ex-depth-card canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; display: block; margin: 10px 0; background: #111; border-radius: 4px; }
+.ex-depth-card strong { display: block; font: 600 9px var(--mono); color: #1d1d1f; margin-top: 4px; }
 .ex-depth-card > div { display: flex; align-items: center; gap: 6px; font: 7px var(--mono); color: #657284; }
 .ex-depth-card > div i { height: 3px; flex: 1; background: linear-gradient(90deg, #141414, #f5f5f5); border-radius: 2px; }
 .ex-depth-card small { display: block; font: 7px var(--mono); color: #657284; margin-top: 10px; text-align: center; }

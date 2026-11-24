@@ -3,7 +3,6 @@ import { POLICY } from './policy_constants.js';
 export const PHYSICS_DT = POLICY.timestep;
 export const CONTROL_DECIMATION = POLICY.decimation;
 export const NUM_ACTIONS = POLICY.joint_names.length;
-export const NUM_OBSERVATIONS = Math.max(...Object.values(POLICY.obs_slices).map(slice => slice[1]));
 export const DEFAULT_ANGLES = POLICY.default_joint_pos;
 export const JOINT_NAMES = POLICY.joint_names.map(name => `robot/${name}`);
 

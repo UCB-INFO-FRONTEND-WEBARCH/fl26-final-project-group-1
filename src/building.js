@@ -79,8 +79,8 @@ export const LIFT_RAILS = [
   { name: 'front', center: [0.81, 0, 0.55], size: [0.08, 1.7, 1.1] },
 ];
 
-export function box_xml(box, prefix = '') {
-  return `<geom name="${prefix}${box.name || 'slab'}" type="box" pos="${box.center.join(' ')}" size="${box.size.map(value => value / 2).join(' ')}" group="0"/>`;
+export function box_xml(box, prefix = '', group = 0) {
+  return `<geom name="${prefix}${box.name || 'slab'}" type="box" pos="${box.center.join(' ')}" size="${box.size.map(value => value / 2).join(' ')}" group="${group}"/>`;
 }
 
 // Geometry helpers are independent of the straight stair's old X/Y assumptions.

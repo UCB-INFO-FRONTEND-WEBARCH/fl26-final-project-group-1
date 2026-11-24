@@ -2,6 +2,7 @@ import { HAS_ELEVATOR } from './world.js';
 import load_mujoco from '@mujoco/mujoco';
 import mujoco_wasm_url from '@mujoco/mujoco/mujoco.wasm?url';
 import * as ort from 'onnxruntime-web/wasm';
+import { POLICY } from './policy_constants.js';
 import ort_wasm_url from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
 import ort_module_url from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url';
 import { make_scene_xml } from './scene_layout.js';
@@ -52,7 +53,7 @@ function send_frame() {
     transforms.set(positions.subarray(id * 3, id * 3 + 3), index * 12);
     transforms.set(rotations.subarray(id * 9, id * 9 + 9), index * 12 + 3);
   }
-  write_robot_pose(transforms.subarray(rendered_ids.length * 12), state, simulation.policy.joint_qpos);
+  write_robot_pose(transforms.subarray(rendered_ids.length * 12), state, simulation.joint_qpos);
   self.postMessage(
     {
       type: 'frame',
@@ -80,7 +81,7 @@ async function pump() {
       rate_step = 0;
       force_frame = true;
     }
-    if (pending_goal && !simulation.fallen) {
+    if (pending_goal && simulation.accepts_commands) {
       simulation.navigation.set_goal(simulation.state.qpos, pending_goal, simulation.step_count * PHYSICS_DT);
       pending_goal = null;
       simulation.command = [0, 0, 0];
@@ -122,16 +123,20 @@ async function initialize() {
   mujoco.FS.writeFile('/robot/apartment.xml', make_scene_xml());
   const model = mujoco.MjModel.from_xml_path('/robot/apartment.xml');
 
-  report_loading('Loading pretrained walking policy');
+  report_loading('Loading walking and get-up policies');
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = { wasm: ort_wasm_url, mjs: ort_module_url };
-  const session = await ort.InferenceSession.create(await fetch_file('policy.onnx'), {
-    executionProviders: ['wasm'],
-    graphOptimizationLevel: 'all',
-  });
+  const policies = Object.fromEntries(await Promise.all(Object.entries(POLICY.policies).map(async ([name, path]) => {
+    const contract = JSON.parse(new TextDecoder().decode(await fetch_file(path)));
+    const session = await ort.InferenceSession.create(await fetch_file(`policies/${contract.onnx}`), {
+      executionProviders: ['wasm'],
+      graphOptimizationLevel: 'all',
+    });
+    return [name, { session, contract }];
+  })));
   report_loading(HAS_ELEVATOR?'Preparing floor routes and elevator controls':'Preparing Hephaestus floor routes and stairs');
-  simulation = new Simulation(mujoco, model, session, make_navigation_maps());
+  simulation = new Simulation(mujoco, model, policies, make_navigation_maps());
   simulation.paused = true;
 
   report_loading('Preparing optimized Lite Pro visuals');
@@ -155,7 +160,7 @@ self.onmessage = (event) => {
     case 'command':
       pending_goal = null;
       simulation.navigation.cancel();
-      simulation.command = message.command;
+      simulation.command = simulation.accepts_commands ? message.command : [0, 0, 0];
       force_frame = true;
       break;
     case 'goal':

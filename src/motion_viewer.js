@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SITE_BASE } from './asset_paths.js';
-import { STAIR_BOXES, STAIRS, FLOOR_HEIGHT } from './building.js';
 
 async function read_asset(path, signal, binary = false) {
   const response = await fetch(`${SITE_BASE}assets/${path}`, { signal });
@@ -10,15 +9,15 @@ async function read_asset(path, signal, binary = false) {
 }
 
 export class MotionViewer {
-  constructor(container, depth_canvas, on_frame) {
+  constructor(container, map_canvas, on_frame) {
     this.container = container;
-    this.depth_canvas = depth_canvas;
+    this.map_canvas = map_canvas;
     this.on_frame = on_frame;
     this.abort = new AbortController();
     this.playing = false;
     this.visible = false;
     this.time = 0;
-    this.direction = 'up';
+    this.direction = 'down';
     this.meshes = [];
     this.cache = {};
     this.dirty = true;
@@ -32,7 +31,7 @@ export class MotionViewer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
-    this.renderer.domElement.setAttribute('aria-label', 'Recorded Lite Pro policy motion on the apartment stairs. Drag to rotate the view.');
+    this.renderer.domElement.setAttribute('aria-label', 'Recorded Lite Pro policy motion in the apartment. Drag to rotate the view.');
     container.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(39, 1, 0.05, 60);
     this.camera.up.set(0, 0, 1);
@@ -54,26 +53,10 @@ export class MotionViewer {
     this.scene.add(side_light);
     this.world = new THREE.Group();
     this.scene.add(this.world);
-    const stair_material = new THREE.MeshStandardMaterial({ color: '#d6dfe9', roughness: 0.85 });
-    for (const box of STAIR_BOXES) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(...box.size), stair_material);
-      step.position.set(box.center[0] - STAIRS.center_x, box.center[1], box.center[2]);
-      this.world.add(step);
-      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(step.geometry),
-        new THREE.LineBasicMaterial({ color: '#a5b8ce', transparent: true, opacity: 0.35 }));
-      edge.position.copy(step.position);
-      this.world.add(edge);
-    }
-    for (const [y, z] of [[-8.4, -0.05], [8.4, FLOOR_HEIGHT - 0.05]]) {
-      const landing = new THREE.Mesh(new THREE.BoxGeometry(5, 6, 0.1), stair_material);
-      landing.position.set(0, y, z);
-      this.world.add(landing);
-    }
     this.robot = new THREE.Group();
     this.world.add(this.robot);
     this.next_rotation = new THREE.Quaternion();
-    this.depth_context = depth_canvas.getContext('2d');
-    this.depth_image = this.depth_context.createImageData(32, 18);
+    this.map_context = map_canvas.getContext('2d');
     this.resize_observer = new ResizeObserver(() => this.resize());
     this.resize_observer.observe(container);
     this.intersection = new IntersectionObserver(entries => {
@@ -95,6 +78,11 @@ export class MotionViewer {
     ]);
     if (this.disposed) return;
     this.manifest = manifest;
+    this.add_stairs(manifest.stairs);
+    const { width, height } = manifest.map;
+    this.map_canvas.width = width;
+    this.map_canvas.height = height;
+    this.map_image = this.map_context.createImageData(width, height);
     for (const geom of manifest.geometries) {
       const mesh = visuals.meshes.find(item => item.mesh_id === geom.mesh_id);
       const geometry = new THREE.BufferGeometry();
@@ -108,7 +96,31 @@ export class MotionViewer {
       this.meshes.push(object);
       this.robot.add(object);
     }
-    await this.select('up');
+    await this.select('down');
+  }
+
+  /** The recorded apartment's stair treads and a ground floor, at their world positions. */
+  add_stairs({ boxes, floor_height, landings }) {
+    const stair_material = new THREE.MeshStandardMaterial({ color: '#d6dfe9', roughness: 0.85 });
+    for (const box of boxes) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(...box.size), stair_material);
+      step.position.set(...box.center);
+      this.world.add(step);
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(step.geometry),
+        new THREE.LineBasicMaterial({ color: '#a5b8ce', transparent: true, opacity: 0.35 }));
+      edge.position.copy(step.position);
+      this.world.add(edge);
+    }
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ color: '#e7ecf2', roughness: 0.95 }));
+    ground.position.z = -0.002;
+    this.world.add(ground);
+    const grid = new THREE.GridHelper(60, 60, '#cfd8e3', '#dde4ec');
+    grid.rotation.x = Math.PI / 2;
+    this.world.add(grid);
+    const [, upper] = landings;
+    const landing = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 0.1), stair_material);
+    landing.position.set(upper[0], upper[1] + 2, floor_height - 0.05);
+    this.world.add(landing);
   }
 
   async select(direction) {
@@ -119,9 +131,9 @@ export class MotionViewer {
     if (!this.cache[direction]) {
       this.cache[direction] = Promise.all([
         read_asset(`explainer/${direction}.poses.bin`, this.abort.signal, true),
-        read_asset(`explainer/${direction}.depth.bin`, this.abort.signal, true),
-      ]).then(([poses, depth]) => ({ ...this.manifest.clips[direction],
-        poses: new Float32Array(poses), depth: new Uint8Array(depth) }));
+        read_asset(`explainer/${direction}.map.bin`, this.abort.signal, true),
+      ]).then(([poses, map]) => ({ ...this.manifest.clips[direction],
+        poses: new Float32Array(poses), map: new Uint8Array(map) }));
     }
     const clip = await this.cache[direction];
     if (this.disposed || direction !== this.direction) return;
@@ -175,25 +187,33 @@ export class MotionViewer {
       this.meshes.forEach((mesh, index) => {
         const a = first * stride + index * 7;
         const b = second * stride + index * 7;
-        mesh.position.set(poses[a] + (poses[b] - poses[a]) * fraction - STAIRS.center_x,
+        mesh.position.set(poses[a] + (poses[b] - poses[a]) * fraction,
           poses[a + 1] + (poses[b + 1] - poses[a + 1]) * fraction,
           poses[a + 2] + (poses[b + 2] - poses[a + 2]) * fraction);
         mesh.quaternion.fromArray(poses, a + 3);
         this.next_rotation.fromArray(poses, b + 3);
         mesh.quaternion.slerp(this.next_rotation, fraction);
       });
+      // The view follows the robot: its root stays at the orbit target.
       const roots = this.clip.roots;
-      const y = roots[first * 3 + 1] + (roots[second * 3 + 1] - roots[first * 3 + 1]) * fraction;
-      const z = roots[first * 3 + 2] + (roots[second * 3 + 2] - roots[first * 3 + 2]) * fraction;
-      this.world.position.set(0, -y, 0.73 - z);
-      for (let pixel = 0; pixel < 576; pixel++) {
-        const value = this.clip.depth[first * 576 + pixel];
-        this.depth_image.data.set([value, value, value, 255], pixel * 4);
+      const [x, y, z] = [0, 1, 2].map(axis =>
+        roots[first * 3 + axis] + (roots[second * 3 + axis] - roots[first * 3 + axis]) * fraction);
+      this.world.position.set(-x, -y, 0.73 - z);
+      // The map's rows run along the robot's left (y), its columns forward (x); the canvas shows forward up.
+      const { width, height } = this.manifest.map;
+      const cells = width * height;
+      for (let row = 0; row < height; row++) {
+        for (let column = 0; column < width; column++) {
+          const value = this.clip.map[first * cells + row * width + column];
+          const pixel = (width - 1 - column) * width + (height - 1 - row);
+          this.map_image.data.set([value, value, value, 255], pixel * 4);
+        }
       }
-      this.depth_context.putImageData(this.depth_image, 0, 0);
+      this.map_context.putImageData(this.map_image, 0, 0);
       this.renderer.render(this.scene, this.camera);
       if (first !== this.last_reported_frame || !this.playing) {
-        this.on_frame({ time: this.time, duration: this.clip.duration, loading: false });
+        this.on_frame({ time: this.time, duration: this.clip.duration, loading: false,
+          policy: this.manifest.labels[this.clip.labels[first]] });
         this.last_reported_frame = first;
       }
       this.dirty = false;

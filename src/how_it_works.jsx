@@ -5,13 +5,17 @@ import { Icon } from './icons.jsx';
 import { SITE_BASE } from './asset_paths.js';
 import { POLICY } from './policy_constants.js';
 import { FLOOR_HEIGHT, STAIRS } from './building.js';
+import { IS_HEPHAESTUS } from './world.js';
 import './style.css';
 import './how_it_works.css';
 
-const REPORT = 'https://claude.ai/artifact/8nh5Z94mUcC7iCdg3cDGpo';
-const SOURCE = 'https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516';
+const POLICY_DOC = 'https://github.com/UCB-INFO-FRONTEND-WEBARCH/fl26-final-project-group-1/blob/main/docs/POLICY.md';
+const MJLAB = 'https://github.com/mujocolab/mjlab';
+const HOST = 'https://arxiv.org/abs/2502.08378';
 const CHAPTERS = [['motion', 'The motion'], ['control', 'The control loop'], ['learning', 'The learning'],
-  ['terrain', 'The stairs'], ['navigation', 'The route'], ['evidence', 'The evidence']];
+  ['recovery', 'The recovery'], ['terrain', 'The stairs'], ['navigation', 'The route'], ['evidence', 'The evidence']];
+const POLICY_LABELS = { walk: 'Walk · flat ground', walk_stairs: 'Walk · stairs', falling: 'Falling · motors hold',
+  getup_supine: 'Get up · from the back', getup_prone: 'Get up · from the front' };
 
 function SectionHeading({ number, label, title, children }) {
   return <div className="ex-section-heading">
@@ -24,7 +28,7 @@ function MotionPlayer({ motion_enabled }) {
   const container_ref = useRef(null);
   const depth_ref = useRef(null);
   const viewer_ref = useRef(null);
-  const [direction, set_direction] = useState('up');
+  const [direction, set_direction] = useState('down');
   const [playing, set_playing] = useState(false);
   const [frame, set_frame] = useState({ loading: true, time: 0, duration: 0 });
   const [error, set_error] = useState('');
@@ -59,15 +63,15 @@ function MotionPlayer({ motion_enabled }) {
     <div className="ex-stage">
       <div className="ex-stage-canvas" ref={container_ref} />
       <div className="ex-stage-top"><span className="ex-recording"><i /> Actual policy recording</span>
-        <div className="ex-segmented" role="group" aria-label="Recorded stair direction">
-          <button aria-pressed={direction === 'up'} onClick={() => change_direction('up')} disabled={frame.loading}>Ascent ↗</button>
-          <button aria-pressed={direction === 'down'} onClick={() => change_direction('down')} disabled={frame.loading}>Descent ↘</button>
+        <div className="ex-segmented" role="group" aria-label="Recorded clip">
+          <button aria-pressed={direction === 'down'} onClick={() => change_direction('down')} disabled={frame.loading}>Stairs ↘</button>
+          <button aria-pressed={direction === 'getup'} onClick={() => change_direction('getup')} disabled={frame.loading}>Get up ↑</button>
         </div>
       </div>
-      <div className="ex-stage-label"><span>BERKELEY HUMANOIDS</span><strong>Lite Pro</strong><small>S3 · iteration 20,000</small></div>
-      <div className="ex-depth-card"><span>THE POLICY SEES</span>
-        <canvas ref={depth_ref} width="32" height="18" aria-label="Recorded 18 by 32 grayscale depth image. Light pixels indicate farther surfaces." />
-        <div><span>Near</span><i /><span>Far</span></div><small>18 × 32 · depth image</small>
+      <div className="ex-stage-label"><span>BERKELEY HUMANOIDS</span><strong>Lite Pro</strong><small>{POLICY_LABELS[frame.policy] || 'Fluctlight PPO'}</small></div>
+      <div className="ex-depth-card"><span>THE STAIRS POLICY SEES</span>
+        <canvas ref={depth_ref} width="21" height="21" aria-label="Recorded 21 by 21 elevation map around the robot, forward up. Light cells are higher than the ground underfoot, dark cells lower." />
+        <div><span>Lower</span><i /><span>Higher</span></div><small>21 × 21 · 2 m elevation map</small>
       </div>
       <span className="ex-drag-hint">Drag the robot to rotate the view</span>
       {(frame.loading || error) && <div className="ex-motion-status" role="status">
@@ -86,24 +90,24 @@ function MotionPlayer({ motion_enabled }) {
           }} /></label>
       <output className="ex-time">{frame.time.toFixed(1)} <span>/ {frame.duration.toFixed(1)} s</span></output>
     </div>
-    <figcaption>Press play or drag the timeline. Both recordings use the playground’s S3 policy and physical contacts.<br />
-      The 3D view isolates the stairs. The depth image includes the full scene.</figcaption>
+    <figcaption>Press play or drag the timeline. Both recordings run the playground’s policies with physical contacts, in the demo
+      apartment’s straight stair (11 cm risers).<br />The 3D view shows the stairs and the ground floor only. The label names the policy in control.</figcaption>
   </figure>;
 }
 
 const LOOP_STAGES = [
-  { name: 'Goal', metric: '10 future frames', title: 'You set the direction.',
-    text: 'Your keys set forward speed, sideways speed, and turn rate. A gradual command ramp fills ten goal frames, 0.1 seconds apart.',
-    detail: 'The playground uses the velocity goal. The pelvis height goal stays at 0.73 m above the supporting ground.' },
-  { name: 'Sense', metric: '2,798 input values', title: 'The robot reads its state.',
-    text: 'The head camera casts 48 × 27 depth rays. Filters remove sharp contours, add range noise, and blur the image.',
-    detail: 'A crop and resize produce an 18 × 32 image. Eight frames of joint and body history describe recent motion.' },
+  { name: 'Goal', metric: '4 command values', title: 'You set the direction.',
+    text: 'Your keys set forward speed, sideways speed, and turn rate. A ramp of 1 m/s² and 2 rad/s² smooths every change.',
+    detail: 'The fourth value is the root height to walk at, 0.75 m above the ground: the median of the human walks the policy learned from.' },
+  { name: 'Sense', metric: '544 values + 441 map cells', title: 'The robot reads its state.',
+    text: 'Gravity and the gyro in the pelvis frame, the 34 joint angles and speeds, and the last action, each over the last five updates.',
+    detail: 'The stairs policy also reads a 21 × 21 elevation map: 441 downward rays, 10 cm apart, heights relative to the ground underfoot.' },
   { name: 'Infer', metric: '50 updates / second', title: 'The policy selects joint targets.',
-    text: 'A convolutional neural network (CNN) encodes depth. A multilayer perceptron (MLP) combines depth, the goal, and body history.',
-    detail: 'The unchanged ONNX file includes input normalization, goal selection, the depth encoder, and the actor. It returns 34 actions.' },
+    text: 'A convolutional neural network (CNN) encodes the map. A multilayer perceptron (MLP) combines it with the command and the history.',
+    detail: 'Each ONNX file includes its input normalization. A controller picks the policy: flat walking, stairs, or getting up.' },
   { name: 'Act', metric: '34 joint targets', title: 'The motors apply torque.',
-    text: 'Each action has a joint-specific scale and offset. A proportional–derivative (PD) controller converts the target error into torque.',
-    detail: 'The motor model limits torque as speed increases. Commands include the trained delay of 5–10 milliseconds.' },
+    text: 'Each action is an offset from the standing pose, with a joint-specific scale. A proportional–derivative (PD) controller converts the error into torque.',
+    detail: 'The motor model limits torque as speed rises, as in training. Commands include the trained delay of 5–10 milliseconds.' },
   { name: 'Step', metric: '200 physics steps / second', title: 'Contacts produce the next pose.',
     text: 'MuJoCo advances physics four times per policy update. Foot contacts support the robot against gravity.',
     detail: 'The next control cycle reads the resulting pose. Three.js displays that pose in the playground.' },
@@ -154,27 +158,27 @@ function ControlLoop() {
           <text x="32" y="210">NOW</text><text x="407" y="210">+0.9 s</text>
         </svg>
         <div className="ex-goal-frames">{frames.map((value, index) => <div key={index}><span>{(index / 10).toFixed(1)} s</span><b>{value.toFixed(1)}</b></div>)}</div>
-        <div className="ex-caption-row"><span>Direction schematic · goal speeds in m/s</span><span>Height <strong>0.73 m</strong></span></div>
+        <div className="ex-caption-row"><span>Direction schematic · command speeds in m/s</span><span>Height <strong>0.75 m</strong></span></div>
       </div>
     </div>
-    <div className="ex-input-strip"><div><strong>576</strong><span>depth pixels</span></div><b>+</b>
-      <div><strong>864</strong><span>body history values</span></div><b>+</b>
-      <div><strong>1,358</strong><span>goal and mask values</span></div><b>=</b><div><strong>2,798</strong><span>total input values</span></div></div>
-    <p className="ex-footnote">The input keeps space for all goal types. The velocity export masks reference-motion and body-point channels.</p>
+    <div className="ex-input-strip"><div><strong>4</strong><span>command values</span></div><b>+</b>
+      <div><strong>540</strong><span>body history values</span></div><b>+</b>
+      <div><strong>441</strong><span>elevation map cells</span></div><b>=</b><div><strong>985</strong><span>total input values</span></div></div>
+    <p className="ex-footnote">The flat-ground policy trained on a plane, so its map input is always zero. The stairs policy trained on stairs, slopes and boxes.</p>
   </section>;
 }
 
 const TRAINING_STAGES = [
-  ['Collect', 'Start with motion and contacts.', 'Motion references describe joint and body movement. Simulator runs provide states, actions, and the next states.'],
-  ['Model', 'Learn how actions change the robot.', 'SuperMimic trains a world model from simulator transitions. The model predicts the robot dynamics.'],
-  ['Imagine', 'Improve through imagined motion.', 'The policy trains through 32-step rollouts of the world model. Gradients from the imagined return improve the policy.'],
-  ['Export', 'Run the policy in the browser.', 'The browser loads the exported policy and runs real MuJoCo physics. The world model serves training only.'],
+  ['Collect', 'Start with human walking.', 'LAFAN1 walks and runs, retargeted to Lite Pro. Each frame gets a command: the clip’s stride-averaged speed, turn rate and height.'],
+  ['Reward', 'Pay for the command, in a human style.', 'The robot never sees the clip. Rewards pay for following the command and for moving like the hidden clip, and only falls end an episode.'],
+  ['Curriculum', 'Raise the speed. Then the stairs.', 'The speed limit rises while episodes follow the command. On terrain, a robot that walks 2.5 m without a fall moves to taller steps.'],
+  ['Export', 'Run the policy in the browser.', 'Training uses mjlab on MuJoCo Warp with PPO. The browser loads the ONNX actor and a contract, and replays recorded mjlab steps to check that it matches.'],
 ];
 function Learning() {
-  const [step, set_step] = useState(2);
+  const [step, set_step] = useState(1);
   return <section className="ex-section ex-learning" id="learning">
-    <SectionHeading number="02" label="THE LEARNING" title={<>Learn the dynamics.<br /><span>Then learn the motion.</span></>}>
-      SuperMimic trains the policy with a learned world model. The browser runs the exported policy.
+    <SectionHeading number="02" label="THE LEARNING" title={<>Learn from human walking.<br /><span>Reward the outcome.</span></>}>
+      Reinforcement learning (PPO) trains each policy in simulation. The browser runs the exported networks.
     </SectionHeading>
     <div className="ex-learning-panel">
       <div className="ex-training-tabs" role="group" aria-label="Training stages">
@@ -183,21 +187,46 @@ function Learning() {
       </div>
       <div className="ex-training-detail"><span className="ex-kicker">{step === 3 ? 'BROWSER · INFERENCE' : 'OFFLINE · TRAINING'}</span>
         <h3>{TRAINING_STAGES[step][1]}</h3><p>{TRAINING_STAGES[step][2]}</p>
-        <div className={`ex-rollout stage-${step}`} aria-label={step === 2 ? '32 imagined steps in one rollout' : 'Diagram of simulator states and actions'}>
-          <div className="ex-rollout-labels"><span>{step === 3 ? 'OBSERVATION' : 'STATE'}</span><span>{step === 3 ? '34 ACTIONS' : '32 IMAGINED STEPS'}</span></div>
+        <div className={`ex-rollout stage-${step}`} aria-label={step === 3 ? 'Diagram of the browser control loop' : 'Diagram of simulated rollouts'}>
+          <div className="ex-rollout-labels"><span>{step === 3 ? 'OBSERVATION' : 'STATE'}</span><span>{step === 3 ? '34 ACTIONS' : '4,096 ROBOTS IN PARALLEL'}</span></div>
           <div className="ex-rollout-dots">{Array.from({ length: 32 }, (_, index) => <i key={index}
             style={{ '--i': index, height: `${22 + Math.sin(index * 0.6) * 11 + index * 0.7}px` }} />)}</div>
           <div className="ex-rollout-line"><i /></div>
-          <span className="ex-rollout-caption">{step === 3 ? 'Policy → motor model → MuJoCo → next observation' : 'Simulator transitions → world model → policy update'}</span>
+          <span className="ex-rollout-caption">{step === 3 ? 'Policy → motor model → MuJoCo → next observation' : 'Simulated steps → rewards → policy update'}</span>
         </div>
       </div>
     </div>
-    <div className="ex-joint-section"><div><h3>One policy. 34 body joints.</h3>
-      <p>Lite Pro controls its legs, waist, arms, and neck. The model fixes the fingers.</p></div>
+    <div className="ex-joint-section"><div><h3>Four policies. 34 body joints.</h3>
+      <p>Each policy controls the legs, waist, arms, and neck. The model fixes the fingers.</p></div>
       <div className="ex-joints">{[['Legs', 14], ['Waist', 3], ['Arms', 14], ['Neck', 3]].map(([name, count]) =>
         <div key={name}><span>{name} <b>{count}</b></span><div>{Array.from({ length: count }, (_, index) => <i key={index} />)}</div></div>)}</div>
     </div>
-    <p className="ex-footnote">The report also describes earlier PPO policies and get-up skills. This playground uses the S3 velocity policy only.</p>
+    <p className="ex-footnote">The two get-up policies, face up and face down, follow <a href={HOST} target="_blank" rel="noreferrer">HoST</a>: they start from settled lying poses and earn rewards for an upright, high pelvis, then the standing pose.</p>
+  </section>;
+}
+
+const RECOVERY_STATES = [
+  ['Walk', 'Flat ground or stairs', 'The flat-ground policy follows speed and turn commands closely. When the stairs policy’s map shows a step ahead, it takes over, and it hands back after a second of flat ground.'],
+  ['Fall', 'Tilt over 57° or the pelvis 0.25 m low', 'The thresholds that ended a walking episode in training. The motors hold the joints where they are until the body comes to rest.'],
+  ['Get up', 'Face up or face down', 'Gravity in the pelvis frame tells the side. That get-up policy stands the robot in about a second; a wedged attempt retries after 6 s.'],
+  ['Stand', 'Pelvis above 0.69 m and upright', 'After a second standing still, or three seconds standing, walking resumes with a zero command and a fresh history.'],
+];
+function Recovery() {
+  const [state, set_state] = useState(1);
+  return <section className="ex-section" id="recovery">
+    <SectionHeading number="03" label="THE RECOVERY" title={<>A fall is not the end.<br /><span>It is another policy.</span></>}>
+      A small state machine picks the policy for the moment. No episode ends in the playground.
+    </SectionHeading>
+    <div className="ex-loop" role="group" aria-label="Explore the recovery states">
+      {RECOVERY_STATES.map(([name, metric], index) => <button key={name} aria-pressed={state === index}
+        onClick={() => set_state(index)} className={state === index ? 'active' : ''}>
+        <span className="ex-loop-number">0{index + 1}</span><strong>{name}</strong><small>{metric}</small>
+        {index < RECOVERY_STATES.length - 1 && <span className="ex-loop-arrow" aria-hidden="true">→</span>}
+      </button>)}
+    </div>
+    <div className="ex-loop-detail" aria-live="polite"><div><span className="ex-kicker">{RECOVERY_STATES[state][1]}</span>
+      <h3>{RECOVERY_STATES[state][0]}</h3><p>{RECOVERY_STATES[state][2]}</p></div>
+      <p>Switching keeps the motors and the physics running. Each walking policy keeps its history warm, so a handover between them needs no reset.</p></div>
   </section>;
 }
 
@@ -210,7 +239,7 @@ function Terrain() {
   const step_index = Math.min(5, Math.floor((foot_x - 60) / width));
   const foot_y = exact ? 250 - (step_index + 1) * rise : Math.max(100, 225 - (foot_x - 60) * rise / width);
   return <section className="ex-section" id="terrain">
-    <SectionHeading number="03" label="THE STAIRS" title={<>The shape you see<br /><span>must be the shape you touch.</span></>}>
+    <SectionHeading number="04" label="THE STAIRS" title={<>The shape you see<br /><span>must be the shape you touch.</span></>}>
       A smooth collider can hide the step edges. Separate boxes preserve each tread and riser.
     </SectionHeading>
     <div className="ex-terrain-layout"><div className="ex-terrain-demo">
@@ -232,14 +261,13 @@ function Terrain() {
       </svg>
       <label htmlFor="contact-position">Move the foot contact <span aria-hidden="true">↔</span></label>
       <input id="contact-position" type="range" min="1" max="99" value={point} onChange={event => set_point(Number(event.target.value))} />
-    </div><div className="ex-terrain-copy"><span className="ex-kicker">A FIX FROM THE REPORT</span>
+    </div><div className="ex-terrain-copy"><span className="ex-kicker">WHY BOXES</span>
       <h3>{exact ? 'Each step has a solid box.' : 'A hull can bridge several steps.'}</h3>
-      <p>{exact ? 'Centoria gives every tread its own collision box. The head camera sees the same step geometry that supports the feet.'
-        : 'The report found that convex parts spanned several treads. Earlier stair tests often measured motion on ramps.'}</p>
-      <p>The playground uses 24 steps between two floors. Stair motion still depends on the approach, balance, and command.</p>
+      <p>{exact ? 'Centoria gives every tread its own collision box. The elevation map reads the same step geometry that supports the feet.'
+        : 'Convex parts that span several treads turn a stair into a ramp, for the feet and for the map.'}</p>
+      <p>The playground uses {STAIRS.steps} steps between two floors. The stairs policy walks down them; walking up remains experimental.</p>
       <div className="ex-dimensions"><div><strong>{(FLOOR_HEIGHT / STAIRS.steps * 100).toFixed(0)}<small>cm</small></strong><span>riser</span></div>
-        <div><strong>45<small>cm</small></strong><span>tread</span></div><div><strong>2.2<small>m</small></strong><span>width</span></div></div>
-      <a className="ex-text-link" href={REPORT} target="_blank" rel="noreferrer">Read the geometry findings · §3.9 <Icon name="external" size={13} /></a>
+        <div><strong>{IS_HEPHAESTUS ? 29 : 45}<small>cm</small></strong><span>tread</span></div><div><strong>{IS_HEPHAESTUS ? '1.3' : '2.2'}<small>m</small></strong><span>width</span></div></div>
     </div></div>
   </section>;
 }
@@ -249,7 +277,7 @@ function NavigationExplanation() {
   const [phase, set_phase] = useState(0);
   const phases = connector === 'stairs' ? ['Approach', 'Climb', 'Continue'] : ['Approach', 'Wait', 'Board', 'Ride', 'Exit'];
   return <section className="ex-section ex-navigation" id="navigation">
-    <SectionHeading number="04" label="THE ROUTE" title={<>Plan the route.<br /><span>Let the policy walk it.</span></>}>
+    <SectionHeading number="05" label="THE ROUTE" title={<>Plan the route.<br /><span>Let the policy walk it.</span></>}>
       A destination needs two systems: a route planner for free space and a policy for balance.
     </SectionHeading>
     <div className="ex-route-panel"><div className="ex-route-copy"><span className="ex-kicker">TWO FLOORS · TWO CONNECTORS</span>
@@ -259,7 +287,7 @@ function NavigationExplanation() {
         {['stairs', 'elevator'].map(value => <button key={value} aria-pressed={connector === value}
           onClick={() => { set_connector(value); set_phase(0); }}>{value === 'stairs' ? 'Stairs' : 'Elevator'}</button>)}
       </div>
-      <p className="ex-route-note">{connector === 'stairs' ? 'The follower keeps a steady heading along the stair center. Stair mode remains experimental.'
+      <p className="ex-route-note">{connector === 'stairs' ? 'The follower keeps a steady heading along the stair center. The stairs policy descends; climbs and turning landings remain experimental.'
         : 'The lift carries the robot through physical contact. Gates close during travel, and a velocity command holds the cabin center.'}</p>
     </div><div className="ex-route-visual">
       <svg viewBox="0 0 480 285" role="img" aria-label={`Cross-floor route with the ${connector}. Highlighted phase: ${phases[phase]}. This diagram explains the route stages.`}>
@@ -288,24 +316,26 @@ function NavigationExplanation() {
 
 function Evidence() {
   return <section className="ex-section" id="evidence">
-    <SectionHeading number="05" label="THE EVIDENCE" title={<>Tested in simulation.<br /><span>Still a research policy.</span></>}>
-      Results depend on the checkpoint, terrain, goal, and test. The playground does not establish a general success rate.
+    <SectionHeading number="06" label="THE EVIDENCE" title={<>Tested in simulation.<br /><span>Still research policies.</span></>}>
+      Results depend on the checkpoint, terrain, command, and test. The playground does not establish a general success rate.
     </SectionHeading>
-    <div className="ex-evidence-grid"><div className="ex-report-card"><span className="ex-kicker">UPSTREAM REPORT · §2.4 / §3.9</span>
-      <h3>S3 goal-mode run</h3><p>The report gives these results with the velocity goal. These values describe the report’s simulation tests.</p>
-      <div className="ex-result-bar"><div><span>Ascent</span><strong>100%</strong></div><i><b style={{ width: '100%' }} /></i></div>
-      <div className="ex-result-bar"><div><span>Descent</span><strong>82%</strong></div><i><b style={{ width: '82%' }} /></i></div>
-      <p className="ex-footnote">These are not success rates for this apartment. The browser export uses iteration 20,000, selected with separate browser tests (§3.10).</p>
+    <div className="ex-evidence-grid"><div className="ex-report-card"><span className="ex-kicker">MJLAB EVALUATION · HELD-OUT STARTS</span>
+      <h3>The four checkpoints</h3><p>Batch tests in the training simulator, from starts the policies did not train on.</p>
+      <div className="ex-result-bar"><div><span>Flat walk below 1 m/s, no fall in 5 s</span><strong>98%</strong></div><i><b style={{ width: '98%' }} /></i></div>
+      <div className="ex-result-bar"><div><span>Stairs down, 2–18 cm, crossed</span><strong>93–100%</strong></div><i><b style={{ width: '96%' }} /></i></div>
+      <div className="ex-result-bar"><div><span>Stairs up, 11 cm and taller, crossed</span><strong>0%</strong></div><i><b style={{ width: '0%' }} /></i></div>
+      <div className="ex-result-bar"><div><span>Get up from held-out lying poses</span><strong>100%</strong></div><i><b style={{ width: '100%' }} /></i></div>
+      <p className="ex-footnote">These are not success rates for this apartment. A newer stairs policy that keeps its heading on a climb is in training.</p>
     </div><div className="ex-checks-card"><span className="ex-kicker">THIS PLAYGROUND</span><h3>What we check</h3>
-      <ul><li><span>01</span><div><strong>Controller agreement</strong><p>A regression compares depth, observations, actions, and poses against the upstream browser controller.</p></div></li>
-        <li><span>02</span><div><strong>Physical routes</strong><p>Seeded tests cover stair ascent and descent, elevator transfers, and contact with walls and furniture.</p></div></li>
-        <li><span>03</span><div><strong>Known limits</strong><p>Live stair runs can fall, including descents after a stop. A fall stops the simulation. Press R to reset.</p></div></li></ul>
-      <p className="ex-footnote">All results are from simulation. The source report does not claim a test on the physical robot.</p>
+      <ul><li><span>01</span><div><strong>Training agreement</strong><p>Recorded mjlab steps replay in the browser runtime: observations, elevation maps and actions match to 1e-5.</p></div></li>
+        <li><span>02</span><div><strong>Physical routes</strong><p>Seeded tests cover routes on each floor, elevator rides, walls and furniture, and getting up face up and face down.</p></div></li>
+        <li><span>03</span><div><strong>Known limits</strong><p>The stairs policy turns away from tall steps. Get-ups need about 1.5 m of free floor. Straight walks drift slowly in heading.</p></div></li></ul>
+      <p className="ex-footnote">All results are from simulation. None of these policies has run on the physical robot.</p>
     </div></div>
     <div className="ex-reference-row"><span>GO DEEPER</span>
-      <a href={REPORT} target="_blank" rel="noreferrer">Motion tracking report <Icon name="external" size={14} /></a>
-      <a href={SOURCE} target="_blank" rel="noreferrer">InstinctMJ source <Icon name="external" size={14} /></a>
-      <a href={`${SITE_BASE}assets/lite_pro/contract.json`} target="_blank" rel="noreferrer">Policy contract <Icon name="external" size={14} /></a>
+      <a href={POLICY_DOC} target="_blank" rel="noreferrer">Policy integration <Icon name="external" size={14} /></a>
+      <a href={MJLAB} target="_blank" rel="noreferrer">mjlab <Icon name="external" size={14} /></a>
+      <a href={`${SITE_BASE}assets/lite_pro/policies/walk.json`} target="_blank" rel="noreferrer">Policy contract <Icon name="external" size={14} /></a>
     </div>
   </section>;
 }
@@ -318,7 +348,7 @@ function PlaygroundControls() {
       <div><dt>Move manually</dt><dd>Hold W/S to move forward or backward. Hold A/D to turn. Hold Q/E to move sideways. Arrow keys also drive.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
-      <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. Press R to reset after a fall. Reset clears the route.</dd></div>
+      <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>
       <div><dt>Enter the world</dt><dd>Select Play. Satellite views zoom from the Bay Area to NVIDIA Building K, then open the apartment. Light and dark themes select day and night. Select Controls to open the panels.</dd></div>
       <div><dt>Change the camera</dt><dd>Shoulder follows closely and turns with the figure. Scroll to zoom. Open Controls to choose a view or use +/−. Press V to cycle views.</dd></div>
     </dl><p>The playground clears held keys when the window loses focus. It pauses physics when you hide the page.</p></div>
@@ -350,20 +380,20 @@ function HowItWorks() {
     <main id="ex-content">
       <section className="ex-hero"><span className="ex-kicker"><i /> A GUIDE TO THE PLAYGROUND</span>
         <h1>How Lite Pro<br /><span>finds its footing.</span></h1>
-        <p>A goal. A depth image. A learned policy.<br />Explore what turns your input into a step.</p>
+        <p>A goal. An elevation map. Learned policies that walk and get up.<br />Explore what turns your input into a step.</p>
         <a className="ex-hero-link" href="#motion">Explore the motion <span aria-hidden="true">↓</span></a>
       </section>
       <div className="ex-content"><MotionPlayer motion_enabled={motion_enabled} />
         <div className="ex-quick-facts"><div><strong>{POLICY.joint_names.length}</strong><span>body joints</span></div>
           <div><strong>50<small>Hz</small></strong><span>policy updates</span></div><div><strong>200<small>Hz</small></strong><span>physics steps</span></div>
-          <div><strong>18 × 32</strong><span>depth image</span></div></div>
+          <div><strong>21 × 21</strong><span>elevation map</span></div></div>
       </div>
       <nav className="ex-chapter-nav" aria-label="Page chapters"><div>{CHAPTERS.map(([id, name], index) =>
         <a key={id} href={`#${id}`} aria-current={chapter === id ? 'location' : undefined}><span>0{index}</span>{name}</a>)}</div>
         <button aria-pressed={motion_enabled} onClick={() => set_motion_enabled(!motion_enabled)}>
           <Icon name={motion_enabled ? 'pause' : 'play'} size={12} /> Motion {motion_enabled ? 'on' : 'off'}</button>
       </nav>
-      <div className="ex-content"><ControlLoop /><Learning /><Terrain /><NavigationExplanation /><Evidence />
+      <div className="ex-content"><ControlLoop /><Learning /><Recovery /><Terrain /><NavigationExplanation /><Evidence />
         <PlaygroundControls />
         <section className="ex-end"><span className="ex-kicker">YOUR TURN</span><h2>Give it a direction.</h2>
           <p>Click an open floor to set a goal. Use WASD to take control.</p>
@@ -372,7 +402,7 @@ function HowItWorks() {
       </div>
     </main>
     <footer className="ex-footer"><a className="brand" href={SITE_BASE}><Icon name="robot" size={20} />Centoria</a>
-      <span>Lite Pro · SuperMimic · MuJoCo</span><span>Policy and controller: <a href={`${SITE_BASE}assets/lite_pro/LICENSE`}>CC BY-NC 4.0</a> · Robot: <a href={`${SITE_BASE}assets/lite_pro/ROBOT_LICENSE`}>MIT</a></span>
+      <span>Lite Pro · Fluctlight PPO · MuJoCo</span><span>Policies: Fluctlight, trained on LAFAN1 (CC BY-NC-ND 4.0) · Robot: <a href={`${SITE_BASE}assets/lite_pro/ROBOT_LICENSE`}>MIT</a></span>
     </footer>
   </div>;
 }

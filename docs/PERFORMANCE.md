@@ -25,6 +25,7 @@ view. The lower facade renders only in Building view. Fast Building view omits
 interior furniture; Quality restores it. Room dimensions, colors, finishes,
 collision surfaces, and the source Blender file are unchanged.
 
+These measurements were taken with the earlier S3 policy and its head depth camera.
 The dominant worker cost was depth ray casting against 4,216 world-body geoms.
 Grouping the same geoms into fixed 4 m bodies gives MuJoCo useful body bounds;
 its ray implementation rejects bodies outside the ray before testing their
@@ -44,6 +45,18 @@ warm-up, and 200 control cycles per scenario. It runs uncapped, without renderin
 | Walking depth sensing | 27.52 ms | 11.42 ms |
 | Walking real-time factor | 0.66× | 1.37× |
 
+With the Fluctlight policies, the elevation map casts 441 downward rays per control
+cycle against the walkable group only. With the same benchmark (Node 24, seed 7, 200 cycles), on a different machine:
+
+| Headless measurement (Fluctlight policies) | Mean |
+| --- | ---: |
+| Idle control cycle | 5.8 ms |
+| Idle elevation map | 4.4 ms |
+| Walking control cycle | 5.5 ms |
+| Walking elevation map | 4.2 ms |
+| Policy inference | 0.15 ms |
+| Walking real-time factor | 3.6× |
+
 To reproduce, stop other simulations and run:
 
 ```bash
@@ -62,8 +75,8 @@ The tested handoff error is below 10⁻⁹ m and 0.000003°.
 ## Historical G1 measurements
 
 These are historical measurements of the earlier Unitree G1 implementation. The
-active Lite Pro renderer uses 6,196 triangles (about 148 KiB); its depth sensor and
-physics retain the upstream model. New policy details are in [POLICY.md](POLICY.md).
+active Lite Pro renderer uses 15,804 triangles (about 373 KiB); its elevation map and
+physics use the full lite-description model. Policy details are in [POLICY.md](POLICY.md).
 
 ## What was expensive
 

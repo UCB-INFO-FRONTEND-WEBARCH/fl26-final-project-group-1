@@ -78,13 +78,15 @@ clear lower and upper stair landings.
 ## Stairs and policy capability
 
 The stairs have 24 solid box treads, each 11 cm high, 45 cm deep, and 2.2 m wide.
-The S3 Lite Pro policy uses head depth and body history for perceptive walking.
-Stair mode follows the step path at up to 0.6 m/s with a steady heading and cadence.
-It may stall or fall. Reset with R to try again.
+On the stairs, the controller hands the robot to the stairs policy, which reads a
+21 × 21 elevation map and body history. Stair mode follows the step path at up to
+0.6 m/s with a steady heading and cadence. Descents usually arrive; climbs stop at the
+first tall step, where the stairs policy turns away, and the follower reports the route
+as blocked. A fall cancels the route and starts a get-up. Reset with R to start over.
 Arrival requires reaching both the horizontal target and its actual step height;
 fall detection and camera tracking use the stair surface height.
 There is no scripted climbing animation, pose correction, or robot teleportation.
-See [policy integration](POLICY.md) for the pinned checkpoint and sensor/motor contract.
+See [policy integration](POLICY.md) for the checkpoints, the switching rules, and the sensor/motor contract.
 
 ## Algorithm choices
 

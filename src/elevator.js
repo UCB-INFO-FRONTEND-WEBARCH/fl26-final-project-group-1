@@ -1,4 +1,5 @@
 import { ELEVATOR, FLOOR_HEIGHT, STANDING_HEIGHT } from './building.js';
+import { EXCLUDED_GROUP } from './geom_groups.js';
 
 export class Elevator {
   constructor(mujoco, model) {
@@ -41,11 +42,11 @@ export class Elevator {
       const closed = Number(this.open_floor !== floor);
       this.model.geom_contype[this.gates[floor]] = closed;
       this.model.geom_conaffinity[this.gates[floor]] = closed;
-      this.model.geom_group[this.gates[floor]] = closed ? 0 : 5;
+      this.model.geom_group[this.gates[floor]] = closed ? 0 : EXCLUDED_GROUP;
     }
     this.model.geom_contype[this.front_rail] = Number(this.moving);
     this.model.geom_conaffinity[this.front_rail] = Number(this.moving);
-    this.model.geom_group[this.front_rail] = this.moving ? 0 : 5;
+    this.model.geom_group[this.front_rail] = this.moving ? 0 : EXCLUDED_GROUP;
   }
   telemetry() {
     return { height: this.height, open_floor: this.open_floor, target_floor: this.target_floor, moving: this.moving };

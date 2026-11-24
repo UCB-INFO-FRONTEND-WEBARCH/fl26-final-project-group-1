@@ -1,8 +1,10 @@
 # Centoria
 
 Centoria is a React application for manual and automatic navigation of Berkeley
-Lite Pro in a furnished, two-floor apartment. The S3 SuperMimic policy controls
-34 body joints using velocity goals, body history, and a head depth camera.
+Lite Pro in a furnished, two-floor apartment. Four learned policies from Fluctlight
+control its 34 body joints: walking on flat ground, walking on stairs with an elevation
+map, and getting up from the back or the front. A state machine switches between them,
+so Lite Pro gets up by itself after a fall.
 MuJoCo simulates the robot, stairs, and furniture in the browser. The default
 playground is the furnished Hephaestus Tower roof apartment and mezzanine,
 exported from the calibrated V20 Blender project. The surrounding highrise is
@@ -22,7 +24,7 @@ Each bone uses the corresponding robot joints in their chain order, as in
 [Lite-Motions](https://huggingface.co/spaces/Berkeley-Humanoids/Lite-Motions).
 The mode adds no IK, motion filtering, foot locking, or secondary animation.
 The character keeps its original proportions, so its feet can slide or intersect
-surfaces. The trained robot still supplies physics, contacts, and depth sensing.
+surfaces. The trained robot still supplies physics, contacts, and terrain sensing.
 
 The public character is NAI by -T.K.-, from the Lite-Motions Space, with authorization for Centoria visitor use.
 `src/character_asset.js` pins its source URL and hash. The app loads the original
@@ -42,28 +44,31 @@ Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
 The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
 the local server. The application runs without a Python server, API key, GPU,
 external inference endpoint, or cross-origin isolation headers.
-The first page load transfers approximately 40 MB of uncompressed robot and runtime assets plus 40 MB
+The first page load transfers approximately 50 MB of uncompressed robot and runtime assets (four policies and the
+full lite-description meshes) plus 40 MB
 of bundled room models and finish textures.
 The browser can cache these assets for later loads.
 
 ### How it works
 
 Open `/how-it-works/`, or select **How it works** in the header. The page explains
-the S3 control loop, depth input, training method, stair contacts, and navigation.
+the control loop, the elevation map, training, fall recovery, stair contacts, and navigation.
 Use the recorded 3D motion player, command sliders, and diagrams to explore each step.
-The player shows physical policy recordings with synchronized depth images.
+The player shows physical policy recordings with the synchronized elevation map.
 It does not load MuJoCo or ONNX Runtime. Playback starts paused and stops outside the viewport.
 The **Motion** control stops diagram animations. The page also respects the system preference for reduced motion.
 
-To regenerate the two seeded stair recordings, run:
+To regenerate the two seeded recordings (a stair descent and a get-up), run:
 
 ```bash
-node scripts/record_explainer.js
+CENTORIA_MAP=demo node scripts/record_explainer.js
 ```
 
-The script checks that both routes finish without a fall. It writes poses, policy
-depth images, and source metadata to `public/assets/explainer/`. The page loads
-the ascent recording first and fetches the descent recording when you select it.
+The script runs in the demo apartment, whose straight stair the page shows, and checks
+that the descent finishes without a fall and the get-up ends walking. It writes poses,
+elevation maps, the active policy, the stair geometry, and source metadata to
+`public/assets/explainer/`. The page loads the descent first and fetches the get-up
+when you select it.
 
 ### Asset library
 
@@ -152,7 +157,7 @@ this apartment has no elevator. Clicking a step selects a stair destination.
 selected floor's walls for inspection. WASD or **Escape** cancels automatic navigation. Pause preserves the
 route. A blue route with a white outline and destination ring stays visible
 over carpets and glazing in every camera view. Stair routes are enabled with the
-current walking policy and may fall or stall; press R to reset. Closed doors and solid furniture remain obstacles.
+current policies: descents usually work, climbs stop at the first tall step, and a fall starts a get-up; press R to reset. Closed doors and solid furniture remain obstacles.
 See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limits.
 
 | Input | Action |
@@ -197,8 +202,9 @@ Select Resume to continue.
 - The L stair has twenty 18 cm risers, 29 cm going, a 90° turn, and a 1.30 m flight width.
 - Live robot-frame commands, actual speed, world position, heading, base height,
   simulation time, distance, rendering FPS, and real-time factor.
-- The perceptive policy handles walking and stair motion. Theta* supplies the global route.
-  Falls stop the simulation and leave Reset available; the policy does not perform get-up recovery.
+- The walking policies handle flat ground and stairs. Theta* supplies the global route.
+- After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
+  Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
 Cross-floor routes attempt the original stair path. The asset library uses
@@ -231,12 +237,12 @@ to inspect it. Its export scripts and external IKEA host are unchanged.
 ## Performance
 
 The page defaults to **Graphics → Fast**. The render-only Lite Pro mesh has
-6,196 triangles and uses about 148 KiB, compared with 100,996 triangles in the
-upstream model. Camera rays and physics keep the upstream meshes and contacts.
+15,804 triangles and uses about 373 KiB, compared with 299,494 triangles in the
+lite-description meshes. Rays and physics keep the full meshes and contacts.
 **Quality** adds static shadows, restores physical glass transmission and distant
 interior furniture, and increases the allowed render resolution.
 Fast uses one-pass glass, local plant batches, and view-dependent tower context.
-The unchanged collision geoms are grouped spatially to accelerate depth rays.
+The unchanged collision geoms are grouped spatially to accelerate the elevation-map rays.
 
 Physics and inference run in a worker. Poses are sent at most 50 times per second,
 with one outstanding message and a reused transfer buffer. React updates telemetry
@@ -250,27 +256,34 @@ commands. The earlier G1 measurements remain separately labeled as historical.
 
 ## Policy and simulation
 
-The application uses the S3 goal-mode Mix checkpoint at iteration 20,000 from
-[InstinctMJ, `feat/lite-pro`](https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516).
-Its unchanged ONNX export includes normalization, the velocity goal mask, depth
-encoder, and actor. The contract and hashes are in `public/assets/lite_pro/contract.json`.
+Four policies from Fluctlight (`tracker/ppo`, trained with PPO in mjlab) drive Lite Pro.
+`src/robot_controller.js` picks one each control step:
+
+| Policy | Drives | Reads |
+| --- | --- | --- |
+| `walk` (flat v3) | Flat ground; follows speed and turn commands | command, 5 frames of body history |
+| `walk_stairs` (stairs v4) | Stairs, when its map shows a step ahead | the same, plus a 21 × 21 elevation map |
+| `getup_supine`, `getup_prone` (v2) | After a fall, by the side it lies on | 5 frames of body history |
 
 ```text
-WASD / route → ten future velocity goals and a 0.73 m ground-relative pelvis height
-Head camera → 48 × 27 rays → filtered, cropped 18 × 32 depth image
-Body state → eight frames of gravity, angular velocity, joints, and previous actions
+WASD / route → vx, vy, yaw rate (ramped) and a 0.75 m root height
+Body state → five frames of gravity, gyro, joints, and previous actions
+Elevation map → 21 × 21 downward rays, 10 cm apart, walkable surfaces only
     ↓
-2,798 observations → CNN + MLP → 34 joint targets, 50 Hz
+state machine: walk ⇄ walk on stairs → fall → get up → walk
+    ↓
+544 observations (+ map) → CNN + MLP → 34 joint targets, 50 Hz
     ↓
 Per-joint PD + motor torque–speed limits + 5–10 ms command delay
     ↓
 MuJoCo rigid-body dynamics and contacts, 200 Hz → Three.js poses
 ```
 
-The shared policy implementation follows the upstream browser controller. Its depth
-images, observations, actions, and physical poses match across a seeded 24-step
-comparison, including depth noise and history rollover. See [policy integration](docs/POLICY.md)
-for provenance, sensor groups, motor mapping, and validation limits.
+The robot model, the ONNX files and a contract per policy come from Fluctlight's
+`export-browser`. The runtime builds every input from the contract, and replays recorded
+mjlab steps to prove it: observations, elevation maps and actions match to about 1e-5.
+See [policy integration](docs/POLICY.md) for the contract, the switching rules, results,
+and limits.
 
 The original G1 policy is available in the earlier 3D-scene PR. It cannot control
 Lite Pro: the joint layout and policy contract differ. The active app loads only Lite Pro.
@@ -283,15 +296,16 @@ npm run test:simulation  # Real bundled MuJoCo WASM + ONNX runtime; no Python ne
 npm run build
 ```
 
-The simulation regression uses the same controller as the browser worker. It checks
-manual locomotion, wall and furniture contacts, compound collision ray probes, pause,
-reset, fall detection, and invalid policy output. Automatic routes cover doorways,
-furniture avoidance, elevator transfers, stair ascent/descent, and holding after arrival.
-The upstream comparison runs before those scenarios. Those original transfer
-regressions run on the explicit demo fixture. The additional Hephaestus run
-checks real floor/table/glazing rays, the mezzanine void, standing and walking on
-the carpet, automatic central-aisle travel, pause, and reset. Physical completion
-of the new 18 cm L stair has not been established; it remains experimental.
+The simulation regression uses the same controller as the browser worker. It first
+replays the mjlab fixtures, then checks manual locomotion, wall and furniture contacts,
+compound collision ray probes, pause, reset, getting up face up and face down, and
+invalid policy output. Automatic routes cover doorways, furniture avoidance, elevator
+transfers, and holding after arrival; stair routes run and report their outcome. Those
+transfer regressions run on the explicit demo fixture. The additional Hephaestus run
+checks real floor/table/glazing rays, the mezzanine void, the elevation map with and
+without spatial grouping, standing and walking on the carpet, automatic central-aisle
+travel, pause, and reset. Physical completion of the 18 cm L stair has not been
+established; it remains experimental.
 
 ## Repository layout
 
@@ -303,29 +317,30 @@ src/world.js                   Default map selection and explicit demo fallback
 src/hephaestus_data.js         Generated source metadata, floor masks, and asset hashes
 src/hephaestus_physics.js      Generated convex contacts, worker-only bundle
 public/assets/hephaestus/      Optimized room/tower GLBs and native finish bakes
-src/lite_pro_policy.js         S3 depth, history, observation, and motor control
-src/policy_constants.js        Generated constants from the pinned export
+src/fluctlight_policy.js       Policy contracts: observations, elevation map, motors, contacts
+src/robot_controller.js        State machine: walking, stairs, falls, and get-ups
+src/policy_constants.js        Generated constants from the Fluctlight bundle
 src/locomotion.js              Timing, joint names, keyboard commands, and heading
-src/simulation.js              Physical stepping, reset, fall detection, and routing
+src/simulation.js              Physical stepping, reset, and routing
 src/simulation.worker.js       Runtime loading, clock, and worker messages
 src/navigation.js             Route following and connector stages
 src/path_planner.js            Clearance-aware Theta* maps
-public/assets/lite_pro/        ONNX, MJCF, meshes, reference controller, and licenses
-scripts/import_lite_pro.py     Re-fetch and verify the pinned policy/model export
+public/assets/lite_pro/        MJCF, meshes, policies (ONNX + contracts), and license
+tests/fixtures/fluctlight/     mjlab rollouts that the runtime must reproduce
+scripts/import_fluctlight.py   Import and verify a Fluctlight browser bundle
 scripts/prepare_visual_assets.js Render-only mesh simplification
-scripts/verify_policy_parity.js Compare against the unchanged upstream controller
+scripts/verify_policy_fixtures.js Replay the mjlab fixtures through the runtime
 scripts/verify_simulation.js   Headless MuJoCo + ONNX physics checks
 ```
 
-The bundled assets are ready to use. To reproduce the import and render meshes:
+The bundled assets are ready to use. To swap in a newly trained checkpoint, export a
+bundle with `uv run export-browser` in Fluctlight's `tracker/ppo` (see
+[policy integration](docs/POLICY.md)), then:
 
 ```bash
-python3 scripts/import_lite_pro.py
+python3 scripts/import_fluctlight.py /path/to/bundle
 npm run assets:visuals
+npm run test:simulation
 ```
-
-Exporting a newly trained checkpoint requires the InstinctMJ training environment
-and `scripts/lite_pro_browser_export.py` in that repository. Pin and validate its
-constants, model, and controller together before changing the bundled checkpoint.
 
 See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution and license locations.

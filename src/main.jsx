@@ -23,12 +23,17 @@ const INITIAL_TELEMETRY = {
   command: [0, 0, 0],
   paused: false,
   fallen: false,
+  mode: 'walk',
+  policy: 'walk',
+  falls: 0,
+  getups: 0,
   inference_ms: 0,
   simulation_rate: 1,
   floor: 0,
   navigation: IDLE_NAVIGATION,
   elevator: { height: 0, open_floor: 0, moving: false, target_floor: 0 },
 };
+const POLICY_LABELS = { walk: 'Walk', walk_stairs: 'Stairs', getup_supine: 'Get up (back)', getup_prone: 'Get up (front)' };
 const CONTROL_KEYS = [
   [['KeyQ', 'Strafe left'], ['KeyW', 'Walk forward'], ['KeyE', 'Strafe right']],
   [['KeyA', 'Turn left'], ['KeyS', 'Walk backward'], ['KeyD', 'Turn right']],
@@ -188,7 +193,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   }
 
   function navigate(goal) {
-    if (!ready_ref.current || telemetry_ref.current.fallen) return;
+    if (!ready_ref.current || telemetry_ref.current.fallen || telemetry_ref.current.mode !== 'walk') return;
     release_keys();
     if (goal.length === 4 || on_stairs(goal)) change_transfer('stairs');
     worker_ref.current?.postMessage({ type: 'goal', goal });
@@ -330,6 +335,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 message.telemetry.fallen ||
                 message.telemetry.time < telemetry_ref.current.time ||
                 message.telemetry.fallen !== telemetry_ref.current.fallen ||
+                message.telemetry.mode !== telemetry_ref.current.mode ||
+                message.telemetry.policy !== telemetry_ref.current.policy ||
                 message.telemetry.paused !== telemetry_ref.current.paused;
               telemetry_ref.current = message.telemetry;
               const now = performance.now();
@@ -439,8 +446,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     : !ready
       ? 'Initializing'
       : telemetry.fallen
-        ? 'Robot fallen'
-        : telemetry.paused
+        ? 'Simulation stopped'
+        : telemetry.mode !== 'walk'
+          ? 'Getting up'
+          : telemetry.paused
           ? 'Paused'
           : 'Simulation live';
   const heading = ((((telemetry.heading * 180) / Math.PI) % 360) + 360) % 360;
@@ -534,7 +543,18 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             {phase === 'playing' && ready && telemetry.fallen && (
               <div className="fallen-banner" role="alert">
                 <Icon name="info" />
-                <span>Lite Pro lost its balance. Reset to try again.</span>
+                <span>The simulation became unstable. Reset to try again.</span>
+                <button onClick={reset}>
+                  Reset robot <kbd>R</kbd>
+                </button>
+              </div>
+            )}
+            {phase === 'playing' && ready && !telemetry.fallen && telemetry.mode !== 'walk' && (
+              <div className="fallen-banner" role="status">
+                <Icon name="info" />
+                <span>{telemetry.mode === 'falling'
+                  ? 'Lite Pro fell. It gets up once it comes to rest.'
+                  : `Getting up from ${telemetry.policy === 'getup_prone' ? 'its front' : 'its back'}. Walking resumes once it stands.`}</span>
                 <button onClick={reset}>
                   Reset robot <kbd>R</kbd>
                 </button>
@@ -616,8 +636,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           </div>
           <div className="policy-tag">
             <i />
-            {ready ? 'Learned locomotion' : 'Loading locomotion'}
-            <span>SuperMimic / depth</span>
+            {ready ? 'Learned walking and get-up' : 'Loading policies'}
+            <span>Fluctlight PPO</span>
           </div>
 
           <section className="navigation-section">
@@ -637,7 +657,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               disabled={!['walking', 'waiting', 'riding', 'arrived'].includes(telemetry.navigation?.status)}>
               {telemetry.navigation?.status === 'arrived' ? 'Clear route' : 'Stop navigation'} <kbd>ESC</kbd></button>
             <p className="navigation-footnote">{transfer === 'stairs'
-              ? 'The head depth camera guides stair walking. Press R to reset after a fall.'
+              ? 'An elevation map guides stair walking. Descents usually work; climbs are experimental. After a fall, Lite Pro gets up by itself.'
               : 'Select Stairs or click a step to try the stairway.'}</p>
           </section>
 
@@ -742,6 +762,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                   {telemetry.position[2].toFixed(2)} <small>m</small>
                 </output>
               </div>
+              <div>
+                <span>Policy <small>{telemetry.getups} get-ups</small></span>
+                <output aria-label="Active policy">{POLICY_LABELS[telemetry.policy] ?? 'Holding still'}</output>
+              </div>
             </div>
             <div className="command-heading">
               VELOCITY COMMAND <span>ROBOT FRAME</span>
@@ -762,9 +786,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               <Icon name="info" size={16} />
               <strong>You lead. It finds its footing.</strong>
             </div>
-            <p>Pick a destination or use your keys. A neural network handles balance and every step.</p>
+            <p>Pick a destination or use your keys. Neural networks handle balance, every step, and getting up after a fall.</p>
             <div className="policy-flow">
-              <span>2,798 obs</span>
+              <span>544 obs + map</span>
               <span>→</span>
               <strong>CNN + MLP</strong>
               <span>→</span>

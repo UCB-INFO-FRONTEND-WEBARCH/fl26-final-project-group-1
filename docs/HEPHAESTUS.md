@@ -117,8 +117,8 @@ then the original full demo regressions (including lift and physical straight
 stairs), then the new-map real MuJoCo/ONNX checks. The latter probe carpet,
 table, glazing, upper slab, and mezzanine void, and exercise idle balance,
 manual aisle locomotion, automatic aisle arrival, pause, and reset.
-It also compares the grouped and flat physics models' raw depth rays at twelve
-poses. See [performance measurements](PERFORMANCE.md) for reproduction and limits.
+It also compares the elevation maps of the grouped and flat physics models at sixteen
+poses, including one at the foot of the stairs. See [performance measurements](PERFORMANCE.md) for reproduction and limits.
 
 All seven exported GLBs passed Khronos glTF Validator with zero errors. Normal
 maps without authored tangents retain generated-tangent warnings. Browser QA

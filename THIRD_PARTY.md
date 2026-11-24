@@ -1,30 +1,27 @@
 # Third-party assets and libraries
 
-## Berkeley Lite Pro model and S3 policy
+## Berkeley Lite Pro model and policies
 
-Source: [Berkeley Humanoids — InstinctMJ](https://github.com/berkeley-humanoids/instinctmj/tree/07396764422e274e4316719f9dfb1fd734e9a516),
-commit `07396764422e274e4316719f9dfb1fd734e9a516`, and the published
-[Lite Pro Motion Tracking artifact](https://claude.ai/artifact/8nh5Z94mUcC7iCdg3cDGpo),
-section 3.10. The checkpoint is the S3 goal-mode Mix run at iteration 20,000.
+The policies come from Fluctlight (`tracker/ppo`), Berkeley Humanoids' policy repository, whose code is MIT-licensed.
+`public/assets/lite_pro/manifest.json` records the Fluctlight commit, each checkpoint, and every file's hash.
 
-- `public/assets/lite_pro/policy.onnx` is the unchanged velocity-mode export.
-  `constants.json` retains the matching joint, camera, normalization-layout, and motor settings.
-- `src/lite_pro_policy.js` adapts the upstream browser controller, under
-  CC BY-NC 4.0. The full license is in `public/assets/lite_pro/LICENSE`.
-  The unchanged reference implementation is in `public/assets/lite_pro/reference/core.js`.
-- Lite Pro MJCF and meshes originate from
-  [lite_description](https://github.com/berkeley-humanoids/lite_description),
-  under MIT; its full license is in `public/assets/lite_pro/ROBOT_LICENSE`.
-  The imported browser model preserves the trained joint configuration and contacts.
-  `robot.xml` removes the demo's terrain, origin markers, and lighting; the app supplies its own scene.
-- `scripts/import_lite_pro.py` checks the source hashes, unpacks the original browser
-  meshes, and generates `src/policy_constants.js`. The asset manifest records file hashes.
+- `public/assets/lite_pro/policies/*.onnx` are the exported actors of the walking (`walk`, `walk_stairs`) and get-up
+  (`getup_supine`, `getup_prone`) policies; `*.json` are their runtime contracts. `src/fluctlight_policy.js` and
+  `src/robot_controller.js` run them; both are written for this repository.
+- The walking policies learned from the [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
+  locomotion clips (Ubisoft La Forge, CC BY-NC-ND 4.0), retargeted to Lite Pro. No motion data ships with the app.
+- The get-up policies follow the reward design of [HoST](https://arxiv.org/abs/2502.08378) (MIT); no HoST code is used.
+- The Lite Pro MJCF and meshes come from
+  [lite_description](https://github.com/berkeley-humanoids/lite_description) 0.5.0, under MIT; its full license is in
+  `public/assets/lite_pro/ROBOT_LICENSE`. `robot.xml` is the model as mjlab compiles it for the walking task, with the
+  Fluctlight patches (collision names, IMU site, elevation-map site), without the training scene.
+- `scripts/import_fluctlight.py` copies the bundle, checks the policy hashes, and generates `src/policy_constants.js`.
+  `tests/fixtures/fluctlight/` holds the mjlab rollouts that `scripts/verify_policy_fixtures.js` replays.
 - `visuals.bin` and `visuals.json` are derived render meshes, simplified offline with
-  meshoptimizer at a 4 mm error target. The camera and physics use the imported meshes.
-- `public/assets/explainer/` contains poses and depth images from two seeded S3
-  policy runs in the apartment. `scripts/record_explainer.js` generates these recordings.
-  `motion.json` records the source commit, policy hash, and attribution. The
-  explanation page reuses the Lite Pro render meshes and links to the original report.
+  meshoptimizer at a 4 mm error target. Rays and physics use the imported meshes.
+- `public/assets/explainer/` contains poses and elevation maps from two seeded runs of these policies in the demo
+  apartment. `scripts/record_explainer.js` generates these recordings; `motion.json` records the source commit and the
+  checkpoints.
 
 ## Character view
 
