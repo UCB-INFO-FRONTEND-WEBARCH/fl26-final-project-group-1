@@ -335,7 +335,7 @@ function Evidence() {
     </div><div className="ex-checks-card"><span className="ex-kicker">THIS PLAYGROUND</span><h3>What we check</h3>
       <ul><li><span>01</span><div><strong>Training agreement</strong><p>Recorded mjlab steps replay in the browser runtime: observations, elevation maps and actions match to 1e-5.</p></div></li>
         <li><span>02</span><div><strong>Physical routes</strong><p>Seeded tests cover routes on each floor, elevator rides, walls and furniture, getting up face up and face down, and sitting down on the seat and standing up in both apartments.</p></div></li>
-        <li><span>03</span><div><strong>Known limits</strong><p>The stairs policy turns away from tall steps. Get-ups need about 1.5 m of free floor. Straight walks drift slowly in heading. The sit policy needs a seat of its trained kind: the apartments’ sofas are too high.</p></div></li></ul>
+        <li><span>03</span><div><strong>Known limits</strong><p>The stairs policy turns away from tall steps. Get-ups need about 1.5 m of free floor. Straight walks drift slowly in heading. Taller KIVIK sofas need a short position alignment before the sit policy.</p></div></li></ul>
       <p className="ex-footnote">All results are from simulation. None of these policies has run on the physical robot.</p>
     </div></div>
     <div className="ex-reference-row"><span>GO DEEPER</span>
@@ -355,7 +355,7 @@ function PlaygroundControls() {
       <div><dt>Open the map</dt><dd>Press M to expand the minimap. Select a floor and click to walk there. Turn on Teleport to place the robot directly. Press M or Escape to close the map.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character in the lower-right corner to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
-      <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair. The F pane appears. Press F to line up and sit, then F to stand. You can also click a chair to walk to it.</dd></div>
+      <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair or blue KIVIK sofa. The F pane appears. Press F to line up and sit, then F to stand. You can also click an armchair to walk to it.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>
       <div><dt>Enter the world</dt><dd>Select Play. Satellite views zoom from the Bay Area to NVIDIA Building K, then open the apartment. Light and dark themes select day and night. Select Controls to open the panels.</dd></div>
       <div><dt>Change the camera</dt><dd>Move the mouse to look around. Hold Alt for the cursor; release it to look again. Drag also works while the cursor is free. Scroll to zoom. Press V to cycle views.</dd></div>

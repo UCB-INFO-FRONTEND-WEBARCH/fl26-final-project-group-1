@@ -169,7 +169,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Shift + movement key | Double movement and turning commands while held |
 | M | Expand or close the map; Escape also closes it |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
-| F near a supported chair | Line up and sit; F again stands up. Clicking a chair also routes to it |
+| F near a supported seat | Line up and sit; F again stands up. Clicking an armchair also routes to it |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
 | V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
@@ -223,8 +223,9 @@ Select Resume to continue.
 - After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
   Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
 - Five real-scale **ULRIKSBERG** armchairs support sitting in Hephaestus: three downstairs and two on the mezzanine.
-  The demo has one on each floor. A nearby F pane offers sitting or standing. The other sofas and chairs remain
-  decorative because their support heights exceed the shipped clip's range. See [seating](docs/SEATING.md).
+  The demo has one on each floor. The six blue main-lounge **KIVIK sofas** also offer F to sit and stand, with a short
+  standing-pose alignment before the real sit policy. Other seating remains decorative. See [seating](docs/SEATING.md)
+  for dimensions, validation, and the sofa approach limit.
 - The HUD keeps the site's blue accents and rounded panels. Game references inform key badges, prompts, and layout.
   The local minimap stays at the bottom left; M expands it to nearly the full screen. Figure cards sit at the bottom right.
 

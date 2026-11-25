@@ -3,7 +3,7 @@ import { SEATING_ASSETS } from './seating_assets.js';
 
 /** The same unscaled, grounded catalog geometry used by the renderer, transformed into MuJoCo's world frame. */
 export function seating_bodies() {
-  return SEATS.flatMap(seat => {
+  return SEATS.filter(seat => !seat.existing).flatMap(seat => {
     const c = Math.cos(seat.model_yaw), s = Math.sin(seat.model_yaw);
     return SEATING_ASSETS[seat.article].hulls.map((hull, index) => ({
       name: `seat_${seat.id}_${index}`, source: seat.id, role: 'furniture',
