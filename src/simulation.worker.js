@@ -26,7 +26,7 @@ let frame_in_flight = false;
 let recycled_buffer = null;
 let force_frame = true;
 let pending_goal = null;
-// 'sit' or 'stand', applied between physics batches as goals are.
+// Seat actions are applied between physics batches, like navigation goals.
 let pending_seat = null;
 
 function report_loading(message) {
@@ -99,7 +99,7 @@ async function pump() {
       force_frame = true;
     }
     if (pending_seat) {
-      if (pending_seat === 'sit') simulation.request_sit();
+      if (pending_seat.type === 'sit') simulation.request_sit(pending_seat.seat_id);
       else simulation.request_stand();
       pending_seat = null;
       force_frame = true;
@@ -180,8 +180,11 @@ self.onmessage = (event) => {
       simulation.teleport_requested = null;
       pending_goal = null;
       // A movement key ends the walk to the seat; a key release does not.
-      if (message.command.some((value) => value !== 0)) simulation.cancel_approach();
-      simulation.navigation.cancel();
+      if (message.command.some((value) => value !== 0)) {
+        pending_seat = null;
+        simulation.cancel_approach();
+      }
+      if (!simulation.approach) simulation.navigation.cancel();
       simulation.command = simulation.accepts_commands ? message.command : [0, 0, 0];
       force_frame = true;
       break;
@@ -189,8 +192,11 @@ self.onmessage = (event) => {
       simulation.teleport_requested = null;
       pending_goal = null;
       // Camera-relative movement ends the walk to the seat; a release does not.
-      if (message.motion && Math.hypot(message.motion[0], message.motion[1]) > 0) simulation.cancel_approach();
-      simulation.navigation.cancel();
+      if (message.motion && Math.hypot(message.motion[0], message.motion[1]) > 0) {
+        pending_seat = null;
+        simulation.cancel_approach();
+      }
+      if (!simulation.approach) simulation.navigation.cancel();
       simulation.camera_motion = simulation.accepts_commands ? message.motion : null;
       simulation.command = [0, 0, 0];
       force_frame = true;
@@ -198,18 +204,23 @@ self.onmessage = (event) => {
     case 'sit':
     case 'stand':
       pending_goal = null;
-      pending_seat = message.type;
+      pending_seat = message;
       break;
     case 'goal':
+      pending_seat = null;
       simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = message.goal;
       break;
     case 'teleport':
-      if (simulation.request_teleport(message.goal)) pending_goal = null;
+      if (simulation.request_teleport(message.goal)) {
+        pending_goal = null;
+        pending_seat = null;
+      }
       else self.postMessage({ type: 'teleport_result', ok: false });
       break;
     case 'cancel_navigation':
+      pending_seat = null;
       simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = null;
@@ -225,6 +236,8 @@ self.onmessage = (event) => {
       if (['elevator', 'stairs'].includes(message.transfer)) {
         simulation.camera_motion = null;
         pending_goal = null;
+        pending_seat = null;
+        simulation.cancel_approach();
         simulation.navigation.cancel();
         simulation.navigation.transfer = message.transfer;
         simulation.command = [0, 0, 0];

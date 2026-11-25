@@ -172,7 +172,7 @@ test('the sit policy carries its chair clips, and each clip its seat', async () 
   }
 });
 
-test('the Lite Pro seat is the trained seat, within the clips\' seat offsets', async () => {
+test('the explainer training fixture matches the clips and runtime footprint includes the catalog leg frame', async () => {
   const contract = await json(POLICY.policies.sit);
   const { SEAT, SEAT_SIZE, seat_boxes, seat_footprint, to_seat } = await import('../src/seat.js');
   const { seat: trained, clips } = contract.motion;
@@ -188,10 +188,10 @@ test('the Lite Pro seat is the trained seat, within the clips\' seat offsets', a
   const [block, back] = seat_boxes();
   assert.ok(Math.abs(block.center[2] - SEAT_SIZE.height / 2) < 1e-9);
   assert.ok(Math.abs(back.center[2] + back.size[2] / 2 - SEAT_SIZE.height - SEAT_SIZE.backrest_height) < 1e-9);
-  // The footprint spans the front edge to the back of the backrest.
+  // The physical footprint comes from the real catalog mesh, including its leg frame.
   const local = seat_footprint().map((p) => to_seat(SEAT, p));
-  assert.ok(Math.abs(Math.max(...local.map((p) => p[0]))) < 1e-9);
-  assert.ok(Math.abs(Math.min(...local.map((p) => p[0])) + SEAT_SIZE.depth + SEAT_SIZE.backrest_thickness) < 1e-9);
+  assert.ok(Math.max(...local.map((p) => p[0])) > 0);
+  assert.ok(Math.min(...local.map((p) => p[0])) < -0.5);
 });
 
 test('a placed clip keeps the sit terms unchanged when the robot and the seat move with it', async () => {

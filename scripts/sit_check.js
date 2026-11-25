@@ -5,7 +5,7 @@ import { Simulation } from '../src/simulation.js';
 import { MODE } from '../src/robot_controller.js';
 import { PHYSICS_DT } from '../src/locomotion.js';
 import { FLOOR_HEIGHT } from '../src/building.js';
-import { SEAT, SEAT_SIZE, to_seat } from '../src/seat.js';
+import { SEAT, to_seat } from '../src/seat.js';
 import { make_navigation_maps } from '../src/path_planner.js';
 import { seeded_random } from './load_policies.js';
 
@@ -25,7 +25,7 @@ export async function check_sit(mujoco, model, policies, starts, seeds = [1, 2])
       const label = `sit from (${start[0].toFixed(1)}, ${start[1].toFixed(1)}), seed ${seed}`;
       const simulation = new Simulation(mujoco, model, policies, make_navigation_maps(), seeded_random(seed + 31 * index));
       simulation.reset(start, yaw);
-      assert.ok(simulation.request_sit(), `${label}: the sit request was refused (${simulation.seat_message})`);
+      assert.ok(simulation.request_sit(SEAT.id), `${label}: the sit request was refused (${simulation.seat_message})`);
       const sat_down = await run_until(simulation, () => simulation.mode === MODE.SIT_DOWN || !simulation.approach, 60);
       assert.ok(sat_down && simulation.mode === MODE.SIT_DOWN,
         `${label}: the walk to the seat ended without sitting (${simulation.seat_message ?? simulation.mode})`);
@@ -35,8 +35,8 @@ export async function check_sit(mujoco, model, policies, starts, seeds = [1, 2])
       const [x, y] = to_seat(SEAT, simulation.state.qpos);
       const height = simulation.state.qpos[2] - SEAT.floor * FLOOR_HEIGHT;
       assert.equal(simulation.mode, MODE.SEATED, `${label}: did not stay seated (${simulation.mode})`);
-      assert.ok(x < -0.1 && x > -SEAT_SIZE.depth + 0.1 && Math.abs(y) < 0.15, `${label}: seated off the seat at ${x.toFixed(2)}, ${y.toFixed(2)}`);
-      assert.ok(height > SEAT_SIZE.height && height < SEAT_SIZE.height + 0.2, `${label}: pelvis at ${height.toFixed(2)} m`);
+      assert.ok(x < -0.1 && x > -SEAT.depth + 0.1 && Math.abs(y) < 0.15, `${label}: seated off the seat at ${x.toFixed(2)}, ${y.toFixed(2)}`);
+      assert.ok(height > SEAT.support_height && height < SEAT.height + 0.2, `${label}: pelvis at ${height.toFixed(2)} m`);
       assert.ok(simulation.request_stand(), `${label}: the stand request was refused`);
       const stood = await run_until(simulation, () => simulation.mode === MODE.WALK || simulation.mode === MODE.FALLING, 8);
       assert.ok(stood && simulation.mode === MODE.WALK, `${label}: did not stand up (${simulation.mode})`);
@@ -55,7 +55,7 @@ export async function check_sit(mujoco, model, policies, starts, seeds = [1, 2])
   // A movement key cancels the walk to the seat.
   const simulation = new Simulation(mujoco, model, policies, make_navigation_maps(), seeded_random(5));
   simulation.reset(starts[0][0], starts[0][1]);
-  simulation.request_sit();
+  simulation.request_sit(SEAT.id);
   await simulation.advance(200);
   assert.ok(simulation.approach, 'the walk to the seat did not start');
   simulation.cancel_approach();

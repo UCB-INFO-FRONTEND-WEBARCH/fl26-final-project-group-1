@@ -2,6 +2,10 @@ import React from 'react';
 
 export function Icon({ name, size = 18 }) {
   const paths = {
+    seat: <><path d="M7 3v9h11v5H5v-5M7 17v4m10-4v4M18 7v5" /><path d="M7 7h7" /></>,
+    controls: <><path d="M4 6h16M4 12h16M4 18h16" /><path d="M8 3v6m8 0v6M10 15v6" /></>,
+    teleport: <><path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2ZM9 4v14m6-12v14" /><circle cx="12" cy="11" r="2" /></>,
+    person: <><circle cx="12" cy="6" r="3" /><path d="M6 21v-3a6 6 0 0 1 12 0v3M9 13l3 3 3-3" /></>,
     sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
     moon: <path d="M20 14.2A8.5 8.5 0 0 1 9.8 4a8.5 8.5 0 1 0 10.4 10.2Z" />,
     reset: (

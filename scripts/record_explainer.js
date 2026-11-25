@@ -103,7 +103,7 @@ let seated_at = null;
 await record('sit', simulation => {
   // Two metres in front of the seat, facing it: walk up, turn, back up, sit, sit for two seconds, stand and step away.
   simulation.reset([...from_seat(SEAT, 2.0, 0.4), STANDING_HEIGHT], SEAT.yaw + Math.PI);
-  assert.ok(simulation.request_sit(), 'The sit request was refused');
+  assert.ok(simulation.request_sit(SEAT.id), 'The sit request was refused');
   seated_at = null;
 }, simulation => {
   if (simulation.mode === MODE.SEATED && seated_at === null) seated_at = simulation.step_count;
