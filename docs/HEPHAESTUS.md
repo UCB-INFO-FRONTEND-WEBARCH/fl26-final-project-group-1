@@ -15,7 +15,7 @@ operate on unsaved copies and check that its hash does not change.
 
 Dimensions stay in metres. The adapter subtracts Blender XYZ
 `[-2.8, 13.935, 3.03]` once. The glTF loader restores Y-up exports to the runtime's
-Z-up frame once. There is no room rescaling or independent furniture rescaling.
+Z-up frame once. The room keeps its original scale. The replacement catalog sofas use the explicit uniform scale below.
 
 | Measurement | Source value |
 | --- | --- |
@@ -23,13 +23,13 @@ Z-up frame once. There is no room rescaling or independent furniture rescaling.
 | Mezzanine elevation above apartment | 3.60 m |
 | Main room ceiling above apartment | 6.60 m |
 | Source V20 sofa aisle | approximately 1.50 m before the lounge edit |
-| Runtime BONDHOLMEN sofa frames | two, approximately 1.384 × 0.810 × 0.737 m each, with KUDDARNA pads |
+| Runtime KIVIK sofas | two upholstered sofas, approximately 1.826 × 0.766 × 0.686 m each at 80% uniform scale |
 | Runtime main-lounge LISTERBY tables | two, approximately 1.400 × 0.600 × 0.365 m each |
 | Shared carpet | 8.20 × 9.50 m |
 | L stair | twenty 0.18 m risers, 0.29 m going, 1.30 m flight width |
 
-The runtime lounge replaces the six tall KIVIK-inspired sofas with two compatible real-size BONDHOLMEN/KUDDARNA
-assemblies. Two coffee tables and their loose decorations are removed. Warm finishes, wardrobes, workspaces,
+The runtime lounge replaces the six tall KIVIK-inspired sofas with two upholstered KIVIK sofas at 80% uniform scale.
+Two coffee tables and their loose decorations are removed. Warm finishes, wardrobes, workspaces,
 kitchen, and perimeter placements remain from V20. See [seating](SEATING.md) and [third-party notes](../THIRD_PARTY.md).
 
 ## Runtime representation

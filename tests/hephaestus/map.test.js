@@ -9,7 +9,9 @@ import {Navigation} from '../../src/navigation.js';
 import {FLOOR_HEIGHT,STAIRS,STAIR_PATH,on_stairs,stair_height,stair_projection} from '../../src/building.js';
 import {make_scene_xml,SPAWN} from '../../src/scene_layout.js';
 import {teleport_position} from '../../src/teleport.js';
-import {SEATS,from_seat,nearby_seat} from '../../src/seat.js';
+import {SEATS,from_seat,nearby_seat,seat_footprint} from '../../src/seat.js';
+import {seating_bodies} from '../../src/seating_geometry.js';
+import {SEATING_ASSETS} from '../../src/seating_assets.js';
 
 test('default map retains V20 metric provenance and declares its real connectors',()=>{
  assert.equal(IS_HEPHAESTUS,true);assert.equal(HAS_ELEVATOR,false);assert.equal(MAP.units,'metres');
@@ -87,6 +89,19 @@ test('two compatible lounge sofas have open walking approaches and replace the t
  assert.equal(MAP.furniture.filter(f=>f.product==='kivik').length,0);
  assert.equal(HEPHAESTUS_PHYSICS.filter(p=>p.source.includes('KIVIK')).length,0);
  for(const sofa of sofas){
+  assert.equal(sofa.label,'KIVIK');
+  assert.equal(sofa.scale,.8);
+  const vertices=seating_bodies().filter(body=>body.source===sofa.id).flatMap(body=>body.vertices);
+  const footprint=seat_footprint(sofa);
+  for(let axis=0;axis<3;axis++){
+   const span=Math.max(...vertices.map(p=>p[axis]))-Math.min(...vertices.map(p=>p[axis]));
+   const expected=SEATING_ASSETS[sofa.article].size[axis]*sofa.scale;
+   assert(Math.abs(span-expected)<.02,`${sofa.id}: collider scale differs on axis ${axis}`);
+   if(axis<2){
+    const nav_span=Math.max(...footprint.map(p=>p[axis]))-Math.min(...footprint.map(p=>p[axis]));
+    assert(Math.abs(nav_span-expected)<1e-6,`${sofa.id}: navigation scale differs on axis ${axis}`);
+   }
+  }
   const stage=from_seat(sofa,.85,0);
   assert(map.free(stage),sofa.id);
   assert(map.plan(SPAWN,stage),`${sofa.id}: disconnected approach`);

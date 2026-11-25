@@ -48,7 +48,7 @@ export function seat_footprint(seat = SEAT) {
     const [lo, hi] = seat.bounds;
     return [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]];
   }
-  const [width, depth] = SEATING_ASSETS[seat.article].size;
+  const [width, depth] = SEATING_ASSETS[seat.article].size.map(length => length * (seat.scale ?? 1));
   const c = Math.cos(seat.model_yaw), s = Math.sin(seat.model_yaw);
   return [[-width / 2, -depth / 2], [width / 2, -depth / 2], [width / 2, depth / 2], [-width / 2, depth / 2]]
     .map(([x, y]) => [seat.position[0] + c * x - s * y, seat.position[1] + s * x + c * y]);
