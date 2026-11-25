@@ -207,7 +207,7 @@ Select Resume to continue.
 ## Scene and robot
 
 - The nonrectangular apartment slab spans 37.68 × 18.06 m; the mezzanine is 3.60 m above it.
-- The lounge has two real-size BONDHOLMEN sofas with KUDDARNA pads and two LISTERBY tables, with clear approaches
+- The lounge has two upholstered KIVIK sofas at 80% uniform scale and two LISTERBY tables, with clear approaches
   and exits. PAX wardrobes, workspaces, kitchen, and perimeter furnishings retain their V20 placements.
 - IKEA-derived and existing Tripo assets retain their source materials, with
   portable PBR approximations and render LODs. Native oak and brick finishes are
@@ -223,7 +223,7 @@ Select Resume to continue.
 - After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
   Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
 - Five real-scale **ULRIKSBERG** armchairs support sitting in Hephaestus: three downstairs and two on the mezzanine.
-  The demo has one on each floor. Two **BONDHOLMEN sofas** also offer F to sit and stand. All enabled seats use a
+  The demo has one on each floor. Two **KIVIK sofas** also offer F to sit and stand. All enabled seats use a
   physical walking approach and real furniture contact. See [seating](docs/SEATING.md) for dimensions and validation.
 - The HUD keeps the site's blue accents and rounded panels. Game references inform key badges, prompts, and layout.
   The local minimap stays at the bottom left; M expands it to nearly the full screen. Figure cards sit at the bottom right.
@@ -345,7 +345,7 @@ src/fluctlight_policy.js       Policy contracts: observations, elevation map, mo
 src/robot_controller.js        State machine: walking, stairs, falls, get-ups, and sitting
 src/seat.js                    Seat proximity, anchors, and the walk that lines up with a seat
 src/seating_layout.js          Catalog seat profiles and per-floor sitting locations
-src/seating_assets.js          Generated convex colliders for unscaled IKEA seating
+src/seating_assets.js          Generated source-mesh convex colliders for IKEA seating
 src/game_hud.css               In-game HUD and furniture interaction pane
 src/policy_constants.js        Generated constants from the Fluctlight bundle
 src/locomotion.js              Timing, joint names, keyboard commands, and heading

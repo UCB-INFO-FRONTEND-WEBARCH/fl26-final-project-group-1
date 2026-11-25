@@ -51,11 +51,11 @@ embedded metadata remain unchanged.
 
 ## Compatible IKEA seating
 
-The compatible lounge sofas use the supplied IKEA catalog meshes for
-[BONDHOLMEN 505.581.85](https://www.ikea.com/ie/en/p/bondholmen-2-seat-sofa-outdoor-white-beige-50558185/) and
-[KUDDARNA 005.472.36](https://www.ikea.com/fi/en/p/kuddarna-chair-cushion-outdoor-light-grey-beige-00547236/).
-They retain their original scale. Their source hashes are in `src/seating_assets.js`; the runtime downloads the
-same pinned external catalog files as the existing armchairs. Generated convex hulls are contact approximations.
+The lounge uses the supplied IKEA catalog mesh for
+[KIVIK 694.997.04, Gunnared blue](https://www.ikea.com/us/en/p/kivik-sofa-gunnared-blue-s69499704/).
+The app applies an 80% uniform runtime scale to match the sit policy; the downloaded model stays unchanged.
+Its source hash is in `src/seating_assets.js`; the runtime uses the same pinned external catalog as the armchairs.
+Generated convex hulls are contact approximations and receive the same scale and placement as the visual mesh.
 
 ## Aerial arrival
 

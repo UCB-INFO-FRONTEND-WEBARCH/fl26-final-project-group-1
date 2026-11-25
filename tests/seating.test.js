@@ -8,7 +8,7 @@ import { seating_bodies } from '../src/seating_geometry.js';
 import { make_navigation_maps } from '../src/path_planner.js';
 import { FLOOR_HEIGHT } from '../src/building.js';
 
-test('catalog support heights match the trained sit and stand clips without scaling the models', async () => {
+test('runtime catalog support heights match the trained sit and stand clips', async () => {
   const contract = JSON.parse(await readFile(new URL('../public/assets/lite_pro/policies/sit.json', import.meta.url)));
   for (const [article, product] of Object.entries(SEATING_PRODUCTS)) {
     const asset = SEATING_ASSETS[article];

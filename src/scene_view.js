@@ -253,7 +253,7 @@ export class SceneView {
     const signal = this.furniture_abort.signal;
     this.seat_groups = [];
     try {
-      const articles = new Set(SEATS.flatMap(seat => seat.components?.map(part => part.article) ?? [seat.article]));
+      const articles = new Set(SEATS.map(seat => seat.article));
       await Promise.all([...articles].map(async article => {
         const asset = SEATING_ASSETS[article];
         const response = await fetch(`${IKEA_BASE}${model_path(article)}`, { signal });
@@ -268,29 +268,22 @@ export class SceneView {
         const upright = new THREE.Group();
         upright.rotation.x = Math.PI / 2;
         upright.add(gltf.scene);
-        for (const seat of SEATS) {
-          const components = seat.components ?? [{article:seat.article, offset:[0,0,0]}];
-          for (const [part, component] of components.entries()) {
-            if (component.article !== article) continue;
-            const group = new THREE.Group();
-            group.name = `${seat.id}_${part}`;
-            group.userData.seat_id = seat.id;
-            group.position.set(...seat.position);
-            group.rotation.z = seat.model_yaw;
-            const piece = new THREE.Group();
-            piece.position.set(...component.offset);
-            piece.rotation.x = component.pitch ?? 0;
-            piece.add(upright.clone(true));
-            group.add(piece);
-            group.updateMatrixWorld(true);
-            group.traverse(object => {
-              object.matrixAutoUpdate = false;
-              if (object.isMesh) object.castShadow = object.receiveShadow = true;
-            });
-            // These low seats stay below the lens when seated; a full body AABB would trap the shoulder camera.
-            this.floor_groups[seat.floor].add(group);
-            this.seat_groups.push(group);
-          }
+        for (const seat of SEATS.filter(seat => seat.article === article)) {
+          const group = new THREE.Group();
+          group.name = seat.id;
+          group.userData.seat_id = seat.id;
+          group.position.set(...seat.position);
+          group.rotation.z = seat.model_yaw;
+          group.scale.setScalar(seat.scale ?? 1);
+          group.add(upright.clone(true));
+          group.updateMatrixWorld(true);
+          group.traverse(object => {
+            object.matrixAutoUpdate = false;
+            if (object.isMesh) object.castShadow = object.receiveShadow = true;
+          });
+          // These low seats stay below the lens when seated; a full body AABB would trap the shoulder camera.
+          this.floor_groups[seat.floor].add(group);
+          this.seat_groups.push(group);
         }
       }));
     } finally { draco.dispose(); }

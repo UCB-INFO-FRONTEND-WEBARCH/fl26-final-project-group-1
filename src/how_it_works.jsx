@@ -355,7 +355,7 @@ function PlaygroundControls() {
       <div><dt>Open the map</dt><dd>Press M to expand the minimap. Select a floor and click to walk there. Turn on Teleport to place the robot directly. Press M or Escape to close the map.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character in the lower-right corner to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
-      <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair or BONDHOLMEN sofa. The F pane appears. Press F to walk into position and sit, then F to stand. You can also click supported seating to walk to it.</dd></div>
+      <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair or KIVIK sofa. The F pane appears. Press F to walk into position and sit, then F to stand. You can also click supported seating to walk to it.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>
       <div><dt>Enter the world</dt><dd>Select Play. Satellite views zoom from the Bay Area to NVIDIA Building K, then open the apartment. Light and dark themes select day and night. Select Controls to open the panels.</dd></div>
       <div><dt>Change the camera</dt><dd>Move the mouse to look around. Hold Alt for the cursor; release it to look again. Drag also works while the cursor is free. Scroll to zoom. Press V to cycle views.</dd></div>

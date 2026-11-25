@@ -125,7 +125,7 @@ the sit policy ships with; the first is the fixture's. Swapping a checkpoint is 
   seat block. Standing still, the walking policy drifts 3–5 cm in half a second, so the sit-down starts on arrival,
   within 3 cm along the seat, 6 cm across and 0.1 rad, below 0.2 m/s. The clip is placed on the seat (its own seat on
   the real one), so the policy steps the last centimetres as it sits.
-- **Sofas.** Two real-size BONDHOLMEN sofas with KUDDARNA pads provide support inside the clips' height range.
+- **Sofas.** Two upholstered KIVIK sofas at 80% uniform scale provide support inside the clips' height range.
   The robot walks into position. Their policy references include the carpet's measured 28.8 mm elevation.
 - **Seated.** The policy keeps tracking the clip's last frame. Standing up places the stand-up clip at the robot,
   as the task's resets do. After 60% of the stand clip, walking can take over when an upright standing stance has
@@ -168,7 +168,7 @@ From the Fluctlight evaluations (mjlab, held-out starts; see `docs/research/` th
   walked away in 8 of 8 seeded walk-ups from different starts in front of the seat in the demo apartment, and in all
   eight runs of the checks in both maps; the robot sits 21–23 cm deep, as the clip does. The shipped clips were chosen from 16 candidates: 6 of 8 sit-down clips sat from the clip's own first pose,
   and 5 of 8 stand-up clips stood every time. Those earlier walk-up results used the training-sized fixture.
-  The runtime uses unscaled ULRIKSBERG chairs and two BONDHOLMEN/KUDDARNA sofa assemblies with matching catalog
+  The runtime uses unscaled ULRIKSBERG chairs and two uniformly scaled KIVIK sofas with matching catalog
   collision meshes. Sofa regression checks use four seeds, a ten-second seated hold, idle standing, and a walk over
   one metre clear. The previous KIVIK alignment assist is removed. See [seating validation and dimensions](SEATING.md).
 
