@@ -119,7 +119,7 @@ the sit policy ships with; the first is the fixture's. Swapping a checkpoint is 
 - Commands ramp at 1 m/s² and 2 rad/s², since the training commands are stride averages that never jump.
 - With no command the walking policy shuffles about 7 cm/s; `src/simulation.js` holds the place where the robot came
   to rest, and the route follower holds the point of an in-place turn (see [navigation](NAVIGATION.md)).
-- **Sit.** Asked to sit (T, the Sit button, or a click on the seat), the robot routes to a point 75 cm in front of
+- **Sit.** Asked to sit (F near a supported chair, the Sit button, or a click on the chair), the robot routes to a point 85 cm in front of
   the seat (`src/seat.js`), turns its back to it, and backs up on a pose controller to 9 cm in front of the sit-down
   clip's first pose; that pose has the pelvis over the seat's front edge, where Lite Pro's heels already meet the
   seat block. Standing still, the walking policy drifts 3–5 cm in half a second, so the sit-down starts on arrival,
@@ -163,8 +163,9 @@ From the Fluctlight evaluations (mjlab, held-out starts; see `docs/research/` th
   the BONES-SEED chair clips (mjlab, `evaluate-sit --seat nominal`). In the browser, the shipped clips sat, stood up and
   walked away in 8 of 8 seeded walk-ups from different starts in front of the seat in the demo apartment, and in all
   eight runs of the checks in both maps; the robot sits 21–23 cm deep, as the clip does. The shipped clips were chosen from 16 candidates: 6 of 8 sit-down clips sat from the clip's own first pose,
-  and 5 of 8 stand-up clips stood every time. The apartments' sofas and armchairs are 6–13 cm higher than any
-  trained seat, so the robot sits only on the Lite Pro seat.
+  and 5 of 8 stand-up clips stood every time. Those earlier walk-up results used the training-sized fixture.
+  The runtime now uses unscaled ULRIKSBERG chairs with matching catalog collision meshes. Other high sofas and
+  chairs do not offer sitting. See [seating validation and dimensions](SEATING.md).
 
 In the apartments:
 

@@ -354,10 +354,10 @@ function PlaygroundControls() {
       <div><dt>Move manually</dt><dd>In Shoulder, WASD moves relative to the camera. Q/E also move sideways. The robot turns toward travel. In other views, A/D turns. Hold Shift for twice the speed.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
-      <div><dt>Sit down</dt><dd>Press T, select Sit, or click the Lite Pro seat. The robot walks there, lines up and sits. Press T again to stand up.</dd></div>
+      <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair. The F pane appears. Press F to line up and sit, then F to stand. You can also click a chair to walk to it.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>
       <div><dt>Enter the world</dt><dd>Select Play. Satellite views zoom from the Bay Area to NVIDIA Building K, then open the apartment. Light and dark themes select day and night. Select Controls to open the panels.</dd></div>
-      <div><dt>Change the camera</dt><dd>Move the mouse to look around. Alt releases or captures the cursor. Drag also works when it is free. Scroll to zoom. The figure blurs and fades near the lens. Press V to cycle views.</dd></div>
+      <div><dt>Change the camera</dt><dd>Move the mouse to look around. Hold Alt for the cursor; release it to look again. Drag also works while the cursor is free. Scroll to zoom. Press V to cycle views.</dd></div>
     </dl><p>The playground clears held keys when the window loses focus. It pauses physics when you hide the page.</p></div>
   </details>;
 }

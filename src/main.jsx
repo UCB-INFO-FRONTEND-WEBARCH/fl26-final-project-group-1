@@ -6,6 +6,7 @@ import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } fr
 import { Icon } from './icons.jsx';
 import { SiteHeader } from './site_header.jsx';
 import { IDLE_NAVIGATION } from './navigation.js';
+import { SEATS } from './seat.js';
 import { FLOOR_NAMES, FLOOR_HEIGHT, ELEVATOR, STAIRS, BUILDING_BOUNDS, on_stairs } from './building.js';
 import { SITE_BASE } from './asset_paths.js';
 import { CHARACTER_ASSET } from './character_asset.js';
@@ -13,6 +14,7 @@ import { ThemeToggle } from './theme_toggle.jsx';
 import { ARRIVAL_LEVELS } from './arrival_levels.js';
 import './style.css';
 import './entry.css';
+import './game_hud.css';
 
 const INITIAL_TELEMETRY = {
   position: SPAWN,
@@ -36,10 +38,10 @@ const INITIAL_TELEMETRY = {
   seat: { available: false, can_sit: false, can_stand: false, approach: null, message: null },
 };
 const POLICY_LABELS = { walk: 'Walk', walk_stairs: 'Stairs', getup_supine: 'Get up (back)', getup_prone: 'Get up (front)', sit: 'Sit (chair clip)' };
-const SEAT_STATUS = { sit_down: 'Sitting down', seated: 'Seated · T stands up', stand_up: 'Standing up' };
+const SEAT_STATUS = { sit_down: 'Sitting down', seated: 'Seated', stand_up: 'Standing up' };
 const SEAT_MESSAGES = {
   sit_down: 'Sitting down: the policy tracks a chair clip placed on the seat.',
-  seated: 'Seated on the Lite Pro seat. Press T to stand up.',
+  seated: 'Seated. Press F to stand up.',
   stand_up: 'Standing up. Walking resumes once it stands still.',
 };
 const CONTROL_KEYS = [
@@ -62,7 +64,7 @@ function capture_cursor() {
   catch (error) { rejected(error); }
 }
 
-function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode, children }) {
+function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode, local_view, children }) {
   const svg_ref = useRef(null);
   const drag_ref = useRef(null);
   const [drop_point, set_drop_point] = useState(null);
@@ -97,17 +99,19 @@ function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode,
     onPointerCancel: event => finish_drag(event, true), onLostPointerCapture: event => finish_drag(event, true),
     onClick: event => event.stopPropagation() };
   return (
-    <div className="minimap">
+    <div className={`minimap ${local_view ? 'local-map' : ''}`}>
       <div className="map-heading">
         <span>
-          <span className="tiny-square" /> {MAP_TITLE}
+          <span className="tiny-square" /> {local_view ? FLOOR_NAMES[floor] : MAP_TITLE}
         </span>
         <span>{FLOOR_NAMES[floor]} · {MAP_SIZE}</span>
         <button className="teleport-grab" aria-label="Grab robot to teleport" title="Drag the robot onto open floor"
           {...drag_handlers}><Icon name="robot" size={19} /></button>
       </div>
       {children}
-      <svg ref={svg_ref} viewBox={`${BUILDING_BOUNDS[0]-.5} ${-BUILDING_BOUNDS[3]-.5} ${BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]+1} ${BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]+1}`} aria-label="Floor plan: click an open spot to set a destination" role="img"
+      <svg ref={svg_ref} viewBox={local_view
+        ? `${telemetry.position[0] - 4.5} ${-telemetry.position[1] - 4.5} 9 9`
+        : `${BUILDING_BOUNDS[0]-.5} ${-BUILDING_BOUNDS[3]-.5} ${BUILDING_BOUNDS[1]-BUILDING_BOUNDS[0]+1} ${BUILDING_BOUNDS[3]-BUILDING_BOUNDS[2]+1}`} aria-label="Floor plan: click an open spot to set a destination" role="img"
         onClick={event => {
           on_destination(map_point(event));
         }}>
@@ -149,6 +153,9 @@ function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode,
           })}
           {telemetry.navigation?.goal && (telemetry.navigation.goal[2] === floor || on_stairs(telemetry.navigation.goal)) &&
             <circle cx={telemetry.navigation.goal[0]} cy={telemetry.navigation.goal[1]} r="0.2" fill="#0071e3" />}
+          {SEATS.filter(seat => seat.floor === floor).map(seat => <circle key={seat.id} className="map-seat"
+            cx={seat.front[0]} cy={seat.front[1]} r="0.14"
+            data-nearby={telemetry.seat?.nearby?.id === seat.id} />)}
           <g className="map-robot" opacity={telemetry.floor === floor ? 1 : 0.2} {...drag_handlers}
             transform={`translate(${telemetry.position[0]},${telemetry.position[1]}) rotate(${(telemetry.heading * 180) / Math.PI})`}
           >
@@ -188,6 +195,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const preview_ref = useRef(null);
   const worker_ref = useRef(null);
   const keys_ref = useRef(new Set());
+  const alt_held_ref = useRef(false);
   const shift_ref = useRef(false);
   const telemetry_ref = useRef(INITIAL_TELEMETRY);
   const speed_ref = useRef(0.6);
@@ -262,10 +270,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     if (keys_ref.current.size) send_command();
   }
 
-  function toggle_cursor() {
+  function resume_cursor() {
+    if (alt_held_ref.current) return;
     release_keys();
-    if (document.pointerLockElement) document.exitPointerLock();
-    else capture_cursor();
+    capture_cursor();
   }
 
   function navigate(goal) {
@@ -304,16 +312,17 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   }
 
   /** Walk to the Lite Pro seat and sit, or stand up from it. */
-  function toggle_seat() {
+  function toggle_seat(id) {
     const current = telemetry_ref.current;
+    const seat_id = typeof id === 'string' ? id : current.seat?.nearby?.id;
     if (!ready_ref.current || current.fallen || current.paused) return;
     if (current.seat?.can_stand) {
       worker_ref.current?.postMessage({ type: 'stand' });
     } else if (current.seat?.approach) {
       cancel_navigation();
-    } else if (current.seat?.can_sit) {
+    } else if (seat_id && current.seat?.available && current.mode === 'walk') {
       release_keys();
-      worker_ref.current?.postMessage({ type: 'sit' });
+      worker_ref.current?.postMessage({ type: 'sit', seat_id });
     }
   }
 
@@ -404,7 +413,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer, () => {
           if (keys_ref.current.size) send_command();
         });
-        view.on_seat = () => { if (telemetry_ref.current.seat?.can_sit) toggle_seat(); };
+        view.on_seat = id => toggle_seat(id);
         view_ref.current = view;
         view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
@@ -462,6 +471,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 message.telemetry.seat?.message !== telemetry_ref.current.seat?.message ||
                 message.telemetry.seat?.can_sit !== telemetry_ref.current.seat?.can_sit ||
                 message.telemetry.seat?.can_stand !== telemetry_ref.current.seat?.can_stand ||
+                message.telemetry.seat?.nearby?.id !== telemetry_ref.current.seat?.nearby?.id ||
                 message.telemetry.paused !== telemetry_ref.current.paused;
               telemetry_ref.current = message.telemetry;
               const now = performance.now();
@@ -503,7 +513,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       }
       if (event.key === 'Alt') {
         event.preventDefault();
-        if (!event.repeat) toggle_cursor();
+        if (!alt_held_ref.current) {
+          alt_held_ref.current = true;
+          release_keys();
+          if (document.pointerLockElement) document.exitPointerLock();
+        }
         return;
       }
       if (phase_ref.current !== 'playing') return;
@@ -533,10 +547,18 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         toggle_pause();
       }
       if (event.code === 'KeyR') reset();
-      if (event.code === 'KeyT') toggle_seat();
+      if (event.code === 'KeyF') toggle_seat();
       if (event.code === 'KeyV' || event.code === 'KeyC') cycle_camera();
     };
     const key_up = (event) => {
+      if (event.key === 'Alt') {
+        event.preventDefault();
+        if (alt_held_ref.current) {
+          alt_held_ref.current = false;
+          if (!document.hidden) capture_cursor();
+        }
+        return;
+      }
       if (event.key === 'Shift') {
         change_shift(event.shiftKey);
         return;
@@ -547,7 +569,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         send_command();
       }
     };
-    const lose_focus = () => release_keys();
+    const lose_focus = () => { alt_held_ref.current = false; release_keys(); };
     const cursor_change = () => {
       set_cursor_locked(Boolean(document.pointerLockElement));
       if (!document.pointerLockElement) release_keys();
@@ -608,6 +630,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           ? 'Paused'
           : 'Simulation live';
   const heading = ((((telemetry.heading * 180) / Math.PI) % 360) + 360) % 360;
+  const interaction_seat = telemetry.seat?.can_stand || telemetry.seat?.approach
+    ? telemetry.seat.active : telemetry.seat?.nearby;
+  const interaction_action = telemetry.seat?.can_stand ? 'Stand up'
+    : telemetry.seat?.approach ? 'Cancel' : telemetry.seat?.can_sit ? 'Sit down' : null;
   const minutes = Math.floor(telemetry.time / 60)
     .toString()
     .padStart(2, '0');
@@ -679,7 +705,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 )}
               </output>
             )}
-            {ready && <MiniMap telemetry={telemetry}
+            {ready && <MiniMap telemetry={telemetry} local_view={!controls_open && !teleport_open}
               floor={teleport_open ? teleport_floor : viewed_floor === 'all' ? telemetry.floor : viewed_floor}
               on_destination={teleport_open ? teleport : navigate} on_teleport={teleport} teleport_mode={teleport_open}>
               {teleport_open && <div className="teleport-tools">
@@ -728,14 +754,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               {telemetry.seat?.available && <button className="secondary-button"
                 disabled={!ready || telemetry.fallen || telemetry.paused || !(telemetry.seat.can_sit || telemetry.seat.can_stand || telemetry.seat.approach)}
                 onClick={toggle_seat}>
-                {telemetry.seat.can_stand ? 'Stand up' : telemetry.seat.approach ? 'Cancel sit' : 'Sit'}<kbd>T</kbd>
+                {telemetry.seat.can_stand ? 'Stand up' : telemetry.seat.approach ? 'Cancel sit' : 'Sit'}<kbd>F</kbd>
               </button>}
-            </div>
-            <div className="figure-switch" role="group" aria-label="Figure appearance">
-              {['robot', 'character'].map(value => <button key={value} aria-pressed={figure === value}
-                disabled={!ready || (value === 'character' && character_loading)} onClick={() => change_figure(value)}>
-                {value === 'robot' ? 'Robot' : 'Character'}
-              </button>)}
             </div>
             <div className="session-stats">
               <span>
@@ -827,9 +847,6 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 <kbd>Q</kbd>
                 <kbd>E</kbd> Strafe
               </span>
-              {telemetry.seat?.available && <span>
-                <kbd>T</kbd> Sit on the seat / stand up
-              </span>}
             </div>
             <div className="speed-label">
               <label htmlFor="walking-speed">Speed</label>
@@ -924,18 +941,37 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           <div className="game-menu">
             <span className="game-status">{status}</span>
             <ThemeToggle />
-            <button aria-expanded={teleport_open} title="Place the robot on either floor" onClick={open_teleport}>Teleport</button>
+            <button aria-label={telemetry.paused ? 'Resume simulation' : 'Pause simulation'} title="Space · Pause"
+              disabled={!ready || telemetry.fallen} onClick={toggle_pause}>
+              <Icon name={telemetry.paused ? 'play' : 'pause'} size={18} /></button>
+            <button aria-label="Reset robot" title="R · Reset" disabled={!ready} onClick={reset}><Icon name="reset" size={18} /></button>
+            <button aria-label="Teleport" aria-expanded={teleport_open} title="Teleport" onClick={open_teleport}><Icon name="teleport" size={18} /></button>
             <button aria-expanded={controls_open} aria-controls="game-controls"
-              onClick={() => set_controls_open(!controls_open)}>{controls_open ? 'Close controls' : 'Controls'}</button>
+              aria-label={controls_open ? 'Close controls' : 'Controls'} title="Controls"
+              onClick={() => set_controls_open(!controls_open)}><Icon name="controls" size={18} /></button>
             <button onClick={on_exit} aria-label="Exit to site"><Icon name="close" size={18} /></button>
           </div>
         </div>
+        <div className="figure-switch game-figure-switch" role="group" aria-label="Figure appearance">
+          {['robot', 'character'].map(value => <button key={value} aria-pressed={figure === value}
+            disabled={!ready || (value === 'character' && character_loading)} onClick={() => change_figure(value)}>
+            <Icon name={value === 'robot' ? 'robot' : 'person'} size={23} />
+            <span>{value === 'robot' ? 'Robot' : 'Character'}</span>
+          </button>)}
+        </div>
+        {interaction_seat && interaction_action && !teleport_open && <div className="interaction-pane" role="group" aria-label="Furniture interaction">
+          <div className="interaction-name"><span className="interaction-symbol"><Icon name="seat" size={20} /></span>
+            <span>{interaction_seat.name}<small>{interaction_seat.kind}</small></span></div>
+          <button onClick={() => toggle_seat(interaction_seat.id)} disabled={telemetry.paused}
+            aria-label={`${interaction_action} · ${interaction_seat.name}`} aria-keyshortcuts="F">
+            <kbd>F</kbd><Icon name="seat" size={18} /><strong>{interaction_action}</strong><span>›</span>
+          </button>
+        </div>}
         <div className="game-key-hint">
           {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span>
-            {telemetry.seat?.available && <span><kbd>T</kbd> {telemetry.seat.can_stand ? 'Stand up' : 'Sit'}</span>}
             <span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></>}
-          <button onClick={toggle_cursor} aria-pressed={cursor_locked} title="Alt toggles mouse capture">
-            <kbd>ALT</kbd> {cursor_locked ? 'Cursor' : 'Capture mouse'}</button>
+          <button onClick={resume_cursor} aria-pressed={cursor_locked} title="Hold Alt for the cursor; release to look">
+            <kbd>ALT</kbd> {cursor_locked ? 'Hold for cursor' : 'Look'}</button>
         </div>
       </>}
     </div>

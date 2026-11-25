@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { FURNITURE_ASSETS } from '../src/furniture_assets.js';
+import { SEATING_ASSETS } from '../src/seating_assets.js';
 import { model_path, image_path } from '../src/asset_paths.js';
 
 const [base, site] = process.argv.slice(2);
@@ -25,7 +26,7 @@ const image_column = manifest.columns.indexOf('image');
 assert.ok(id_column >= 0 && image_column >= 0, 'Catalog identity or image columns are missing');
 const articles = new Map(rows.map((row) => [row[id_column], row]));
 
-await Promise.all(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
+await Promise.all(Object.entries({ ...FURNITURE_ASSETS, ...SEATING_ASSETS }).map(async ([article, asset]) => {
   const row = articles.get(article);
   assert.ok(row, `Playground article ${article} is missing from the catalog`);
   const response = await read(model_path(article));

@@ -2,7 +2,7 @@ import { IS_HEPHAESTUS, MAP } from './world.js';
 import { point_in_ring } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS } from './scene_layout.js';
 import { BUILDING_BOUNDS, FLOOR_HEIGHT, STAIRS, SHAFT_BOXES } from './building.js';
-import { SEAT, seat_footprint } from './seat.js';
+import { SEATS, seat_footprint } from './seat.js';
 
 export function convex_hull(points) {
   const sorted = [...new Map(points.map(point => [point.join(','), point])).values()]
@@ -236,8 +236,7 @@ export class NavigationMap {
 }
 
 export function make_navigation_maps() {
-  // The Lite Pro seat is the one obstacle that is not part of either map's own furniture.
-  const seat = floor => floor === SEAT.floor ? [seat_footprint(SEAT)] : [];
+  const seat = floor => SEATS.filter(seat => seat.floor === floor).map(seat_footprint);
   if(IS_HEPHAESTUS) return [0,1].map(floor=>new NavigationMap(
     seat(floor),MAP.bounds,.1,.52,.3,MAP.floor_areas[floor]));
   const boxes = [...SCENE_WALLS, ...SHAFT_BOXES];

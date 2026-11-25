@@ -6,7 +6,7 @@ import { Elevator } from './elevator.js';
 import { Navigation, hold_position, hold_point } from './navigation.js';
 import { ELEVATOR, FLOOR_HEIGHT, STANDING_HEIGHT, floor_of } from './building.js';
 import { teleport_position } from './teleport.js';
-import { SEAT, SeatApproach, seat_pose } from './seat.js';
+import { SEAT, SEATS, SeatApproach, seat_pose, nearby_seat } from './seat.js';
 
 const OBJ_GEOM = 5;
 // Standing still, the walking policy shuffles about 7 cm/s in one direction (0.7 m in 10 s), into furniture or out of
@@ -39,17 +39,22 @@ export class Simulation {
 
   get action() { return this.controller.last_action; }
   /** The seat pose the sit policy reads: front edge, surface height and yaw. */
-  get seat() { return seat_pose(SEAT, SEAT.floor * FLOOR_HEIGHT); }
+  get seat() { return seat_pose(this.active_seat ?? SEAT); }
   get joint_qpos() { return this.controller.body.joint_qpos; }
   get mode() { return this.controller.mode; }
 
   /** Walk to the seat, line up with it, and sit down. */
-  request_sit() {
+  request_sit(id) {
     if (!this.controller.can_sit || this.fallen) return false;
+    const seat = id ? SEATS.find(seat => seat.id === id)
+      : nearby_seat(this.state.qpos, floor_of(this.state.qpos), this.navigation?.maps);
+    if (!seat) return false;
+    this.active_seat = seat;
+    this.camera_motion = null;
     this.navigation?.cancel();
     this.command = [0, 0, 0];
     this.seat_message = null;
-    this.approach = new SeatApproach(SEAT, this.controller.sit_start(this.seat), this.navigation);
+    this.approach = new SeatApproach(seat, this.controller.sit_start(this.seat), this.navigation);
     if (this.navigation) this.approach.begin(this.state.qpos, this.step_count * PHYSICS_DT);
     else this.approach.set_phase('align');
     if (this.approach.phase === 'failed') return this.end_approach();
@@ -65,6 +70,7 @@ export class Simulation {
     if (!this.approach) return false;
     if (this.approach.phase === 'failed') this.seat_message = this.approach.message;
     this.approach = null;
+    if (this.controller.mode === MODE.WALK) this.active_seat = null;
     this.navigation?.cancel();
     this.command = [0, 0, 0];
     return false;
@@ -113,6 +119,7 @@ export class Simulation {
     this.teleport_requested = null;
     this.approach = null;
     this.seat_message = null;
+    this.active_seat = null;
     this.idle_anchor = null;
     this.elevator?.reset();
     this.elevator?.advance(this.state, 0);
@@ -146,6 +153,7 @@ export class Simulation {
     }
     this.controller.reset();
     this.command = [0, 0, 0];
+    this.active_seat = null;
     this.fallen = false;
     this.teleport_requested = null;
     this.idle_anchor = null;
@@ -163,7 +171,7 @@ export class Simulation {
       if (this.approach.phase === 'ready') {
         this.approach = null;
         this.command = [0, 0, 0];
-        this.controller.sit(this.seat, SEAT.floor * FLOOR_HEIGHT);
+        this.controller.sit(this.seat, this.active_seat.floor * FLOOR_HEIGHT);
       } else if (this.approach.phase === 'failed') this.end_approach();
       return this.command;
     }
@@ -255,6 +263,8 @@ export class Simulation {
   get can_stand() { return this.controller.can_stand && !this.fallen; }
 
   telemetry() {
+    const nearest = nearby_seat(this.state.qpos, floor_of(this.state.qpos), this.navigation?.maps);
+    const describe = seat => seat ? { id: seat.id, name: seat.label, kind: seat.kind, floor: seat.floor } : null;
     return {
       position: Array.from(this.state.qpos.slice(0, 3)),
       heading: heading_from_quaternion(this.state.qpos),
@@ -271,8 +281,10 @@ export class Simulation {
       navigation: this.navigation?.state,
       seat: {
         available: Boolean(this.controller.clips),
-        can_sit: this.can_sit && !this.approach,
+        can_sit: this.can_sit && !this.approach && Boolean(nearest),
         can_stand: this.can_stand,
+        nearby: describe(nearest),
+        active: describe(this.active_seat),
         approach: this.approach ? { phase: this.approach.phase, message: this.approach.message } : null,
         message: this.seat_message,
       },

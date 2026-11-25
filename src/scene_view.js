@@ -17,7 +17,8 @@ import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPAWN_YAW } from './scene_layout.js';
-import { SEAT, SEAT_SIZE, seat_boxes, from_seat } from './seat.js';
+import { SEATS } from './seat.js';
+import { SEATING_ASSETS } from './seating_assets.js';
 
 function floor_label(text, width, color = '#85858d') {
   const canvas = document.createElement('canvas');
@@ -241,44 +242,50 @@ export class SceneView {
     this.scene.add(this.robot_marker, this.robot_shadow);
     this.navigation_overlay = new NavigationOverlay();
     this.scene.add(this.navigation_overlay);
-    this.add_seat();
     this.set_floor(0);
   }
 
-  /** The Lite Pro seat (src/seat.js), drawn as its physical boxes: a base, a cushion on top, and the backrest. */
-  add_seat() {
-    const floor_z = SEAT.floor * FLOOR_HEIGHT;
-    const [block, back] = seat_boxes(SEAT, floor_z);
-    const cushion_height = 0.06;
-    const fabric = new THREE.MeshLambertMaterial({ color: '#7f9bb3' });
-    const base = new THREE.MeshLambertMaterial({ color: '#4d5b69' });
-    const box = ({ center, size, yaw }, material) => {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
-      mesh.position.set(...center);
-      mesh.rotation.z = yaw;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      return mesh;
-    };
-    const group = new THREE.Group();
-    group.name = SEAT.name;
-    const [bx, by, bz] = block.center;
-    group.add(box({ ...block, center: [bx, by, bz - cushion_height / 2], size: [block.size[0], block.size[1], block.size[2] - cushion_height] }, base));
-    group.add(box({ ...block, center: [bx, by, floor_z + SEAT_SIZE.height - cushion_height / 2], size: [block.size[0], block.size[1], cushion_height] }, fabric));
-    group.add(box(back, fabric));
-    const label = floor_label('LITE PRO SEAT', 1.3, '#5f7d95');
-    label.position.set(...from_seat(SEAT, 0.42, 0), floor_z + 0.016);
-    label.rotation.z = SEAT.yaw + Math.PI / 2; // reads from in front of the seat
-    group.add(label);
-    group.updateMatrixWorld(true);
-    group.traverse((object) => { object.matrixAutoUpdate = false; });
-    this.seat_group = group;
-    // Not a camera obstacle: the backrest is 80 cm tall, and the shoulder camera looks over it at a seated robot.
-    this.floor_groups[SEAT.floor].add(group);
+  async load_seating() {
+    const { loader, draco } = create_model_loader();
+    const signal = this.furniture_abort.signal;
+    this.seat_groups = [];
+    try {
+      await Promise.all(Object.entries(SEATING_ASSETS).map(async ([article, asset]) => {
+        const response = await fetch(`${IKEA_BASE}${model_path(article)}`, { signal });
+        if (!response.ok) throw new Error(`Could not load IKEA seating ${article}.`);
+        const bytes = await response.arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        const hash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+        if (hash !== asset.sha256) throw new Error(`IKEA seating ${article} differs from its collision mesh.`);
+        const gltf = await loader.parseAsync(bytes, '');
+        if (signal.aborted) { dispose_model(gltf.scene); return; }
+        gltf.scene.position.sub(new THREE.Vector3(...asset.origin));
+        const upright = new THREE.Group();
+        upright.rotation.x = Math.PI / 2;
+        upright.add(gltf.scene);
+        for (const seat of SEATS.filter(seat => seat.article === article)) {
+          const group = new THREE.Group();
+          group.name = seat.id;
+          group.userData.seat_id = seat.id;
+          group.position.set(...seat.position);
+          group.rotation.z = seat.model_yaw;
+          group.add(upright.clone(true));
+          group.updateMatrixWorld(true);
+          group.traverse(object => {
+            object.matrixAutoUpdate = false;
+            if (object.isMesh) object.castShadow = object.receiveShadow = true;
+          });
+          // These low seats stay below the lens when seated; a full body AABB would trap the shoulder camera.
+          this.floor_groups[seat.floor].add(group);
+          this.seat_groups.push(group);
+        }
+      }));
+    } finally { draco.dispose(); }
   }
 
   async load_furniture() {
-    if (IS_HEPHAESTUS) return this.load_native_map();
+    if (IS_HEPHAESTUS) return Promise.all([this.load_native_map(), this.load_seating()]);
+    await this.load_seating();
     const { loader, draco } = create_model_loader();
     const signal = this.furniture_abort.signal;
     const results = await Promise.allSettled(Object.entries(FURNITURE_ASSETS).map(async ([article, asset]) => {
@@ -372,7 +379,6 @@ export class SceneView {
     this.scene.add(this.robot_marker,this.robot_shadow);
     this.navigation_overlay = new NavigationOverlay();
     this.scene.add(this.navigation_overlay);
-    this.add_seat();
     this.renderer.localClippingEnabled=true;
   }
 
@@ -794,11 +800,15 @@ export class SceneView {
       surfaces.push(this.stair_mesh);
       if (this.lift_open_floor >= 0 && (this.viewed_floor === 'all' || this.lift_open_floor === this.viewed_floor)) surfaces.push(this.lift_deck);
       // A click on the seat asks the robot to sit on it.
-      if (this.seat_group && this.on_seat && (this.viewed_floor === 'all' || this.viewed_floor === SEAT.floor)) {
-        const seat_hit = raycaster.intersectObject(this.seat_group, true).find((h) => h.object.isMesh && h.object.geometry.type === 'BoxGeometry');
+      if (this.seat_groups && this.on_seat) {
+        const groups = this.seat_groups.filter(group => this.viewed_floor === 'all' ||
+          SEATS.find(seat => seat.id === group.userData.seat_id).floor === this.viewed_floor);
+        const seat_hit = raycaster.intersectObjects(groups, true)[0];
         const floor_hit = raycaster.intersectObjects(surfaces, false)[0];
         if (seat_hit && (!floor_hit || seat_hit.distance <= floor_hit.distance)) {
-          this.on_seat();
+          let object = seat_hit.object;
+          while (object && !object.userData.seat_id) object = object.parent;
+          this.on_seat(object.userData.seat_id);
           canvas.focus({ preventScroll: true });
           return;
         }

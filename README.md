@@ -5,7 +5,7 @@ Lite Pro in a furnished, two-floor apartment. Five learned policies from Fluctli
 control its 34 body joints: walking on flat ground, walking on stairs with an elevation
 map, getting up from the back or the front, and sitting down on a seat and standing up.
 A state machine switches between them, so Lite Pro gets up by itself after a fall and
-can walk to the Lite Pro seat, sit, and stand again.
+can walk to compatible IKEA chairs, sit, and stand again.
 MuJoCo simulates the robot, stairs, and furniture in the browser. The default
 playground is the furnished Hephaestus Tower roof apartment and mezzanine,
 exported from the calibrated V20 Blender project. The surrounding highrise is
@@ -168,16 +168,16 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Q / E | Strafe left / right |
 | Shift + movement key | Double movement and turning commands while held |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
-| T, **Sit**, or a click on the seat | Walk to the Lite Pro seat and sit; T again stands up |
+| F near a supported chair | Line up and sit; F again stands up. Clicking a chair also routes to it |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
 | V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
-| Alt | Release / capture the mouse; Escape also releases it |
+| Hold Alt | Free the cursor while held; release Alt to capture it again. Escape also releases it |
 | Mouse drag / right-drag / scroll | Look around / look around / zoom in Shoulder; orbit / pan / zoom in Follow and Orbit |
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
-Play captures the mouse. Move it to look around; press Alt to free the cursor for menus and map clicks.
-Press Alt again or select **Capture mouse** to resume looking. Drag also works while the cursor is free.
+Play requests mouse capture. Move it to look around; hold Alt for menus and map clicks.
+Release Alt to resume looking. Drag also works if the browser does not permit capture.
 In Shoulder view, WASD moves relative to the camera; Q/E also move sideways. Diagonal input keeps the
 same travel speed. The robot turns toward travel, and the camera keeps its world heading while it follows.
 Drag to look around; scroll to zoom. Near the body, only the figure blurs and fades. It is hidden before
@@ -221,9 +221,10 @@ Select Resume to continue.
 - The walking policies handle flat ground and stairs. Theta* supplies the global route.
 - After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
   Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
-- Each map has one **Lite Pro seat**, sized like the seat the sit policy trained on (35 cm high, with a backrest):
-  east of the main lounge in Hephaestus, and in the living room's south half in the demo apartment. The apartments'
-  sofas and armchairs (41–48 cm) are higher than the chair clips for a 1.2 m robot allow.
+- Five real-scale **ULRIKSBERG** armchairs support sitting in Hephaestus: three downstairs and two on the mezzanine.
+  The demo has one on each floor. A nearby F pane offers sitting or standing. The other sofas and chairs remain
+  decorative because their support heights exceed the shipped clip's range. See [seating](docs/SEATING.md).
+- The in-game HUD uses compact action icons, a local minimap, figure cards, and a contextual interaction pane.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
 Cross-floor routes attempt the original stair path. The asset library uses
@@ -339,7 +340,10 @@ src/hephaestus_physics.js      Generated convex contacts, worker-only bundle
 public/assets/hephaestus/      Optimized room/tower GLBs and native finish bakes
 src/fluctlight_policy.js       Policy contracts: observations, elevation map, motors, contacts
 src/robot_controller.js        State machine: walking, stairs, falls, get-ups, and sitting
-src/seat.js                    The Lite Pro seat of each map and the walk that lines up with it
+src/seat.js                    Seat proximity, anchors, and the walk that lines up with a seat
+src/seating_layout.js          Catalog seat profiles and per-floor sitting locations
+src/seating_assets.js          Generated convex colliders for unscaled IKEA seating
+src/game_hud.css               In-game HUD and furniture interaction pane
 src/policy_constants.js        Generated constants from the Fluctlight bundle
 src/locomotion.js              Timing, joint names, keyboard commands, and heading
 src/simulation.js              Physical stepping, reset, and routing

@@ -70,9 +70,11 @@ where it came to rest. Standing still, the walking policy shuffles about 7 cm/s 
 one direction; the hold keeps it within about 10 cm. Every hold sends corrections of
 at least 0.1 m/s, since the policy ignores smaller commands.
 
-**Sit** routes to a point 75 cm in front of the Lite Pro seat, then a pose
+**Sit** routes to a point 85 cm in front of the selected catalog chair, then a pose
 controller turns the robot's back to the seat and backs it up to where the
 sit-down clip starts (see [policy integration](POLICY.md)).
+The nearby F prompt selects only a chair on the robot's floor with a clear approach.
+Each chair is a physical obstacle in both the planning and tracking maps.
 
 The elevator has a gravity-compensated slide joint and a separate position servo.
 Travel is limited to 0.3 m/s with gradual acceleration. Landing gates close when

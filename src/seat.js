@@ -1,12 +1,8 @@
-// The Lite Pro seat of each map, and the walk that lines the robot up in front of it.
-//
-// The sit policy (Fluctlight Lite-Pro-Sit-Head) trained on one kind of seat: a block from the floor to a flat seat at
-// the height of the chair clip it tracks, 55 cm wide, with a backrest whose front face stands about 52 cm behind the
-// front edge (the clip's seat depth plus a gap). The apartments' own sofas and armchairs sit 41 to 48 cm high, above
-// the 30 to 38 cm of the clips for a 1.2 m robot, so each map gets one seat of the trained kind.
-//
-// A seat is the middle of its front edge (x, y on its floor), the direction a sitter faces (yaw), and its floor.
-import { IS_HEPHAESTUS } from './world.js';
+// Catalog seating anchors and the physical walk-up that aligns the robot with a sit clip.
+import { SEAT, SEATS } from './seating_layout.js';
+import { SEATING_ASSETS } from './seating_assets.js';
+import { FLOOR_HEIGHT } from './building.js';
+export { SEAT, SEATS } from './seating_layout.js';
 
 export const SEAT_SIZE = Object.freeze({
   height: 0.35, // m, seat surface above the floor (the shipped clips' seats are 34.8 and 36.0 cm)
@@ -16,15 +12,9 @@ export const SEAT_SIZE = Object.freeze({
   backrest_thickness: 0.05,
 });
 
-export const SEAT = Object.freeze(IS_HEPHAESTUS
-  // East of the main lounge, facing it, in the open floor between the lounge and the reading nook.
-  ? { name: 'lite_pro_seat', front: [7.0, 0.0], yaw: Math.PI, floor: 0 }
-  // In the living room's south half, facing north into the room.
-  : { name: 'lite_pro_seat', front: [-2.6, -5.9], yaw: Math.PI / 2, floor: 0 });
-
 /** The seat pose the sit policy observes: front edge x, y, the seat surface's z, and yaw. */
-export function seat_pose(seat = SEAT, floor_height = 0) {
-  return [seat.front[0], seat.front[1], floor_height + SEAT_SIZE.height, seat.yaw];
+export function seat_pose(seat = SEAT, floor_height = seat.floor * FLOOR_HEIGHT) {
+  return [seat.front[0], seat.front[1], floor_height + seat.height, seat.yaw];
 }
 
 /** A point given in the seat frame (x toward the sitter's front, from the middle of the front edge), in the world. */
@@ -40,7 +30,7 @@ export function to_seat(seat, point) {
   return [c * dx + s * dy, -s * dx + c * dy];
 }
 
-/** The seat's boxes: the block under the seat surface and the backrest, as {name, center, size, yaw}. */
+/** The training fixture used by the offline explainer; runtime furniture uses its catalog mesh colliders. */
 export function seat_boxes(seat = SEAT, floor_height = 0) {
   const { height, width, depth, backrest_height, backrest_thickness } = SEAT_SIZE;
   const block = from_seat(seat, -depth / 2, 0);
@@ -52,18 +42,28 @@ export function seat_boxes(seat = SEAT, floor_height = 0) {
   ];
 }
 
-/** MJCF geoms of the seat. The policy found the training seat by contact, so its friction is the default's. */
-export function seat_xml(seat = SEAT, floor_height = 0) {
-  return seat_boxes(seat, floor_height).map(({ name, center, size, yaw }) =>
-    `<geom name="${name}" type="box" pos="${center.join(' ')}" size="${size.map((v) => v / 2).join(' ')}" ` +
-    `euler="0 0 ${yaw}" friction="1 0.005 0.0001"/>`).join('\n');
-}
-
 /** The seat's footprint on its floor, for the route planner. */
 export function seat_footprint(seat = SEAT) {
-  const { width, depth, backrest_thickness } = SEAT_SIZE;
-  const back = depth + backrest_thickness;
-  return [[0, -width / 2], [0, width / 2], [-back, width / 2], [-back, -width / 2]].map(([x, y]) => from_seat(seat, x, y));
+  const [width, depth] = SEATING_ASSETS[seat.article].size;
+  const c = Math.cos(seat.model_yaw), s = Math.sin(seat.model_yaw);
+  return [[-width / 2, -depth / 2], [width / 2, -depth / 2], [width / 2, depth / 2], [-width / 2, depth / 2]]
+    .map(([x, y]) => [seat.position[0] + c * x - s * y, seat.position[1] + s * x + c * y]);
+}
+
+/** A nearby seat on this floor, approached from its front with no wall between the robot and staging point. */
+export function nearby_seat(position, floor, maps, seats = SEATS) {
+  let nearest = null, distance = 1.7;
+  for (const seat of seats) {
+    if (seat.floor !== floor) continue;
+    const [x, y] = to_seat(seat, position);
+    const reach = Math.hypot(x, y);
+    if (x < 0.05 || x > 1.6 || Math.abs(y) > 0.8 || reach >= distance) continue;
+    const staging = from_seat(seat, APPROACH.staging, 0);
+    if (maps && !maps[floor]?.line_clear(position, staging, true)) continue;
+    nearest = seat;
+    distance = reach;
+  }
+  return nearest;
 }
 
 const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -75,7 +75,7 @@ const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
 // sit-down clip is then placed on the seat, and the policy closes the stand-off as it sits (in the demo apartment it
 // sat 22 cm deep, as the clip does, from stand-offs of 8 to 9 cm, and shallower from farther out).
 export const APPROACH = Object.freeze({
-  staging: 0.75, // m in front of the front edge
+  staging: 0.85, // m in front of the front edge, clear of the chair's forward leg frame
   stand_off: 0.09, // m in front of the clip's first pose
   turn_first: 0.5, // rad of heading error above which the robot only turns
   gain: [1.2, 1.2, 1.8], // command per m (x, y) and per rad (yaw)

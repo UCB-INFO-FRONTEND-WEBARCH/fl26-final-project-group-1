@@ -1,7 +1,7 @@
 import { HEPHAESTUS_PHYSICS } from './hephaestus_physics.js';
 import { static_world_xml, hull_group } from './static_scene.js';
 import { WALKABLE_GROUP } from './geom_groups.js';
-import { SEAT, seat_xml } from './seat.js';
+import { seating_bodies } from './seating_geometry.js';
 import { IS_HEPHAESTUS, MAP } from './world.js';
 import { PHYSICS_DT } from './locomotion.js';
 import { SCENE_FURNITURE as DEMO_FURNITURE } from './furniture_layout.js';
@@ -40,9 +40,10 @@ export const ROOM_LABELS = IS_HEPHAESTUS ? MAP.rooms : [
 
 export function make_scene_xml({ spatial_cells = true } = {}) {
   if (IS_HEPHAESTUS) {
-    const meshes=HEPHAESTUS_PHYSICS.map(p=>`<mesh name="${p.name}" vertex="${p.vertices.flat().join(' ')}"/>`).join('\n');
-    const geoms=spatial_cells ? static_world_xml(HEPHAESTUS_PHYSICS) : HEPHAESTUS_PHYSICS.map(p=>`<geom name="${p.name}" type="mesh" mesh="${p.name}" group="${hull_group(p)}" density="0" friction="0.9 0.005 0.0001" margin="0"/>`).join('\n');
-    return `<mujoco model="Hephaestus Tower V20"><include file="robot.xml"/><option timestep="${PHYSICS_DT}" gravity="0 0 -9.81"/><asset>${meshes}</asset><worldbody>${geoms}${seat_xml(SEAT, SEAT.floor * FLOOR_HEIGHT)}</worldbody></mujoco>`;
+    const physics = [...HEPHAESTUS_PHYSICS, ...seating_bodies()];
+    const meshes=physics.map(p=>`<mesh name="${p.name}" vertex="${p.vertices.flat().join(' ')}"/>`).join('\n');
+    const geoms=spatial_cells ? static_world_xml(physics) : physics.map(p=>`<geom name="${p.name}" type="mesh" mesh="${p.name}" group="${hull_group(p)}" density="0" friction="0.9 0.005 0.0001" margin="0"/>`).join('\n');
+    return `<mujoco model="Hephaestus Tower V20"><include file="robot.xml"/><option timestep="${PHYSICS_DT}" gravity="0 0 -9.81"/><asset>${meshes}</asset><worldbody>${geoms}</worldbody></mujoco>`;
   }
   const walls = [0, 1].flatMap(floor => SCENE_WALLS.map(wall => box_xml({ ...wall,
     center: [wall.center[0], wall.center[1], wall.center[2] + floor * FLOOR_HEIGHT] }, floor ? 'upper_' : ''))).join('\n');
@@ -56,15 +57,17 @@ export function make_scene_xml({ spatial_cells = true } = {}) {
     ).join('\n');
     return `<body name="${item.name}" pos="${item.position.join(' ')}" euler="0 0 ${item.yaw}">${geoms}</body>`;
   }).join('\n');
+  const seats = seating_bodies();
+  const seat_meshes = seats.map(hull => `<mesh name="${hull.name}" vertex="${hull.vertices.flat().join(' ')}"/>`).join('\n');
   return `<mujoco model="Centoria IKEA apartment">
     <include file="robot.xml"/>
     <option timestep="${PHYSICS_DT}" gravity="0 0 -9.81"/>
-    <asset>${meshes}</asset>
+    <asset>${meshes}${seat_meshes}</asset>
     <worldbody>
       <geom name="floor" type="plane" size="0 0 0.1" friction="1 0.005 0.0001" group="${WALKABLE_GROUP}"/>
       ${walls}
       ${furniture}
-      ${seat_xml(SEAT, SEAT.floor * FLOOR_HEIGHT)}
+      ${static_world_xml(seats)}
       ${upper_slabs().map((slab, index) => box_xml({ ...slab, name: `upper_slab_${index}` }, '', WALKABLE_GROUP)).join('\n')}
       ${STAIR_BOXES.map(box => box_xml(box, '', WALKABLE_GROUP)).join('\n')}
       ${[...STAIR_RAIL_BOXES, ...SHAFT_BOXES].map(box => box_xml(box)).join('\n')}

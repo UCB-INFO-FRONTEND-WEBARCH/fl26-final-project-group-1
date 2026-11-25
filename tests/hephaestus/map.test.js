@@ -9,6 +9,7 @@ import {Navigation} from '../../src/navigation.js';
 import {FLOOR_HEIGHT,STAIRS,STAIR_PATH,on_stairs,stair_height,stair_projection} from '../../src/building.js';
 import {make_scene_xml,SPAWN} from '../../src/scene_layout.js';
 import {teleport_position} from '../../src/teleport.js';
+import {SEATS,from_seat,nearby_seat} from '../../src/seat.js';
 
 test('default map retains V20 metric provenance and declares its real connectors',()=>{
  assert.equal(IS_HEPHAESTUS,true);assert.equal(HAS_ELEVATOR,false);assert.equal(MAP.units,'metres');
@@ -66,4 +67,16 @@ test('teleport can reach the mezzanine while rejecting the open void and real so
  assert.deepEqual(teleport_position([-15, -2, 1], maps), [-15, -2, FLOOR_HEIGHT + 0.73]);
  assert.equal(teleport_position([0, 0, 1], maps), null);
  assert.equal(teleport_position([0, 2.735, 0], maps), null);
+});
+
+test('all five catalog chairs have connected approaches on their own floor', () => {
+ const maps=make_navigation_maps();
+ assert.equal(SEATS.length,5);
+ assert(SEATS.some(s=>s.floor===1));
+ for(const seat of SEATS){
+  const stage=from_seat(seat,.85,0);
+  assert(maps[seat.floor].free(stage),seat.id);
+  assert(maps[seat.floor].plan(seat.floor?[-15,-2]:SPAWN,stage),`${seat.id}: disconnected staging point`);
+  assert.equal(nearby_seat([...stage,seat.floor*FLOOR_HEIGHT+.73],seat.floor,maps)?.id,seat.id);
+ }
 });
