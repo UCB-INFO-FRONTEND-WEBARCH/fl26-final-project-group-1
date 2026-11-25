@@ -170,7 +170,9 @@ export class Navigation {
     this.state.status = 'walking';
     this.state.message = segment.boarding ? 'Boarding the elevator.' : segment.stair_approach ? 'Walking to the stair entry.' : `Walking on the ${FLOOR_NAMES[segment.floor].toLowerCase()}.`;
     let path = segment.path;
-    if (distance(position, path.at(-1)) < (segment.boarding ? 0.15 : 0.22)) { this.next(time); return [0, 0, 0]; }
+    if (distance(position, path.at(-1)) < (segment.boarding ? .15 : segment.tracking ? .1 : .22)) {
+      this.next(time); return [0, 0, 0];
+    }
     const map = this.maps[segment.floor];
     for (let index = path.length - 1; index >= this.waypoint; index--) {
       if (map.line_clear(position, path[index], segment.tracking)) { this.waypoint = index; break; }

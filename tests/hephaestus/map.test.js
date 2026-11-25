@@ -9,7 +9,7 @@ import {Navigation} from '../../src/navigation.js';
 import {FLOOR_HEIGHT,STAIRS,STAIR_PATH,on_stairs,stair_height,stair_projection} from '../../src/building.js';
 import {make_scene_xml,SPAWN} from '../../src/scene_layout.js';
 import {teleport_position} from '../../src/teleport.js';
-import {SEATS,from_seat,nearby_seat} from '../../src/seat.js';
+import {SEATS,SeatApproach,from_seat,nearby_seat} from '../../src/seat.js';
 
 test('default map retains V20 metric provenance and declares its real connectors',()=>{
  assert.equal(IS_HEPHAESTUS,true);assert.equal(HAS_ELEVATOR,false);assert.equal(MAP.units,'metres');
@@ -90,4 +90,20 @@ test('all six lounge sofas reuse their real geometry and have a tracking-clear a
   assert(map.plan(SPAWN,stage,true),`${sofa.id}: disconnected approach`);
   assert.equal(nearby_seat(stage,0,[map])?.id,sofa.id);
  }
+});
+
+test('sofa alignment cannot skip a floor transfer or cross blocked furniture', () => {
+ const maps=make_navigation_maps(),sofa=SEATS.find(seat=>seat.id==='sofa_north');
+ const stage=from_seat(sofa,sofa.staging,0);
+ const start=[...sofa.front,sofa.yaw];
+ const nearby=new SeatApproach(sofa,start,new Navigation(maps,null));
+ nearby.begin([...stage,.73],0);
+ assert.equal(nearby.phase,'ready');
+ for(const position of [[...stage,FLOOR_HEIGHT+.73],[...from_seat(sofa,-.2,0),.73]]){
+  const approach=new SeatApproach(sofa,start,new Navigation(maps,null));
+  approach.begin(position,0);
+  assert.notEqual(approach.phase,'ready');
+ }
+ assert.equal(nearby_seat(from_seat(sofa,.81,0),0,maps,[sofa]),null);
+ assert.equal(nearby_seat(from_seat(sofa,.5,.46),0,maps,[sofa]),null);
 });

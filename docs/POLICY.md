@@ -119,12 +119,16 @@ the sit policy ships with; the first is the fixture's. Swapping a checkpoint is 
 - Commands ramp at 1 m/s² and 2 rad/s², since the training commands are stride averages that never jump.
 - With no command the walking policy shuffles about 7 cm/s; `src/simulation.js` holds the place where the robot came
   to rest, and the route follower holds the point of an in-place turn (see [navigation](NAVIGATION.md)).
-- **Sit.** Asked to sit (F near a supported chair, the Sit button, or a click on the chair), the robot routes to a point 85 cm in front of
+- **Sit.** Asked to sit at a supported armchair (F, the Sit button, or a click), the robot routes to a point 85 cm in front of
   the seat (`src/seat.js`), turns its back to it, and backs up on a pose controller to 9 cm in front of the sit-down
   clip's first pose; that pose has the pelvis over the seat's front edge, where Lite Pro's heels already meet the
   seat block. Standing still, the walking policy drifts 3–5 cm in half a second, so the sit-down starts on arrival,
   within 3 cm along the seat, 6 cm across and 0.1 rad, below 0.2 m/s. The clip is placed on the seat (its own seat on
   the real one), so the policy steps the last centimetres as it sits.
+- **Sofa alignment.** The six native main-lounge KIVIK sofas are taller than the clips' training range. Their walking
+  approach stalls, so a bounded game assist places the standing robot 20 cm in front of the seat before starting the
+  same sit policy. The displacement is at most 70 cm on the same floor. This preserves the world, clock and recovery
+  history; it does not modify policy weights, reference frames, furniture scale, or collision meshes.
 - **Seated.** The policy keeps tracking the clip's last frame. Standing up places the stand-up clip at the robot,
   as the task's resets do; walking takes over once the robot stands still for 0.3 s, or after 2 s standing. While
   sitting, a tilt past 1 rad or the pelvis within 20 cm of the floor is a fall, and the get-up follows.
@@ -164,8 +168,9 @@ From the Fluctlight evaluations (mjlab, held-out starts; see `docs/research/` th
   walked away in 8 of 8 seeded walk-ups from different starts in front of the seat in the demo apartment, and in all
   eight runs of the checks in both maps; the robot sits 21–23 cm deep, as the clip does. The shipped clips were chosen from 16 candidates: 6 of 8 sit-down clips sat from the clip's own first pose,
   and 5 of 8 stand-up clips stood every time. Those earlier walk-up results used the training-sized fixture.
-  The runtime now uses unscaled ULRIKSBERG chairs with matching catalog collision meshes. Other high sofas and
-  chairs do not offer sitting. See [seating validation and dimensions](SEATING.md).
+  The runtime now uses unscaled ULRIKSBERG chairs with matching catalog collision meshes. Six native KIVIK sofa
+  anchors passed two-seed sit/hold/stand/walk-away checks with the alignment assist and real sofa contact. Autonomous
+  walking alignment on these taller sofas is not supported. See [seating validation and dimensions](SEATING.md).
 
 In the apartments:
 

@@ -73,8 +73,10 @@ at least 0.1 m/s, since the policy ignores smaller commands.
 **Sit** routes to a point 85 cm in front of the selected catalog chair, then a pose
 controller turns the robot's back to the seat and backs it up to where the
 sit-down clip starts (see [policy integration](POLICY.md)).
-The nearby F prompt selects only a chair on the robot's floor with a clear approach.
-Each chair is a physical obstacle in both the planning and tracking maps.
+The nearby F prompt selects only supported furniture on the robot's floor with a clear approach.
+Each seat remains a physical obstacle in both the planning and tracking maps. Six native KIVIK sofa anchors use
+tracking clearance to reach a 50 cm staging point, then a bounded standing-pose alignment before the real sit policy.
+See [seating](SEATING.md) for this assist's limits; ordinary navigation retains its wider planning clearance.
 
 The elevator has a gravity-compensated slide joint and a separate position servo.
 Travel is limited to 0.3 m/s with gradual acceleration. Landing gates close when
