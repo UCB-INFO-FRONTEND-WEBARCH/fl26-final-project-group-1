@@ -1,7 +1,7 @@
 // Catalog seating anchors and the physical walk-up that aligns the robot with a sit clip.
 import { SEAT, SEATS } from './seating_layout.js';
 import { SEATING_ASSETS } from './seating_assets.js';
-import { FLOOR_HEIGHT, floor_of } from './building.js';
+import { FLOOR_HEIGHT } from './building.js';
 export { SEAT, SEATS } from './seating_layout.js';
 
 export const SEAT_SIZE = Object.freeze({
@@ -13,7 +13,7 @@ export const SEAT_SIZE = Object.freeze({
 });
 
 /** The seat pose the sit policy observes: front edge x, y, the seat surface's z, and yaw. */
-export function seat_pose(seat = SEAT, floor_height = seat.floor * FLOOR_HEIGHT) {
+export function seat_pose(seat = SEAT, floor_height = seat.floor_z ?? seat.floor * FLOOR_HEIGHT) {
   return [seat.front[0], seat.front[1], floor_height + seat.height, seat.yaw];
 }
 
@@ -113,14 +113,7 @@ export class SeatApproach {
   /** Begin: plan the route to the staging point, or skip it when the robot already stands near the seat. */
   begin(position, time) {
     const [x, y] = to_seat(this.seat, position);
-    const assist = this.seat.alignment_assist;
-    if (assist && floor_of(position) === this.seat.floor && x > .05 &&
-      Math.hypot(x - assist.stand_off, y) <= assist.max_distance &&
-      this.navigation.maps[this.seat.floor].line_clear(position, this.staging, true)) {
-      this.set_phase('ready');
-      return;
-    }
-    if (!assist && x > 0.05 && x < this.staging_distance + 0.4 && Math.abs(y) < 0.6) {
+    if (x > 0.05 && x < this.staging_distance + 0.4 && Math.abs(y) < 0.6) {
       this.set_phase('align');
       return;
     }
@@ -162,7 +155,7 @@ export class SeatApproach {
       const status = this.navigation.state.status;
       if (status === 'arrived') {
         this.navigation.cancel();
-        this.set_phase(this.seat.alignment_assist ? 'ready' : 'align');
+        this.set_phase('align');
       } else if (status === 'blocked' || status === 'idle') {
         this.fail(status === 'blocked' ? this.navigation.state.message : 'The route to the seat was cancelled.');
       }

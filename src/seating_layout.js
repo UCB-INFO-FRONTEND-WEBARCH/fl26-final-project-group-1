@@ -1,4 +1,4 @@
-import { IS_HEPHAESTUS, MAP } from './world.js';
+import { IS_HEPHAESTUS } from './world.js';
 import { FLOOR_HEIGHT } from './building.js';
 
 // Anchor coordinates are measured on the unscaled catalog meshes after grounding in Z-up.
@@ -7,6 +7,15 @@ export const SEATING_PRODUCTS = {
   '90434310': { name: 'ULRIKSBERG', kind: 'Armchair', front: [0, -0.265], yaw: -Math.PI / 2,
     height: 0.367, support_height: 0.332, width: 0.60, depth: 0.53,
     source: 'https://www.ikea.com/gb/en/p/ulriksberg-armchair-rattan-anthracite-90434310/' },
+  '50558185': { name: 'BONDHOLMEN', kind: 'Sofa', front: [.31, -.30], yaw: -Math.PI / 2,
+    height: .35, support_height: .333, width: .5, depth: .5,
+    source: 'https://www.ikea.com/ie/en/p/bondholmen-2-seat-sofa-outdoor-white-beige-50558185/',
+    // Real-size KUDDARNA pads follow the wooden seat's measured slope; no mesh scaling.
+    components: [
+      {article:'50558185', offset:[0,0,0]},
+      {article:'00547236', offset:[-.31,-.02,.259], pitch:-.08},
+      {article:'00547236', offset:[.31,-.02,.259], pitch:-.08},
+    ] },
 };
 
 const placements = IS_HEPHAESTUS ? [
@@ -15,38 +24,22 @@ const placements = IS_HEPHAESTUS ? [
   { id: 'west_armchair', article: '90434310', front: [-20, -3], yaw: 0, floor: 0 },
   { id: 'mezzanine_armchair', article: '90434310', front: [-16, -3], yaw: 0, floor: 1 },
   { id: 'mezzanine_reading_armchair', article: '90434310', front: [-16, -5], yaw: 0, floor: 1 },
+  // Sofa feet rest on the source carpet, whose top is 28.8 mm above the slab.
+  { id: 'sofa_north', article: '50558185', front: [.51, 2.7], yaw: -Math.PI / 2, floor: 0, floor_z: .0288 },
+  { id: 'sofa_south', article: '50558185', front: [-.51, -2.7], yaw: Math.PI / 2, floor: 0, floor_z: .0288 },
 ] : [
   { id: 'living_armchair', article: '90434310', front: [-2.6, -5.9], yaw: Math.PI / 2, floor: 0 },
   { id: 'upper_armchair', article: '90434310', front: [-2.6, -5.9], yaw: Math.PI / 2, floor: 1 },
 ];
 
-const armchairs = placements.map(placement => {
+export const SEATS = placements.map(placement => {
   const product = SEATING_PRODUCTS[placement.article];
   const model_yaw = placement.yaw - product.yaw;
   const c = Math.cos(model_yaw), s = Math.sin(model_yaw);
   return { ...product, ...placement, name: placement.id, model_yaw,
     position: [placement.front[0] - c * product.front[0] + s * product.front[1],
-      placement.front[1] - s * product.front[0] - c * product.front[1], placement.floor * FLOOR_HEIGHT],
+      placement.front[1] - s * product.front[0] - c * product.front[1], placement.floor_z ?? placement.floor * FLOOR_HEIGHT],
     label: product.name };
 });
 
-// These sofas already exist in the room and have their own authored collision meshes.
-// Seat heights exceed the clips' training range; each enabled anchor is checked with the real policy and contacts.
-const sofa_anchors = [
-  ['sofa_north', 'KIVIK sofa with chaise · Main lounge north', [.35, 2.599], -Math.PI / 2],
-  ['sofa_south', 'KIVIK sofa with chaise · Main lounge south', [-.35, -2.599], Math.PI / 2],
-  ['sofa_north_east', 'V20 / KIVIK north / east return', [2.5632, 1.8], Math.PI],
-  ['sofa_north_west', 'V20 / KIVIK north / west return', [-2.5632, 2.5], 0],
-  ['sofa_south_east', 'V20 / KIVIK south / east return', [2.5632, -2.5], Math.PI],
-  ['sofa_south_west', 'V20 / KIVIK south / west return', [-2.5632, -1.8], 0],
-];
-const sofas = IS_HEPHAESTUS ? sofa_anchors.map(([id, prefix, front, yaw]) => {
-  const item = MAP.furniture.find(item => item.name.startsWith(prefix));
-  return { id, name: id, label: 'KIVIK', kind: 'Sofa', existing: true, front, yaw, floor: item.floor,
-    height: .485, width: .75, depth: .53, staging: .5, precise_approach: true,
-    interaction_range: .8, lateral_reach: .45, alignment_assist: { stand_off: .2, max_distance: .7 },
-    bounds: item.bounds, collision_source: item.name, position: item.bounds[0] };
-}) : [];
-
-export const SEATS = [...armchairs, ...sofas];
 export const SEAT = SEATS[0];

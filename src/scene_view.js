@@ -15,6 +15,7 @@ import { ShoulderCamera } from './shoulder_camera.js';
 import { FigureFocus, figure_opacity } from './figure_focus.js';
 import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
+import { aerial_pixel_ratio } from './arrival_geography.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPAWN_YAW } from './scene_layout.js';
 import { SEATS } from './seat.js';
@@ -252,7 +253,9 @@ export class SceneView {
     const signal = this.furniture_abort.signal;
     this.seat_groups = [];
     try {
-      await Promise.all(Object.entries(SEATING_ASSETS).map(async ([article, asset]) => {
+      const articles = new Set(SEATS.flatMap(seat => seat.components?.map(part => part.article) ?? [seat.article]));
+      await Promise.all([...articles].map(async article => {
+        const asset = SEATING_ASSETS[article];
         const response = await fetch(`${IKEA_BASE}${model_path(article)}`, { signal });
         if (!response.ok) throw new Error(`Could not load IKEA seating ${article}.`);
         const bytes = await response.arrayBuffer();
@@ -265,21 +268,29 @@ export class SceneView {
         const upright = new THREE.Group();
         upright.rotation.x = Math.PI / 2;
         upright.add(gltf.scene);
-        for (const seat of SEATS.filter(seat => seat.article === article)) {
-          const group = new THREE.Group();
-          group.name = seat.id;
-          group.userData.seat_id = seat.id;
-          group.position.set(...seat.position);
-          group.rotation.z = seat.model_yaw;
-          group.add(upright.clone(true));
-          group.updateMatrixWorld(true);
-          group.traverse(object => {
-            object.matrixAutoUpdate = false;
-            if (object.isMesh) object.castShadow = object.receiveShadow = true;
-          });
-          // These low seats stay below the lens when seated; a full body AABB would trap the shoulder camera.
-          this.floor_groups[seat.floor].add(group);
-          this.seat_groups.push(group);
+        for (const seat of SEATS) {
+          const components = seat.components ?? [{article:seat.article, offset:[0,0,0]}];
+          for (const [part, component] of components.entries()) {
+            if (component.article !== article) continue;
+            const group = new THREE.Group();
+            group.name = `${seat.id}_${part}`;
+            group.userData.seat_id = seat.id;
+            group.position.set(...seat.position);
+            group.rotation.z = seat.model_yaw;
+            const piece = new THREE.Group();
+            piece.position.set(...component.offset);
+            piece.rotation.x = component.pitch ?? 0;
+            piece.add(upright.clone(true));
+            group.add(piece);
+            group.updateMatrixWorld(true);
+            group.traverse(object => {
+              object.matrixAutoUpdate = false;
+              if (object.isMesh) object.castShadow = object.receiveShadow = true;
+            });
+            // These low seats stay below the lens when seated; a full body AABB would trap the shoulder camera.
+            this.floor_groups[seat.floor].add(group);
+            this.seat_groups.push(group);
+          }
         }
       }));
     } finally { draco.dispose(); }
@@ -635,6 +646,7 @@ export class SceneView {
     this.on_arrival_complete = on_complete;
     this.on_arrival_reveal = on_reveal;
     this.arrival_level = 0;
+    this.resize();
     this.needs_render = true;
   }
 
@@ -833,7 +845,10 @@ export class SceneView {
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
     const cap = this.quality === 'performance' ? 1 : Math.min(window.devicePixelRatio, 1.5);
-    this.renderer.setPixelRatio(Math.min(cap, Math.sqrt(1_000_000 / Math.max(width * height, 1))));
+    const pixel_ratio = this.arrival && this.arrival.level < 2
+      ? aerial_pixel_ratio(width, height, window.devicePixelRatio)
+      : Math.min(cap, Math.sqrt(1_000_000 / Math.max(width * height, 1)));
+    this.renderer.setPixelRatio(pixel_ratio);
     this.renderer.setSize(width, height);
     this.needs_render = true;
   }
@@ -897,6 +912,7 @@ export class SceneView {
       }
       if (this.arrival.level !== this.arrival_level && !this.arrival.done) {
         this.arrival_level = this.arrival.level;
+        this.resize();
         this.on_arrival_level({ index: this.arrival.level, label: ARRIVAL_LEVELS[this.arrival.level].label });
       }
       if (this.arrival.done) this.finish_arrival();

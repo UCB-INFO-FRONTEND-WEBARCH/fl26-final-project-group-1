@@ -6,7 +6,7 @@ import { Elevator } from './elevator.js';
 import { Navigation, hold_position, hold_point } from './navigation.js';
 import { ELEVATOR, FLOOR_HEIGHT, STANDING_HEIGHT, floor_of } from './building.js';
 import { teleport_position } from './teleport.js';
-import { SEAT, SEATS, SeatApproach, seat_pose, nearby_seat, from_seat } from './seat.js';
+import { SEAT, SEATS, SeatApproach, seat_pose, nearby_seat } from './seat.js';
 
 const OBJ_GEOM = 5;
 // Standing still, the walking policy shuffles about 7 cm/s in one direction (0.7 m in 10 s), into furniture or out of
@@ -66,22 +66,11 @@ export class Simulation {
     return this.controller.stand();
   }
 
-  /** Sofa interactions align the standing pose locally, then run the real policy with normal contacts. */
+  /** Start policy tracking only after the walking approach reaches the seat. */
   start_sitting() {
     const seat = this.active_seat;
     if (!seat || !this.controller.can_sit || this.fallen) return false;
-    if (seat.alignment_assist) {
-      const point = from_seat(seat, seat.alignment_assist.stand_off, 0);
-      if (floor_of(this.state.qpos) !== seat.floor ||
-        Math.hypot(point[0] - this.state.qpos[0], point[1] - this.state.qpos[1]) > seat.alignment_assist.max_distance + 1e-6) {
-        this.seat_message = 'Move closer to the seat.';
-        this.active_seat = null;
-        return false;
-      }
-      this.place_robot([...point, seat.floor * FLOOR_HEIGHT + STANDING_HEIGHT], seat.yaw);
-      this.controller.motors.set_target(DEFAULT_ANGLES);
-    }
-    return this.controller.sit(this.seat, seat.floor * FLOOR_HEIGHT);
+    return this.controller.sit(this.seat, seat.floor_z ?? seat.floor * FLOOR_HEIGHT);
   }
 
   end_approach() {
@@ -113,19 +102,10 @@ export class Simulation {
 
   /** Stand the robot in its default pose at (x, y), soles on the floor at z - STANDING_HEIGHT, facing yaw. */
   place(position = SPAWN, yaw = SPAWN_YAW) {
-    this.mujoco.mj_resetData(this.model, this.state);
-    this.place_robot(position, yaw);
-  }
-
-  /** Change only the robot pose and velocity; retain world state, time and interaction history. */
-  place_robot(position, yaw) {
     const { mujoco, model, state } = this;
     const [x, y, z] = position;
     const body = this.controller.body;
-    for (let index = body.root_qvel; index < body.root_qvel + 6; index++) {
-      state.qvel[index] = state.qacc_warmstart[index] = 0;
-    }
-    for (const index of body.joint_qvel) state.qvel[index] = state.qacc_warmstart[index] = 0;
+    mujoco.mj_resetData(model, state);
     state.qpos.set([x, y, 1.0, Math.cos(yaw / 2), 0, 0, Math.sin(yaw / 2)], body.root_qpos);
     body.joint_qpos.forEach((address, index) => { state.qpos[address] = DEFAULT_ANGLES[index]; });
     mujoco.mj_forward(model, state);

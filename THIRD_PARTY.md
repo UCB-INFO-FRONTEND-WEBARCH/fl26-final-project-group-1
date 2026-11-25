@@ -49,10 +49,22 @@ and prohibits redistribution and modification. The project-specific authorizatio
 does not change these restrictions for other uses. The original file and its
 embedded metadata remain unchanged.
 
+## Compatible IKEA seating
+
+The compatible lounge sofas use the supplied IKEA catalog meshes for
+[BONDHOLMEN 505.581.85](https://www.ikea.com/ie/en/p/bondholmen-2-seat-sofa-outdoor-white-beige-50558185/) and
+[KUDDARNA 005.472.36](https://www.ikea.com/fi/en/p/kuddarna-chair-cushion-outdoor-light-grey-beige-00547236/).
+They retain their original scale. Their source hashes are in `src/seating_assets.js`; the runtime downloads the
+same pinned external catalog files as the existing armchairs. Generated convex hulls are contact approximations.
+
 ## Aerial arrival
 
-The Bay Area overview is NASA GIBS MODIS Terra corrected-reflectance imagery,
-dated July 16, 2024, retrieved through its [public WMS service](https://nasa-gibs.github.io/gibs-api-docs/access-basics/).
+The 4000 × 4000 Bay Area overview is **Sentinel-2 cloudless** by
+[EOX IT Services GmbH](https://eox.at), retrieved from its public WMS layer `s2cloudless_3857`.
+Required attribution: [Sentinel-2 cloudless](https://s2maps.eu) by EOX IT Services GmbH
+(Contains modified Copernicus Sentinel data 2016 & 2017). This vintage is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); see the provider's
+[license and attribution](https://eox.at/2025/03/sentinel-2-cloudless-2024/#license).
 The closer Santa Clara, campus, and Building K views use public-domain
 [USGS/USDA NAIP orthoimagery](https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer).
 The downloaded JPEG images are unchanged. The app applies its color grade and

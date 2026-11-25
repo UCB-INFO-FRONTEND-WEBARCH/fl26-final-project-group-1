@@ -3,6 +3,7 @@ import { ArrivalMap } from './arrival_map.js';
 import { ArrivalOpening } from './arrival_opening.js';
 import { SITE_BASE } from './asset_paths.js';
 import { get_theme, THEME_EVENT } from './theme.js';
+import { aerial_pixel_ratio } from './arrival_geography.js';
 
 export class ArrivalPreview {
   constructor() {
@@ -27,8 +28,10 @@ export class ArrivalPreview {
     this.theme_handler();
     window.addEventListener(THEME_EVENT, this.theme_handler);
     this.resize_handler = () => {
-      this.renderer.setSize(this.container?.clientWidth || window.innerWidth,
-        this.container?.clientHeight || window.innerHeight);
+      const width = this.container?.clientWidth || window.innerWidth;
+      const height = this.container?.clientHeight || window.innerHeight;
+      this.renderer.setPixelRatio(aerial_pixel_ratio(width, height, window.devicePixelRatio));
+      this.renderer.setSize(width, height);
       if (!this.active && this.map.ready) this.draw(0);
     };
     window.addEventListener('resize', this.resize_handler);

@@ -44,18 +44,20 @@ def prepare_images():
     center = mercator(*location)
     bounds = [center[0] - extent / 2, center[1] - extent / 2,
               center[0] + extent / 2, center[1] + extent / 2]
+    # The opening crops the regional image around Building K. Use a detailed,
+    # cloud-free satellite mosaic with complete coastal coverage for that crop.
+    pixels = 4000 if index == 0 else 1536
     parameters = {'bbox': ','.join(map(str, bounds)), 'bboxSR': 3857, 'imageSR': 3857,
-                  'size': '1536,1536', 'format': 'jpg', 'f': 'image'}
+                  'size': f'{pixels},{pixels}', 'format': 'jpg', 'f': 'image',
+                  'bandIds': '0,1,2', 'interpolation': 'RSP_BilinearInterpolation',
+                  'compressionQuality': 92 if index == 0 else 88}
+    service = IMAGERY + '/exportImage'
     if index == 0:
-      service = 'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi'
-      parameters = {'SERVICE': 'WMS', 'REQUEST': 'GetMap', 'VERSION': '1.3.0',
-                    'LAYERS': 'MODIS_Terra_CorrectedReflectance_TrueColor', 'STYLES': '',
-                    'FORMAT': 'image/jpeg', 'CRS': 'EPSG:3857', 'BBOX': ','.join(map(str, bounds)),
-                    'WIDTH': 1536, 'HEIGHT': 1536, 'TIME': '2024-07-16'}
-    else:
-      service = IMAGERY + '/exportImage'
-      parameters.update({'bandIds': '0,1,2', 'interpolation': 'RSP_BilinearInterpolation',
-                         'compressionQuality': 88})
+      service = 'https://tiles.maps.eox.at/wms'
+      parameters = {'SERVICE': 'WMS', 'REQUEST': 'GetMap', 'VERSION': '1.1.1',
+                    'LAYERS': 's2cloudless_3857', 'STYLES': '', 'FORMAT': 'image/jpeg',
+                    'SRS': 'EPSG:3857', 'BBOX': ','.join(map(str, bounds)),
+                    'WIDTH': pixels, 'HEIGHT': pixels}
     url = service + '?' + urllib.parse.urlencode(parameters)
     path = OUTPUT / f'{name}.jpg'
     if not path.exists() or known.get(name) != url:
@@ -66,7 +68,11 @@ def prepare_images():
     contents = path.read_bytes()
     images.append({'name': name, 'label': label, 'file': path.name, 'extent': extent,
                    'center': [round(center[0] - target[0], 3), round(center[1] - target[1], 3)],
-                   'source': url, 'sha256': hashlib.sha256(contents).hexdigest()})
+                   'pixels': [pixels, pixels], 'source': url,
+                   'sha256': hashlib.sha256(contents).hexdigest()})
+    if index == 0:
+      images[-1].update(license='CC-BY-4.0', acquisition_years=[2016, 2017],
+        attribution='Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)')
     print(f'{name}: {len(contents):,} bytes', flush=True)
   return images
 
@@ -153,7 +159,7 @@ def main():
   manifest = {'target': {'name': 'NVIDIA Building K', 'address': '2886 Scott Blvd, Santa Clara, CA',
                          'coordinates': TARGET, 'focus': focus}, 'origin': ORIGIN,
               'lights': lights,
-              'imagery_credit': 'NASA GIBS / USGS / USDA · © OpenStreetMap contributors',
+              'imagery_credit': 'Sentinel-2 cloudless by EOX (Copernicus 2016 & 2017) / USGS / USDA · © OpenStreetMap contributors',
               'imagery_source': 'https://www.usgs.gov/programs/national-geospatial-program/national-map',
               'images': images}
   (OUTPUT / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
