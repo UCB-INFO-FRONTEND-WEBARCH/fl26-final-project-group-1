@@ -59,8 +59,20 @@ rate and sends robot-frame forward, lateral, and yaw velocity commands. It never
 sets the robot's position or joint angles. Automatic walking is capped at 0.6 m/s.
 When a segment becomes obstructed but the robot still has planning clearance,
 the follower can replan from its current position up to four times. It turns
-before advancing through a sharp heading change. Routes stop if no safe recovery
-exists or the robot makes no progress.
+before advancing through a sharp heading change, holding the point where the turn
+began: turning in place, the walking policy slides sideways about 30 cm in a half
+turn. A robot that has drifted inside the planning clearance, but not the smaller
+tracking clearance, first walks straight out to the nearest free cell within 0.8 m.
+Routes stop if no safe recovery exists or the robot makes no progress.
+
+With no command, route, or walk to the seat, the robot holds the place and heading
+where it came to rest. Standing still, the walking policy shuffles about 7 cm/s in
+one direction; the hold keeps it within about 10 cm. Every hold sends corrections of
+at least 0.1 m/s, since the policy ignores smaller commands.
+
+**Sit** routes to a point 75 cm in front of the Lite Pro seat, then a pose
+controller turns the robot's back to the seat and backs it up to where the
+sit-down clip starts (see [policy integration](POLICY.md)).
 
 The elevator has a gravity-compensated slide joint and a separate position servo.
 Travel is limited to 0.3 m/s with gradual acceleration. Landing gates close when

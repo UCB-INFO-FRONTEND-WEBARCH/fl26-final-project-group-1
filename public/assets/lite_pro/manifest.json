@@ -1,6 +1,6 @@
 {
   "source": "https://github.com/berkeley-humanoids/Fluctlight (tracker/ppo, export-browser)",
-  "commit": "060d710aa76075ca164c21bafb78e2a7e032afa9",
+  "commit": "e0c54afe05f091532841c4a009ecf9d1e9beb349",
   "robot": {
     "file": "robot.xml",
     "task": "Lite-Pro-Velocity-Motion-Flat",
@@ -26,6 +26,11 @@
       "task": "Lite-Pro-Getup-Prone-RandomMotors",
       "checkpoint": "2026-11-24_04-54-07_getup_prone_v2/model_9999.pt",
       "onnx_sha256": "bd35694a9982d3ea601402a6145b86cf9b6a3b9455f52d2d2815ea92f91a572c"
+    },
+    "sit": {
+      "task": "Lite-Pro-Sit-Head",
+      "checkpoint": "2026-11-23_21-00-30_sit_v6a_head/model_7999.pt",
+      "onnx_sha256": "83dd01ee51cfd478ed6bbe9e29ca82b83601722fb1cf01a59d8a74f629e6ad65"
     }
   },
   "files": [
@@ -411,8 +416,8 @@
     },
     {
       "file": "policies/getup_prone.json",
-      "bytes": 7551,
-      "sha256": "4d463cba36126781ce8d2cf4dc5a45e8b1bd36dbc58d03aaf973e30b3f975fc4"
+      "bytes": 7568,
+      "sha256": "d32c12b24327f0d56562f9432e57236b2eed1bd4c6d3cd0ed376422872b1b6b8"
     },
     {
       "file": "policies/getup_prone.onnx",
@@ -421,8 +426,8 @@
     },
     {
       "file": "policies/getup_supine.json",
-      "bytes": 7555,
-      "sha256": "58e2ee4887014b07e1e130c9b8ca581de86c759b80cd54ab944b298d841509c8"
+      "bytes": 7572,
+      "sha256": "5ec1685a9dc7a7b371c2f35d1e698ca3fdce68507228cd7305bbaa14fa960bd5"
     },
     {
       "file": "policies/getup_supine.onnx",
@@ -430,9 +435,24 @@
       "sha256": "0e6b2d46ce4faa73b12b52398b922170243d810b3244f1b08a12c056138c190a"
     },
     {
+      "file": "policies/sit.clips.bin",
+      "bytes": 155584,
+      "sha256": "fe0dfa369d30f6414da659fb91bce42ae50951f2355a32eb2060a62fea3bb471"
+    },
+    {
+      "file": "policies/sit.json",
+      "bytes": 10629,
+      "sha256": "d836368953839599de2130bb22f3649a0f272263ab7f7009db5367f40896d719"
+    },
+    {
+      "file": "policies/sit.onnx",
+      "bytes": 1186840,
+      "sha256": "83dd01ee51cfd478ed6bbe9e29ca82b83601722fb1cf01a59d8a74f629e6ad65"
+    },
+    {
       "file": "policies/walk.json",
-      "bytes": 8553,
-      "sha256": "65eff5dddb959d34637714526f464b5f6b2ea496acbef2642f9c5196fc68a858"
+      "bytes": 8570,
+      "sha256": "d73fcb3af5301dfe9456523848251d8e3e265f566f7b3147a73895824ef87dc0"
     },
     {
       "file": "policies/walk.onnx",
@@ -441,8 +461,8 @@
     },
     {
       "file": "policies/walk_stairs.json",
-      "bytes": 8563,
-      "sha256": "a9bec134a88c23de303b47248aeb58b89e9626a72dbcfd7a22582f268bb2b745"
+      "bytes": 8580,
+      "sha256": "c4292122157e69db5abfc495b195a6fefa40861f1844e619a1fffe34e519edb8"
     },
     {
       "file": "policies/walk_stairs.onnx",

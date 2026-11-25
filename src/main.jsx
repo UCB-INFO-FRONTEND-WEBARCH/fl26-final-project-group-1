@@ -33,8 +33,15 @@ const INITIAL_TELEMETRY = {
   floor: 0,
   navigation: IDLE_NAVIGATION,
   elevator: { height: 0, open_floor: 0, moving: false, target_floor: 0 },
+  seat: { available: false, can_sit: false, can_stand: false, approach: null, message: null },
 };
-const POLICY_LABELS = { walk: 'Walk', walk_stairs: 'Stairs', getup_supine: 'Get up (back)', getup_prone: 'Get up (front)' };
+const POLICY_LABELS = { walk: 'Walk', walk_stairs: 'Stairs', getup_supine: 'Get up (back)', getup_prone: 'Get up (front)', sit: 'Sit (chair clip)' };
+const SEAT_STATUS = { sit_down: 'Sitting down', seated: 'Seated · T stands up', stand_up: 'Standing up' };
+const SEAT_MESSAGES = {
+  sit_down: 'Sitting down: the policy tracks a chair clip placed on the seat.',
+  seated: 'Seated on the Lite Pro seat. Press T to stand up.',
+  stand_up: 'Standing up. Walking resumes once it stands still.',
+};
 const CONTROL_KEYS = [
   [['KeyQ', 'Strafe left'], ['KeyW', 'Walk forward'], ['KeyE', 'Strafe right']],
   [['KeyA', 'Turn left'], ['KeyS', 'Walk backward'], ['KeyD', 'Turn right']],
@@ -296,6 +303,20 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     set_controls_open(false);
   }
 
+  /** Walk to the Lite Pro seat and sit, or stand up from it. */
+  function toggle_seat() {
+    const current = telemetry_ref.current;
+    if (!ready_ref.current || current.fallen || current.paused) return;
+    if (current.seat?.can_stand) {
+      worker_ref.current?.postMessage({ type: 'stand' });
+    } else if (current.seat?.approach) {
+      cancel_navigation();
+    } else if (current.seat?.can_sit) {
+      release_keys();
+      worker_ref.current?.postMessage({ type: 'sit' });
+    }
+  }
+
   function change_floor(floor) {
     if (['follow', 'shoulder'].includes(view_ref.current?.mode)) change_camera('orbit');
     view_ref.current?.set_floor(floor);
@@ -383,6 +404,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer, () => {
           if (keys_ref.current.size) send_command();
         });
+        view.on_seat = () => { if (telemetry_ref.current.seat?.can_sit) toggle_seat(); };
         view_ref.current = view;
         view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
@@ -436,6 +458,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 message.telemetry.mode !== telemetry_ref.current.mode ||
                 message.telemetry.policy !== telemetry_ref.current.policy ||
                 message.telemetry.teleports !== telemetry_ref.current.teleports ||
+                message.telemetry.seat?.approach?.phase !== telemetry_ref.current.seat?.approach?.phase ||
+                message.telemetry.seat?.message !== telemetry_ref.current.seat?.message ||
+                message.telemetry.seat?.can_sit !== telemetry_ref.current.seat?.can_sit ||
+                message.telemetry.seat?.can_stand !== telemetry_ref.current.seat?.can_stand ||
                 message.telemetry.paused !== telemetry_ref.current.paused;
               telemetry_ref.current = message.telemetry;
               const now = performance.now();
@@ -507,6 +533,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         toggle_pause();
       }
       if (event.code === 'KeyR') reset();
+      if (event.code === 'KeyT') toggle_seat();
       if (event.code === 'KeyV' || event.code === 'KeyC') cycle_camera();
     };
     const key_up = (event) => {
@@ -569,8 +596,14 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       ? 'Initializing'
       : telemetry.fallen
         ? 'Simulation stopped'
-        : telemetry.mode !== 'walk'
+        : SEAT_STATUS[telemetry.mode]
+          ? SEAT_STATUS[telemetry.mode]
+          : telemetry.mode !== 'walk'
           ? 'Getting up'
+          : telemetry.seat?.approach
+          ? 'Walking to the seat'
+          : telemetry.seat?.message
+          ? 'Could not reach the seat'
           : telemetry.paused
           ? 'Paused'
           : 'Simulation live';
@@ -692,6 +725,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 <Icon name="reset" size={16} />
                 Reset<kbd>R</kbd>
               </button>
+              {telemetry.seat?.available && <button className="secondary-button"
+                disabled={!ready || telemetry.fallen || telemetry.paused || !(telemetry.seat.can_sit || telemetry.seat.can_stand || telemetry.seat.approach)}
+                onClick={toggle_seat}>
+                {telemetry.seat.can_stand ? 'Stand up' : telemetry.seat.approach ? 'Cancel sit' : 'Sit'}<kbd>T</kbd>
+              </button>}
             </div>
             <div className="figure-switch" role="group" aria-label="Figure appearance">
               {['robot', 'character'].map(value => <button key={value} aria-pressed={figure === value}
@@ -746,7 +784,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               </select>
             </label>}
             <div className={`navigation-status ${telemetry.navigation?.status || 'idle'}`} role="status" aria-label="Navigation status">
-              {telemetry.paused && ['walking', 'waiting', 'riding'].includes(telemetry.navigation?.status) ? 'Paused · route saved' : telemetry.navigation?.message || IDLE_NAVIGATION.message}
+              {telemetry.paused && ['walking', 'waiting', 'riding'].includes(telemetry.navigation?.status) ? 'Paused · route saved'
+                : SEAT_MESSAGES[telemetry.mode] ?? telemetry.seat?.approach?.message ?? telemetry.seat?.message ?? (telemetry.navigation?.message || IDLE_NAVIGATION.message)}
               {telemetry.navigation?.remaining > 0 && <span>{telemetry.navigation.remaining.toFixed(1)} m remaining</span>}
             </div>
             <button className="stop-navigation" onClick={cancel_navigation}
@@ -788,6 +827,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 <kbd>Q</kbd>
                 <kbd>E</kbd> Strafe
               </span>
+              {telemetry.seat?.available && <span>
+                <kbd>T</kbd> Sit on the seat / stand up
+              </span>}
             </div>
             <div className="speed-label">
               <label htmlFor="walking-speed">Speed</label>
@@ -890,6 +932,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         </div>
         <div className="game-key-hint">
           {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span>
+            {telemetry.seat?.available && <span><kbd>T</kbd> {telemetry.seat.can_stand ? 'Stand up' : 'Sit'}</span>}
             <span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></>}
           <button onClick={toggle_cursor} aria-pressed={cursor_locked} title="Alt toggles mouse capture">
             <kbd>ALT</kbd> {cursor_locked ? 'Cursor' : 'Capture mouse'}</button>

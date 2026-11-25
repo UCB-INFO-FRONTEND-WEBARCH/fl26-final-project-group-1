@@ -79,13 +79,18 @@ export const POLICY = {
     "walk": "policies/walk.json",
     "walk_stairs": "policies/walk_stairs.json",
     "getup_supine": "policies/getup_supine.json",
-    "getup_prone": "policies/getup_prone.json"
+    "getup_prone": "policies/getup_prone.json",
+    "sit": "policies/sit.json"
   },
   "checkpoints": {
     "walk": "2026-11-22_17-36-15_velocity_flat_v3/model_7999.pt",
     "walk_stairs": "2026-11-23_21-16-43_velocity_stairs_v4/model_7999.pt",
     "getup_supine": "2026-11-24_04-52-37_getup_supine_v2/model_9999.pt",
-    "getup_prone": "2026-11-24_04-54-07_getup_prone_v2/model_9999.pt"
+    "getup_prone": "2026-11-24_04-54-07_getup_prone_v2/model_9999.pt",
+    "sit": "2026-11-23_21-00-30_sit_v6a_head/model_7999.pt"
+  },
+  "clips": {
+    "sit": "policies/sit.clips.bin"
   },
   "root_height_walk": 0.7454105019569397,
   "root_height_stand": 0.7608116269111633

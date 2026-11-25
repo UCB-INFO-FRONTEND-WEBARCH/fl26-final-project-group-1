@@ -17,6 +17,7 @@ import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPAWN_YAW } from './scene_layout.js';
+import { SEAT, SEAT_SIZE, seat_boxes, from_seat } from './seat.js';
 
 function floor_label(text, width, color = '#85858d') {
   const canvas = document.createElement('canvas');
@@ -240,7 +241,40 @@ export class SceneView {
     this.scene.add(this.robot_marker, this.robot_shadow);
     this.navigation_overlay = new NavigationOverlay();
     this.scene.add(this.navigation_overlay);
+    this.add_seat();
     this.set_floor(0);
+  }
+
+  /** The Lite Pro seat (src/seat.js), drawn as its physical boxes: a base, a cushion on top, and the backrest. */
+  add_seat() {
+    const floor_z = SEAT.floor * FLOOR_HEIGHT;
+    const [block, back] = seat_boxes(SEAT, floor_z);
+    const cushion_height = 0.06;
+    const fabric = new THREE.MeshLambertMaterial({ color: '#7f9bb3' });
+    const base = new THREE.MeshLambertMaterial({ color: '#4d5b69' });
+    const box = ({ center, size, yaw }, material) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
+      mesh.position.set(...center);
+      mesh.rotation.z = yaw;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    };
+    const group = new THREE.Group();
+    group.name = SEAT.name;
+    const [bx, by, bz] = block.center;
+    group.add(box({ ...block, center: [bx, by, bz - cushion_height / 2], size: [block.size[0], block.size[1], block.size[2] - cushion_height] }, base));
+    group.add(box({ ...block, center: [bx, by, floor_z + SEAT_SIZE.height - cushion_height / 2], size: [block.size[0], block.size[1], cushion_height] }, fabric));
+    group.add(box(back, fabric));
+    const label = floor_label('LITE PRO SEAT', 1.3, '#5f7d95');
+    label.position.set(...from_seat(SEAT, 0.42, 0), floor_z + 0.016);
+    label.rotation.z = SEAT.yaw + Math.PI / 2; // reads from in front of the seat
+    group.add(label);
+    group.updateMatrixWorld(true);
+    group.traverse((object) => { object.matrixAutoUpdate = false; });
+    this.seat_group = group;
+    // Not a camera obstacle: the backrest is 80 cm tall, and the shoulder camera looks over it at a seated robot.
+    this.floor_groups[SEAT.floor].add(group);
   }
 
   async load_furniture() {
@@ -338,6 +372,7 @@ export class SceneView {
     this.scene.add(this.robot_marker,this.robot_shadow);
     this.navigation_overlay = new NavigationOverlay();
     this.scene.add(this.navigation_overlay);
+    this.add_seat();
     this.renderer.localClippingEnabled=true;
   }
 
@@ -758,6 +793,16 @@ export class SceneView {
       const surfaces = this.floor_surfaces.filter(surface => this.viewed_floor === 'all' || surface.userData.floor === this.viewed_floor);
       surfaces.push(this.stair_mesh);
       if (this.lift_open_floor >= 0 && (this.viewed_floor === 'all' || this.lift_open_floor === this.viewed_floor)) surfaces.push(this.lift_deck);
+      // A click on the seat asks the robot to sit on it.
+      if (this.seat_group && this.on_seat && (this.viewed_floor === 'all' || this.viewed_floor === SEAT.floor)) {
+        const seat_hit = raycaster.intersectObject(this.seat_group, true).find((h) => h.object.isMesh && h.object.geometry.type === 'BoxGeometry');
+        const floor_hit = raycaster.intersectObjects(surfaces, false)[0];
+        if (seat_hit && (!floor_hit || seat_hit.distance <= floor_hit.distance)) {
+          this.on_seat();
+          canvas.focus({ preventScroll: true });
+          return;
+        }
+      }
       const hit = raycaster.intersectObjects(surfaces, false)[0];
       if (hit) {
         if (hit.object === this.stair_mesh) this.on_destination?.([hit.point.x, hit.point.y, Math.round(stair_height([hit.point.x, hit.point.y]) / FLOOR_HEIGHT), stair_height([hit.point.x, hit.point.y])]);

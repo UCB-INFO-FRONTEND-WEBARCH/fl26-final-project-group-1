@@ -11,13 +11,14 @@ ort.env.wasm.wasmPaths = {
   mjs: new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs', import.meta.url).href,
 };
 
-/** {name: {session, contract}} for every policy in src/policy_constants.js. */
+/** {name: {session, contract, clips?}} for every policy in src/policy_constants.js; clips are the raw bytes. */
 export async function load_policies() {
   const policies = {};
   for (const [name, path] of Object.entries(POLICY.policies)) {
     const contract = JSON.parse(await readFile(new URL(path, ASSET_BASE), 'utf8'));
     const bytes = new Uint8Array(await readFile(new URL(`policies/${contract.onnx}`, ASSET_BASE)));
     policies[name] = { contract, session: await ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] }) };
+    if (contract.motion) policies[name].clips = new Uint8Array(await readFile(new URL(`policies/${contract.motion.file}`, ASSET_BASE)));
   }
   return policies;
 }

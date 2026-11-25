@@ -2,6 +2,7 @@ import { IS_HEPHAESTUS, MAP } from './world.js';
 import { point_in_ring } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS } from './scene_layout.js';
 import { BUILDING_BOUNDS, FLOOR_HEIGHT, STAIRS, SHAFT_BOXES } from './building.js';
+import { SEAT, seat_footprint } from './seat.js';
 
 export function convex_hull(points) {
   const sorted = [...new Map(points.map(point => [point.join(','), point])).values()]
@@ -151,10 +152,35 @@ export class NavigationMap {
     return false;
   }
 
+  /**
+   * The nearest planning-free point within `reach` (m) that the robot can walk to in a straight line clear of the
+   * tracking margin, or null. Standing still, the walking policy drifts, and a robot that drifted into the planning
+   * margin (but not the tracking one) would otherwise have no route at all.
+   */
+  exit_point(start, reach = 0.8) {
+    if (!this.free(start, true)) return null;
+    const steps = Math.ceil(reach / this.resolution);
+    let best = null, best_distance = Infinity;
+    for (let dy = -steps; dy <= steps; dy++) for (let dx = -steps; dx <= steps; dx++) {
+      const candidate = [start[0] + dx * this.resolution, start[1] + dy * this.resolution];
+      const distance = Math.hypot(dx, dy) * this.resolution;
+      if (distance > reach || distance >= best_distance || !this.free(candidate)) continue;
+      if (!this.line_clear(start, candidate, true)) continue;
+      best = this.point(this.index(candidate));
+      best_distance = distance;
+    }
+    return best;
+  }
+
   plan(start, goal) {
     start = start.slice(0, 2);
     goal = goal.slice(0, 2);
-    if (!this.free(start) || !this.free(goal)) return null;
+    if (!this.free(goal)) return null;
+    if (!this.free(start)) {
+      const exit = this.exit_point(start);
+      const rest = exit && this.plan(exit, goal);
+      return rest ? [start, ...rest] : null;
+    }
     if (this.line_clear(start, goal)) return [start, goal];
     const first = this.index(start);
     const last = this.index(goal);
@@ -210,15 +236,17 @@ export class NavigationMap {
 }
 
 export function make_navigation_maps() {
+  // The Lite Pro seat is the one obstacle that is not part of either map's own furniture.
+  const seat = floor => floor === SEAT.floor ? [seat_footprint(SEAT)] : [];
   if(IS_HEPHAESTUS) return [0,1].map(floor=>new NavigationMap(
-    [],MAP.bounds,.1,.52,.3,MAP.floor_areas[floor]));
+    seat(floor),MAP.bounds,.1,.52,.3,MAP.floor_areas[floor]));
   const boxes = [...SCENE_WALLS, ...SHAFT_BOXES];
   const common = boxes.map(box => rectangle([box.center[0] - box.size[0] / 2, box.center[0] + box.size[0] / 2,
     box.center[1] - box.size[1] / 2, box.center[1] + box.size[1] / 2]));
   // Floor paths cannot cross the well; explicit stair segments follow its 3D steps.
   common.push(rectangle(STAIRS.opening));
   return [0, 1].map(floor => {
-    const polygons = [...common];
+    const polygons = [...common, ...seat(floor)];
     for (const item of SCENE_FURNITURE) {
       if (Math.floor((item.position[2] + 0.01) / FLOOR_HEIGHT) !== floor) continue;
       const cosine = Math.cos(item.yaw);

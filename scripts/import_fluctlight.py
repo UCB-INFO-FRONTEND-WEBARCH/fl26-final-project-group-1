@@ -19,7 +19,7 @@ DESTINATION = ROOT / 'public/assets/lite_pro'
 FIXTURES = ROOT / 'tests/fixtures/fluctlight'
 # Kept across imports: the robot description's license notice and the render-only meshes.
 KEPT = {'ROBOT_LICENSE', 'visuals.json', 'visuals.bin'}
-# The policies the controller switches between (src/robot_controller.js); walk_stairs is optional.
+# The policies the controller switches between (src/robot_controller.js); walk_stairs and sit are optional.
 REQUIRED = ('walk', 'getup_supine', 'getup_prone')
 
 
@@ -57,6 +57,13 @@ def main():
       raise ValueError(f'{name}: the ONNX file differs from its contract.')
     shutil.copy2(onnx, DESTINATION / 'policies' / contract['onnx'])
     shutil.copy2(args.bundle / entry['contract'], DESTINATION / 'policies' / f'{name}.json')
+    motion = contract.get('motion')
+    if motion:
+      # A sit policy's chair clips (BONES-SEED, retargeted to Lite Pro), which it tracks at run time.
+      clips = args.bundle / 'policies' / motion['file']
+      if sha256(clips) != motion['sha256']:
+        raise ValueError(f'{name}: the clips differ from their contract.')
+      shutil.copy2(clips, DESTINATION / 'policies' / motion['file'])
     contracts[name] = contract
 
   walk = contracts['walk']
@@ -87,6 +94,7 @@ def main():
     'step_dt': walk['policy_dt'],
     'policies': {name: f'policies/{name}.json' for name in contracts},
     'checkpoints': {name: contract['checkpoint'] for name, contract in contracts.items()},
+    'clips': {name: f"policies/{c['motion']['file']}" for name, c in contracts.items() if c.get('motion')},
     'root_height_walk': walk['command']['root_height_walk'],
     'root_height_stand': walk['command']['root_height_stand'],
   }

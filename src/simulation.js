@@ -3,11 +3,16 @@ import { PHYSICS_DT, CONTROL_DECIMATION, DEFAULT_ANGLES, heading_from_quaternion
 import { validate_model } from './robot_assets.js';
 import { RobotController, MODE } from './robot_controller.js';
 import { Elevator } from './elevator.js';
-import { Navigation, hold_position } from './navigation.js';
-import { ELEVATOR, STANDING_HEIGHT, floor_of } from './building.js';
+import { Navigation, hold_position, hold_point } from './navigation.js';
+import { ELEVATOR, FLOOR_HEIGHT, STANDING_HEIGHT, floor_of } from './building.js';
 import { teleport_position } from './teleport.js';
+import { SEAT, SeatApproach, seat_pose } from './seat.js';
 
 const OBJ_GEOM = 5;
+// Standing still, the walking policy shuffles about 7 cm/s in one direction (0.7 m in 10 s), into furniture or out of
+// any route. With no command, the robot holds the place and heading where it came to rest (hold_point); it stays
+// within about 10 cm.
+const IDLE_HOLD = { settle_speed: 0.15, yaw_tolerance: 0.05, yaw_gain: 1.5, yaw_limit: 0.5 };
 // mjtWarning: MuJoCo resets a state with a bad position, velocity or acceleration and counts it here.
 const BAD_STATE_WARNINGS = [3, 4, 5];
 
@@ -33,12 +38,49 @@ export class Simulation {
   }
 
   get action() { return this.controller.last_action; }
+  /** The seat pose the sit policy reads: front edge, surface height and yaw. */
+  get seat() { return seat_pose(SEAT, SEAT.floor * FLOOR_HEIGHT); }
   get joint_qpos() { return this.controller.body.joint_qpos; }
   get mode() { return this.controller.mode; }
+
+  /** Walk to the seat, line up with it, and sit down. */
+  request_sit() {
+    if (!this.controller.can_sit || this.fallen) return false;
+    this.navigation?.cancel();
+    this.command = [0, 0, 0];
+    this.seat_message = null;
+    this.approach = new SeatApproach(SEAT, this.controller.sit_start(this.seat), this.navigation);
+    if (this.navigation) this.approach.begin(this.state.qpos, this.step_count * PHYSICS_DT);
+    else this.approach.set_phase('align');
+    if (this.approach.phase === 'failed') return this.end_approach();
+    return true;
+  }
+
+  /** Stand up from the seat. */
+  request_stand() {
+    return this.controller.stand();
+  }
+
+  end_approach() {
+    if (!this.approach) return false;
+    if (this.approach.phase === 'failed') this.seat_message = this.approach.message;
+    this.approach = null;
+    this.navigation?.cancel();
+    this.command = [0, 0, 0];
+    return false;
+  }
+
+  /** A manual command or another destination ends the walk to the seat. */
+  cancel_approach() {
+    if (this.approach) this.approach.phase = 'cancelled';
+    this.end_approach();
+    this.seat_message = null;
+  }
 
   request_reset() {
     this.camera_motion = null;
     this.teleport_requested = null;
+    this.cancel_approach();
     this.navigation?.cancel();
     this.command = [0, 0, 0];
     this.paused = false;
@@ -69,6 +111,9 @@ export class Simulation {
     this.fallen = false; // the simulation diverged; only a reset continues
     this.reset_requested = false;
     this.teleport_requested = null;
+    this.approach = null;
+    this.seat_message = null;
+    this.idle_anchor = null;
     this.elevator?.reset();
     this.elevator?.advance(this.state, 0);
     this.navigation?.cancel();
@@ -78,6 +123,7 @@ export class Simulation {
     const position = teleport_position(goal, this.navigation?.maps);
     if (!position) return false;
     this.camera_motion = null;
+    this.cancel_approach();
     this.teleport_requested = { position, floor: goal[2], yaw: heading_from_quaternion(this.state.qpos) };
     this.reset_requested = false;
     this.command = [0, 0, 0];
@@ -102,13 +148,27 @@ export class Simulation {
     this.command = [0, 0, 0];
     this.fallen = false;
     this.teleport_requested = null;
+    this.idle_anchor = null;
     this.teleports++;
     return target;
   }
 
-  /** The walking command for this control step: the route, a hold in a moving lift, or the manual command. */
+  /** The walking command for this control step: the walk to the seat, the route, a hold in a moving lift, or the manual command. */
   walking_command() {
-    if (this.navigation && ['walking', 'waiting', 'riding', 'arrived'].includes(this.navigation.state.status)) {
+    if (this.approach) {
+      this.idle_anchor = null;
+      const step_dt = PHYSICS_DT * CONTROL_DECIMATION;
+      const speed = Math.hypot(this.state.qvel[0], this.state.qvel[1]);
+      this.command = this.approach.update(this.state.qpos, heading_from_quaternion(this.state.qpos), this.step_count * PHYSICS_DT, step_dt, speed);
+      if (this.approach.phase === 'ready') {
+        this.approach = null;
+        this.command = [0, 0, 0];
+        this.controller.sit(this.seat, SEAT.floor * FLOOR_HEIGHT);
+      } else if (this.approach.phase === 'failed') this.end_approach();
+      return this.command;
+    }
+    const navigating = this.navigation && ['walking', 'waiting', 'riding', 'arrived'].includes(this.navigation.state.status);
+    if (navigating) {
       this.command = this.navigation.update(this.state.qpos, heading_from_quaternion(this.state.qpos), this.step_count * PHYSICS_DT);
     } else if (this.camera_motion) {
       this.command = command_from_camera_motion(this.camera_motion, heading_from_quaternion(this.state.qpos));
@@ -117,11 +177,29 @@ export class Simulation {
     const riding = this.elevator?.moving && this.elevator.occupied(this.state.qpos);
     if (riding) this.command = [0, 0, 0];
     const hold_cabin = this.elevator?.occupied(this.state.qpos) && this.command.every(value => value === 0);
-    if (!riding && !hold_cabin) return this.command;
+    if (!riding && !hold_cabin) {
+      if (!navigating && this.controller.mode === MODE.WALK && this.command.every(value => value === 0)) return this.idle_command();
+      this.idle_anchor = null;
+      return this.command;
+    }
+    this.idle_anchor = null;
     const heading = heading_from_quaternion(this.state.qpos);
     const target = hold_position(this.state.qpos, ELEVATOR.center, heading, 0.25);
     target[2] = Math.max(-0.5, Math.min(0.5, -heading * 1.4));
     return target;
+  }
+
+  /** Hold the pose where the robot came to rest (see IDLE_HOLD). */
+  idle_command() {
+    const q = this.state.qpos;
+    const heading = heading_from_quaternion(q);
+    if (!this.idle_anchor) {
+      if (Math.hypot(this.state.qvel[0], this.state.qvel[1]) > IDLE_HOLD.settle_speed) return [0, 0, 0];
+      this.idle_anchor = [q[0], q[1], heading];
+    }
+    const turn = Math.atan2(Math.sin(this.idle_anchor[2] - heading), Math.cos(this.idle_anchor[2] - heading));
+    return [...hold_point(q, this.idle_anchor, heading),
+      Math.abs(turn) < IDLE_HOLD.yaw_tolerance ? 0 : Math.max(-IDLE_HOLD.yaw_limit, Math.min(IDLE_HOLD.yaw_limit, IDLE_HOLD.yaw_gain * turn))];
   }
 
   async advance(steps) {
@@ -134,8 +212,9 @@ export class Simulation {
         const was_walking = this.controller.mode === MODE.WALK;
         await this.controller.control(this.walking_command(), step_dt);
         if (was_walking && this.controller.mode !== MODE.WALK) {
-          // A fall drops the route and the manual command; walking resumes standing still.
+          // A fall drops the route, the walk to the seat and the manual command; walking resumes standing still.
           this.camera_motion = null;
+          if (this.approach) this.cancel_approach();
           this.command = [0, 0, 0];
           this.navigation?.cancel();
         }
@@ -172,6 +251,8 @@ export class Simulation {
 
   /** Manual or route commands apply only while walking. */
   get accepts_commands() { return this.controller.mode === MODE.WALK && !this.fallen; }
+  get can_sit() { return this.controller.can_sit && !this.fallen; }
+  get can_stand() { return this.controller.can_stand && !this.fallen; }
 
   telemetry() {
     return {
@@ -188,6 +269,13 @@ export class Simulation {
       floor: floor_of(this.state.qpos),
       elevator: this.elevator?.telemetry(),
       navigation: this.navigation?.state,
+      seat: {
+        available: Boolean(this.controller.clips),
+        can_sit: this.can_sit && !this.approach,
+        can_stand: this.can_stand,
+        approach: this.approach ? { phase: this.approach.phase, message: this.approach.message } : null,
+        message: this.seat_message,
+      },
     };
   }
 

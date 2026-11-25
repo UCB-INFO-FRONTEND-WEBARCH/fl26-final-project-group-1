@@ -2,7 +2,7 @@
  "name": "getup_supine",
  "task": "Lite-Pro-Getup-Supine-RandomMotors",
  "checkpoint": "2026-11-24_04-52-37_getup_supine_v2/model_9999.pt",
- "fluctlight_commit": "060d710aa76075ca164c21bafb78e2a7e032afa9",
+ "fluctlight_commit": "e0c54afe05f091532841c4a009ecf9d1e9beb349",
  "onnx": "getup_supine.onnx",
  "onnx_sha256": "0e6b2d46ce4faa73b12b52398b922170243d810b3244f1b08a12c056138c190a",
  "inputs": [
@@ -646,5 +646,6 @@
    0,
    1.0
   ]
- }
+ },
+ "motion": null
 }

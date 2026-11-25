@@ -79,6 +79,7 @@ export class MotionViewer {
     if (this.disposed) return;
     this.manifest = manifest;
     this.add_stairs(manifest.stairs);
+    if (manifest.seat) this.add_seat(manifest.seat);
     const { width, height } = manifest.map;
     this.map_canvas.width = width;
     this.map_canvas.height = height;
@@ -121,6 +122,22 @@ export class MotionViewer {
     const landing = new THREE.Mesh(new THREE.BoxGeometry(5, 4, 0.1), stair_material);
     landing.position.set(upper[0], upper[1] + 2, floor_height - 0.05);
     this.world.add(landing);
+  }
+
+  /** The Lite Pro seat the sit clip was recorded on: its block and backrest, at their world positions. */
+  add_seat({ boxes }) {
+    const material = new THREE.MeshStandardMaterial({ color: '#7f9bb3', roughness: 0.9 });
+    for (const box of boxes) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...box.size), material);
+      mesh.position.set(...box.center);
+      mesh.rotation.z = box.yaw;
+      this.world.add(mesh);
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),
+        new THREE.LineBasicMaterial({ color: '#5f7d95', transparent: true, opacity: 0.5 }));
+      edge.position.copy(mesh.position);
+      edge.rotation.copy(mesh.rotation);
+      this.world.add(edge);
+    }
   }
 
   async select(direction) {

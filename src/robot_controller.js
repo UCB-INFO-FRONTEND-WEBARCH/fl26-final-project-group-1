@@ -1,14 +1,17 @@
-// Switches Lite Pro between its Fluctlight policies: walking on flat ground, walking on stairs, and getting up.
+// Switches Lite Pro between its Fluctlight policies: walking on flat ground, walking on stairs, getting up, and
+// sitting down on a seat and standing up from it.
 //
 //                 steps in the map
 //   walk (flat) ◀────────────────▶ walk (stairs)
 //        │       flat ground 1 s        │
-//        └─────────────┬────────────────┘
-//                    fall
-//                      ▼
-//                   falling ──at rest──▶ getup (supine or prone) ──stood 1 s──▶ walk
-//                      ▲                         │
-//                      └─────timeout or fall─────┘
+//        ├─────────────┬────────────────┘
+//        │           fall ◀──────────────────────────────────────┐
+//        │             ▼                                         │
+//        │          falling ──at rest──▶ getup (supine or prone) ──stood 1 s──▶ walk
+//        │             ▲                         │               │
+//        │             └─────timeout or fall─────┘               │
+//        │  sit                                                  │ fall
+//        └──────▶ sit down ──clip ends──▶ seated ──stand──▶ stand up ──stood──▶ walk
 //
 // Walking: the flat-ground policy follows speed and turn commands closely but is blind; the stairs policy reads its
 // elevation map and walks down stairs, but barely follows turn commands. Both see the same command and observation
@@ -23,9 +26,22 @@
 // Standing is the get-up task's own test (pelvis above 90% of 0.77 m and upright above 0.9). After 1 s of standing at
 // rest, or 3 s of standing, the walking policies start from fresh histories with a zero command. A get-up that is not
 // standing after 6 s (wedged against furniture, say) goes back to falling, and starts again from rest.
-import { LiteProBody, Motors, FluctlightPolicy, projected_gravity, WALKABLE_GROUP } from './fluctlight_policy.js';
+//
+// Sitting: one tracking policy plays a chair clip (BONES-SEED, retargeted to Lite Pro) placed so that its first pose
+// is where the robot stands, and reads the seat's place as the robot would estimate it. The sit-down clip ends seated,
+// and the policy keeps tracking its last frame until asked to stand; the stand-up clip starts from where the robot
+// sits and ends standing, where walking takes over as after a get-up. A tilt past 1 rad or the pelvis within 20 cm of
+// the floor is a fall, and the get-up follows.
+import { LiteProBody, Motors, FluctlightPolicy, MotionClips, Reference, heading_of, projected_gravity, WALKABLE_GROUP } from './fluctlight_policy.js';
 
-export const MODE = Object.freeze({ WALK: 'walk', FALLING: 'falling', GETUP: 'getup' });
+export const MODE = Object.freeze({
+  WALK: 'walk', FALLING: 'falling', GETUP: 'getup', SIT_DOWN: 'sit_down', SEATED: 'seated', STAND_UP: 'stand_up',
+});
+const SITTING = new Set([MODE.SIT_DOWN, MODE.SEATED, MODE.STAND_UP]);
+// While sitting, a fall: tilt past 1 rad, or the pelvis within 0.2 m of the floor (seated it rests about 0.42 m up).
+const SIT_FALL = { tilt: 1.0, height: 0.2 };
+// After the stand-up clip ends, the robot has this long to stand still before walking takes over anyway.
+const STAND_UP_GRACE_S = 2.0;
 
 const FALL_TILT = 1.0; // rad, velocity task FALL_TILT
 const FALL_DROP = 0.25; // m below the commanded root height, velocity task FALL_DROP
@@ -52,8 +68,13 @@ export class RobotController {
     }
     this.body = new LiteProBody(mujoco, model, policies.walk.contract);
     this.motors = new Motors(this.body, random);
+    this.clips = policies.sit ? new MotionClips(policies.sit.contract.motion, policies.sit.clips) : null;
     this.policies = Object.fromEntries(Object.entries(policies).map(([name, { session, contract }]) =>
-      [name, new FluctlightPolicy(mujoco, model, this.body, session, contract, { random })]));
+      [name, new FluctlightPolicy(mujoco, model, this.body, session, contract,
+        { random, clips: contract.motion ? this.clips : null })]));
+    if (this.clips && (!this.clips.names('sit_down').length || !this.clips.names('stand_up').length)) {
+      throw new Error('The sit policy needs a sit-down and a stand-up clip.');
+    }
     this.walkers = WALKERS.filter((name) => this.policies[name]);
     if (this.policies.walk_stairs && !this.policies.walk_stairs.map) {
       throw new Error('The stairs policy needs an elevation map.');
@@ -67,12 +88,16 @@ export class RobotController {
   }
 
   get active() { return this.policies[this.policy_name] ?? null; }
+  get can_sit() { return Boolean(this.clips) && this.mode === MODE.WALK; }
+  get can_stand() { return this.mode === MODE.SEATED; }
+  get sitting() { return SITTING.has(this.mode); }
   get last_action() { return this.active?.last_action ?? this.policies.walk.last_action; }
   get inference_ms() { return this.active?.inference_ms ?? 0; }
 
   /** Start walking from the standing pose, with fresh histories. */
   reset() {
     this.time = 0;
+    this.reference = null;
     this.enter(MODE.WALK, 'walk');
     this.motors.set_target(this.policies.walk.contract.default_joint_pos);
   }
@@ -84,6 +109,7 @@ export class RobotController {
     this.stand_time = 0;
     this.still_time = 0;
     this.flat_time = 0;
+    this.done_time = 0;
     this.policy_name = policy_name;
     // While falling the motors keep the get-up gains and contacts, so the whole body meets the floor as it will
     // when the get-up starts.
@@ -93,6 +119,51 @@ export class RobotController {
     const fresh = mode === MODE.WALK ? this.walkers : policy_name ? [policy_name] : [];
     for (const name of fresh) this.policies[name].reset();
     this.command = [0, 0, 0];
+  }
+
+  /** The robot's root on the floor: x, y and heading. */
+  root_pose() {
+    const q = this.body.root_qpos;
+    return [this.state.qpos[q], this.state.qpos[q + 1], heading_of(this.state.qpos, q + 3)];
+  }
+
+  /** The first pose of the sit-down clip when its seat is `seat` (x, y, heading on the floor). */
+  sit_start(seat, name = this.clips.names('sit_down')[0]) {
+    const reference = Reference.on_seat(this.clips, name, seat, 0);
+    const root = reference.root_pos(0);
+    return [root[0], root[1], heading_of(reference.root_quat(0))];
+  }
+
+  /**
+   * Sit down on `seat` ([x, y, z, yaw]: the front edge, the seat surface's height, the direction a sitter faces), on a
+   * floor at height `floor`. The clip is placed on the seat, so the robot, which stands a few centimetres in front of
+   * the clip's first pose (see seat.js), steps into it as it sits. `placement: 'root'` starts the clip at the robot.
+   */
+  sit(seat, floor = 0, name = this.clips.names('sit_down')[0], placement = 'seat') {
+    if (!this.can_sit) return false;
+    this.reference = placement === 'seat'
+      ? Reference.on_seat(this.clips, name, seat, floor)
+      : Reference.on_root(this.clips, name, this.root_pose(), floor, seat);
+    this.switch_between_steps(MODE.SIT_DOWN, 'sit');
+    return true;
+  }
+
+  /** Stand up from the seat: the stand-up clip starts where the robot sits, as the task's resets do. */
+  stand(name = this.clips.names('stand_up')[0], placement = 'root') {
+    if (!this.can_stand) return false;
+    const { seat, offset } = this.reference;
+    this.reference = placement === 'seat'
+      ? Reference.on_seat(this.clips, name, seat, offset[2])
+      : Reference.on_root(this.clips, name, this.root_pose(), offset[2], seat);
+    this.switch_between_steps(MODE.STAND_UP, 'sit');
+    return true;
+  }
+
+  /** Enter a mode outside a control step: the motors hold the last target until the new policy's first one. */
+  switch_between_steps(mode, policy_name) {
+    const last = this.motors.targets.at(-1);
+    this.enter(mode, policy_name);
+    if (last) this.motors.set_target(last);
   }
 
   /** Height of the walkable surface under the pelvis, or the pelvis height itself if nothing is below. */
@@ -119,6 +190,29 @@ export class RobotController {
   update_mode(posture, dt) {
     this.mode_time += dt;
     const fallen = posture.upright < Math.cos(FALL_TILT) || posture.height < this.root_height - FALL_DROP;
+    if (SITTING.has(this.mode)) {
+      if (posture.upright < Math.cos(SIT_FALL.tilt) || posture.height < SIT_FALL.height) {
+        this.falls++;
+        this.reference = null;
+        this.enter(MODE.FALLING, null);
+        return;
+      }
+      if (this.mode === MODE.SIT_DOWN && this.reference.done) {
+        // Same policy and histories: it keeps tracking the clip's last, seated frame.
+        this.mode = MODE.SEATED;
+        this.mode_time = 0;
+      } else if (this.mode === MODE.STAND_UP && this.reference.done) {
+        const standing = posture.height > STAND.height && posture.upright > STAND.upright;
+        this.stand_time = standing ? this.stand_time + dt : 0;
+        this.still_time = standing && this.at_rest(STAND) ? this.still_time + dt : 0;
+        this.done_time = (this.done_time ?? 0) + dt;
+        if (this.still_time >= 0.3 || (standing && this.done_time >= STAND_UP_GRACE_S)) {
+          this.reference = null;
+          this.enter(MODE.WALK, 'walk');
+        }
+      }
+      return;
+    }
     switch (this.mode) {
       case MODE.WALK:
         if (fallen) {
@@ -186,6 +280,13 @@ export class RobotController {
       this.motors.push_target(await this.active.act());
       return;
     }
+    if (SITTING.has(this.mode)) {
+      // The reference leads the robot by one frame, as after a reset in training; it holds at the clip's last frame.
+      this.reference.advance();
+      this.active.observe(this.state, this.reference);
+      this.motors.push_target(await this.active.act());
+      return;
+    }
     this.command = this.command.map((value, i) =>
       value + Math.max(-COMMAND_RATE[i] * dt, Math.min(COMMAND_RATE[i] * dt, command[i] - value)));
     const input = [...this.command, this.root_height];
@@ -210,7 +311,9 @@ export class RobotController {
   }
 
   telemetry() {
-    return { mode: this.mode, policy: this.policy_name, falls: this.falls, getups: this.getups, command: [...this.command] };
+    const clip = this.reference && { kind: this.reference.clip.kind, frame: this.reference.frame, frames: this.reference.clip.frames };
+    return { mode: this.mode, policy: this.policy_name, falls: this.falls, getups: this.getups, command: [...this.command],
+      can_sit: this.can_sit, can_stand: this.can_stand, clip };
   }
 
   dispose() {

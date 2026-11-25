@@ -14,6 +14,7 @@ import { ROBOT_VISUAL_GROUP } from '../src/geom_groups.js';
 import { IS_HEPHAESTUS } from '../src/world.js';
 import { POLICY } from '../src/policy_constants.js';
 import { ASSET_BASE, load_policies, release_policies, seeded_random } from './load_policies.js';
+import { SEAT, seat_boxes, from_seat } from '../src/seat.js';
 
 assert.ok(!IS_HEPHAESTUS, 'Record in the demo apartment: CENTORIA_MAP=demo node scripts/record_explainer.js');
 const destination = new URL('../public/assets/explainer/', import.meta.url);
@@ -33,7 +34,8 @@ const rotation = new Matrix4();
 const quaternion = new Quaternion();
 // The stairs policy's elevation map, as grey levels: mid grey is the ground underfoot, white 0.5 m above, black 0.5 m below.
 const MAP_RANGE = 0.5;
-const LABELS = ['walk', 'walk_stairs', 'falling', 'getup_supine', 'getup_prone'];
+const LABELS = ['walk', 'walk_stairs', 'falling', 'getup_supine', 'getup_prone', 'sit_down', 'seated', 'stand_up'];
+const SITTING = new Set([MODE.SIT_DOWN, MODE.SEATED, MODE.STAND_UP]);
 const manifest = {
   description: 'Seeded physical runs of the Fluctlight policies in the Centoria demo apartment. Recorded at 10 frames/s. No pose corrections.',
   source: source.source,
@@ -46,6 +48,7 @@ const manifest = {
   labels: LABELS,
   stairs: { boxes: STAIR_BOXES, center_x: STAIRS.center_x, floor_height: FLOOR_HEIGHT,
     landings: [STAIRS.lower_landing, STAIRS.upper_landing] },
+  seat: { boxes: seat_boxes(SEAT) },
   clips: {},
 };
 
@@ -68,7 +71,8 @@ async function record(name, setup, done, limit_s) {
     // The map as the stairs policy would see it now, whichever policy drives.
     mujoco.mj_forward(model, simulation.state);
     for (const h of map.sense(simulation.state)) heights.push(Math.round(Math.max(0, Math.min(1, (h + MAP_RANGE) / (2 * MAP_RANGE))) * 255));
-    labels.push(LABELS.indexOf(simulation.mode === MODE.FALLING ? 'falling' : simulation.controller.policy_name));
+    labels.push(LABELS.indexOf(simulation.mode === MODE.FALLING ? 'falling'
+      : SITTING.has(simulation.mode) ? simulation.mode : simulation.controller.policy_name));
     if (done(simulation)) break;
   }
   assert.equal(simulation.fallen, false, `${name}: the simulation diverged`);
@@ -94,6 +98,18 @@ await record('getup', simulation => {
   simulation.state.qpos[2] = 0.25;
   simulation.state.qpos.set([Math.SQRT1_2, 0, Math.SQRT1_2, 0], 3);
 }, simulation => simulation.controller.getups > 0 && simulation.mode === MODE.WALK && simulation.controller.mode_time > 1.5, 20);
+
+let seated_at = null;
+await record('sit', simulation => {
+  // Two metres in front of the seat, facing it: walk up, turn, back up, sit, sit for two seconds, stand and step away.
+  simulation.reset([...from_seat(SEAT, 2.0, 0.4), STANDING_HEIGHT], SEAT.yaw + Math.PI);
+  assert.ok(simulation.request_sit(), 'The sit request was refused');
+  seated_at = null;
+}, simulation => {
+  if (simulation.mode === MODE.SEATED && seated_at === null) seated_at = simulation.step_count;
+  if (simulation.mode === MODE.SEATED && simulation.step_count - seated_at > 400) simulation.request_stand();
+  return seated_at !== null && simulation.mode === MODE.WALK && simulation.controller.mode_time > 1.0;
+}, 45);
 
 await writeFile(new URL('motion.json', destination), JSON.stringify(manifest));
 await release_policies(policies);

@@ -79,3 +79,19 @@ test('upper floor slabs leave actual stairs and elevator openings', () => {
       Math.abs(point[1] - slab.center[1]) < slab.size[1] / 2));
   }
 });
+
+test('a robot that drifted into the planning margin walks straight out of it first', () => {
+  const map = new NavigationMap([rectangle([-0.5, 0.5, -1.5, 1.5])], [-4, 4, -4, 4]);
+  // 0.4 m from the obstacle: inside the planning margin (0.42 m radius), outside the tracking one (0.30 m).
+  const start = [0.9, 0];
+  assert.equal(map.free(start), false);
+  assert.equal(map.free(start, true), true);
+  const path = map.plan(start, [3, 2]);
+  assert.ok(path, 'no route out of the margin');
+  assert.deepEqual(path[0], start);
+  assert.ok(map.free(path[1]) && map.line_clear(start, path[1], true));
+  assert.ok(Math.hypot(path[1][0] - start[0], path[1][1] - start[1]) < 0.3);
+  assert.ok(path.slice(2).every((point, index) => map.line_clear(path[index + 1], point)));
+  // Inside the tracking margin there is no way out.
+  assert.equal(map.plan([0.75, 0], [3, 2]), null);
+});

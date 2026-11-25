@@ -10,6 +10,7 @@ import { Navigation } from '../src/navigation.js';
 import { MODE } from '../src/robot_controller.js';
 import { load_policies, release_policies, seeded_random } from './load_policies.js';
 import { make_navigation_maps } from '../src/path_planner.js';
+import { check_sit } from './sit_check.js';
 import { FLOOR_HEIGHT, STANDING_HEIGHT, STAIRS, ELEVATOR, floor_of, on_stairs, stair_height } from '../src/building.js';
 
 const asset_base = new URL('../public/assets/lite_pro/', import.meta.url);
@@ -308,6 +309,9 @@ await navigate([...STAIRS.lower_landing, 0], {
   start: [...STAIRS.upper_landing, FLOOR_HEIGHT + STANDING_HEIGHT], yaw: -Math.PI / 2, transfer: 'stairs', experimental: true,
 });
 
+console.log('Checking the walk to the seat, sitting down and standing up');
+await check_sit(mujoco, model, policies, [[SPAWN, 0], [[0, -1.5, SPAWN[2]], Math.PI]]);
+
 await release_policies(policies);
 model.delete();
-console.log('PASS: manual locomotion and collisions, fall recovery face up and face down, 6 navigation routes including elevator travel, arrival hold, pause/reset, and invalid-action rejection. Stair routes reported as experimental.');
+console.log('PASS: manual locomotion and collisions, fall recovery face up and face down, 6 navigation routes including elevator travel, arrival hold, pause/reset, invalid-action rejection, and sitting down on and standing up from the seat. Stair routes reported as experimental.');

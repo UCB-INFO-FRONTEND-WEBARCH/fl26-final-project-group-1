@@ -23,6 +23,22 @@ export function rotation(q, o = 0) {
   ];
 }
 
+/** The product a * b of unit quaternions (w, x, y, z). */
+export function quat_multiply(a, b) {
+  return [
+    a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+    a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+    a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+    a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0],
+  ];
+}
+
+/** The yaw (rad) of the quaternion at q[o..o+3], as mjlab's yaw_quat and heading terms take it. */
+export function heading_of(q, o = 0) {
+  const w = q[o], x = q[o + 1], y = q[o + 2], z = q[o + 3];
+  return Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
+}
+
 /** Gravity's direction in the frame of the quaternion at q[o..o+3]: R^T (0, 0, -1). */
 export function projected_gravity(q, o = 0) {
   const r = rotation(q, o);
@@ -246,9 +262,101 @@ class ElevationMap {
   dispose() {}
 }
 
+/**
+ * The chair clips of a sit policy: policies/<name>.clips.bin, float32 frames laid out as its contract's `motion`
+ * says. Positions and quaternions are in the clip's own frame, whose floor is z = 0.
+ */
+export class MotionClips {
+  constructor(motion, buffer) {
+    this.spec = motion;
+    this.clips = motion.clips;
+    this.size = motion.frame_size;
+    this.data = new Float32Array(buffer.buffer ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) : buffer);
+    this.fields = {};
+    let offset = 0;
+    for (const [name, size] of motion.frame_layout) {
+      this.fields[name] = [offset, size];
+      offset += size;
+    }
+    const frames = Object.values(this.clips).reduce((n, clip) => Math.max(n, clip.first_frame + clip.frames), 0);
+    if (offset !== this.size || this.data.length !== frames * this.size) {
+      throw new Error(`The ${motion.file} clips do not match their layout.`);
+    }
+  }
+
+  /** The clips of one kind (sit_down, seated, stand_up), in export order. */
+  names(kind) { return Object.keys(this.clips).filter((name) => this.clips[name].kind === kind); }
+
+  /** One field of a clip frame, held at the clip's first and last frames. */
+  field(name, frame, field) {
+    const clip = this.clips[name];
+    const index = clip.first_frame + Math.max(0, Math.min(clip.frames - 1, frame));
+    const [offset, size] = this.fields[field];
+    return this.data.subarray(index * this.size + offset, index * this.size + offset + size);
+  }
+}
+
+/**
+ * A clip placed in the world, as the sit task places its reference: turned by `yaw` about the world origin, then
+ * moved by `offset`. Every observation term of the sit policy is unchanged when the robot and the seat move with the
+ * clip, so any placement whose seat lands where the clip's would is one the policy trained on. `seat` is the seat it
+ * sits on: front edge (x, y, z of the surface) and yaw, in the world.
+ */
+export class Reference {
+  constructor(clips, name, { yaw = 0, offset = [0, 0, 0] }, seat) {
+    if (!clips.clips[name]) throw new Error(`There is no clip ${name}.`);
+    Object.assign(this, { clips, name, yaw, offset, seat });
+    this.clip = clips.clips[name];
+    this.frame = 0;
+    this.cos = Math.cos(yaw);
+    this.sin = Math.sin(yaw);
+  }
+
+  get last_frame() { return this.clip.frames - 1; }
+  get done() { return this.frame >= this.last_frame; }
+  advance() { if (!this.done) this.frame++; }
+  field(field, frame = this.frame) { return this.clips.field(this.name, frame, field); }
+
+  /** A point of the clip frame, in the world. */
+  to_world(p) {
+    const { cos, sin, offset } = this;
+    return [cos * p[0] - sin * p[1] + offset[0], sin * p[0] + cos * p[1] + offset[1], p[2] + offset[2]];
+  }
+
+  /** A quaternion of the clip frame, in the world. */
+  turn(q) { return quat_multiply([Math.cos(this.yaw / 2), 0, 0, Math.sin(this.yaw / 2)], q); }
+
+  anchor_pos(frame) { return this.to_world(this.field('anchor_pos', frame)); }
+  anchor_quat(frame) { return this.turn(this.field('anchor_quat', frame)); }
+  root_pos(frame) { return this.to_world(this.field('root_pos', frame)); }
+  root_quat(frame) { return this.turn(this.field('root_quat', frame)); }
+
+  /** The clip's own seat, placed: front edge (x, y, z of the surface) and yaw. */
+  clip_seat() {
+    const { front, height, yaw } = this.clip.seat;
+    return [...this.to_world([front[0], front[1], height]), yaw + this.yaw];
+  }
+
+  /** Place `name` so its frame `frame` root stands at the root pose (x, y, heading) on a floor at height `floor`. */
+  static on_root(clips, name, root, floor, seat, frame = 0) {
+    const pos = clips.field(name, frame, 'root_pos');
+    const yaw = root[2] - heading_of(clips.field(name, frame, 'root_quat'));
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    return new Reference(clips, name, { yaw, offset: [root[0] - (c * pos[0] - s * pos[1]), root[1] - (s * pos[0] + c * pos[1]), floor] }, seat);
+  }
+
+  /** Place `name` so its own seat's front edge and yaw land on `seat`'s, on a floor at height `floor`. */
+  static on_seat(clips, name, seat, floor) {
+    const { front, yaw: clip_yaw } = clips.clips[name].seat;
+    const yaw = seat[3] - clip_yaw;
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    return new Reference(clips, name, { yaw, offset: [seat[0] - (c * front[0] - s * front[1]), seat[1] - (s * front[0] + c * front[1]), floor] }, seat);
+  }
+}
+
 /** One exported policy: its observation, inference and targets. */
 export class FluctlightPolicy {
-  constructor(mujoco, model, body, session, contract, { random = Math.random, deterministic = false } = {}) {
+  constructor(mujoco, model, body, session, contract, { random = Math.random, deterministic = false, clips = null } = {}) {
     Object.assign(this, { mujoco, model, body, session, contract });
     if (contract.joint_names.join() !== body.joint_names.join()) throw new Error(`${contract.name}: joint order differs.`);
     if (contract.action_joint_names.join() !== contract.joint_names.join()) {
@@ -268,6 +376,13 @@ export class FluctlightPolicy {
       const heights = this.map?.heights ?? new Float32Array(map.shape.reduce((a, b) => a * b, 1));
       this.feeds[map.input] = new ort.Tensor('float32', heights, [1, ...map.shape]);
     }
+    // A motion-tracking policy follows a placed clip (Reference) and reads its own anchor body.
+    if (contract.motion) {
+      if (!clips) throw new Error(`${contract.name}: the policy needs its clips.`);
+      this.clips = clips;
+      this.anchor = mujoco.mj_name2id(model, OBJ_BODY, contract.motion.anchor_body);
+      if (this.anchor < 0) throw new Error(`The robot model has no ${contract.motion.anchor_body}.`);
+    }
     this.num_joints = contract.joint_names.length;
     this.last_action = new Float32Array(this.num_joints);
     this.target = Float64Array.from(contract.default_joint_pos);
@@ -280,11 +395,38 @@ export class FluctlightPolicy {
     this.last_action.fill(0);
   }
 
-  /** The current value of each term, from a state whose derived quantities are up to date (after mj_forward). */
+  /**
+   * The current value of each term, from a state whose derived quantities are up to date (after mj_forward).
+   * `command` is the velocity command of a walking policy, or the placed Reference of a motion-tracking one.
+   */
   term_value(name, state, command) {
     const { body, contract } = this;
     switch (name) {
       case 'velocity_command': return command;
+      case 'command': return command.field('command');
+      case 'motion_anchor_ori_b': {
+        // R(robot anchor)^T R(reference anchor), its first two columns row by row (mjlab's matrix_from_quat[..., :2]).
+        const robot = state.xquat.subarray(4 * this.anchor, 4 * this.anchor + 4);
+        const r = rotation(quat_multiply([robot[0], -robot[1], -robot[2], -robot[3]], command.anchor_quat()));
+        return [r[0], r[1], r[3], r[4], r[6], r[7]];
+      }
+      case 'motion_anchor_pos_estimate': {
+        // The reference anchor in the robot anchor's frame. The odometry drift of training is zero here.
+        const p = state.xpos.subarray(3 * this.anchor, 3 * this.anchor + 3);
+        const r = rotation(state.xquat, 4 * this.anchor);
+        const target = command.anchor_pos();
+        const d = [target[0] - p[0], target[1] - p[1], target[2] - p[2]];
+        return [0, 1, 2].map((i) => r[i] * d[0] + r[3 + i] * d[1] + r[6 + i] * d[2]);
+      }
+      case 'seat_estimate': {
+        // The seat's front edge relative to the root, in its heading frame, and the seat's yaw relative to the heading.
+        const q = body.root_qpos;
+        const heading = heading_of(state.qpos, q + 3);
+        const c = Math.cos(heading), s = Math.sin(heading);
+        const [x, y, z, yaw] = command.seat;
+        const d = [x - state.qpos[q], y - state.qpos[q + 1], z - state.qpos[q + 2]];
+        return [c * d[0] + s * d[1], -s * d[0] + c * d[1], d[2], Math.sin(yaw - heading), Math.cos(yaw - heading)];
+      }
       case 'projected_gravity': return projected_gravity(state.qpos, body.root_qpos + 3);
       case 'base_ang_vel': return Array.from(state.sensordata.subarray(body.gyro, body.gyro + 3));
       case 'joint_pos': return body.joint_qpos.map((a, i) => state.qpos[a] - contract.default_joint_pos[i]);

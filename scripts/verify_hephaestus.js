@@ -10,6 +10,7 @@ import {MAP} from '../src/world.js';
 import {PHYSICS_DT} from '../src/locomotion.js';
 import {MODE} from '../src/robot_controller.js';
 import {load_policies,release_policies,seeded_random} from './load_policies.js';
+import {check_sit} from './sit_check.js';
 const base=new URL('../public/assets/lite_pro/',import.meta.url);
 const mujoco=await load_mujoco({locateFile:()=>fileURLToPath(new URL('../node_modules/@mujoco/mujoco/mujoco.wasm',import.meta.url))});
 await load_robot_files(mujoco,p=>readFile(new URL(p,base)));
@@ -58,4 +59,5 @@ assert(max_tracking_y<.65,`Automatic route left central aisle: ${max_tracking_y}
 assert(!sim.fallen&&sim.mode===MODE.WALK,'Automatic aisle route fell');assert.equal(sim.navigation.state.status,'arrived',sim.navigation.state.message);results.automatic_aisle=sim.telemetry();
 // Pause and reset must still work with a no-lift model and a source-normalized spawn.
 sim.paused=true;const before=Array.from(sim.state.qpos);assert.equal(await sim.advance(20),0);assert.deepEqual(Array.from(sim.state.qpos),before);sim.paused=false;sim.reset();assert.deepEqual(Array.from(sim.state.qpos.slice(0,7)),initial_pose);assert.equal(sim.elevator,null);
+console.log('Hephaestus: walk to the seat, sit down and stand up');await check_sit(mujoco,model,policies,[[SPAWN,SPAWN_YAW],[[6,-2.5,SPAWN[2]],0]]);
 const report={status:'PASS',map:MAP.id,source_sha256:MAP.source_sha256,geom_count:model.ngeom,body_count:model.nbody,spatial_map_max_error:map_error,ray_checks:{carpet,void_ray,table,glass,upper},results,limits:MAP.limits};await mkdir(new URL('../local_assets/hephaestus/',import.meta.url),{recursive:true});await writeFile(new URL('../local_assets/hephaestus/verification.json',import.meta.url),JSON.stringify(report,null,2));console.log('HEPHAESTUS_PHYSICS_PASS',model.ngeom);sim.dispose();model.delete();await release_policies(policies);

@@ -1,10 +1,11 @@
 # Centoria
 
 Centoria is a React application for manual and automatic navigation of Berkeley
-Lite Pro in a furnished, two-floor apartment. Four learned policies from Fluctlight
+Lite Pro in a furnished, two-floor apartment. Five learned policies from Fluctlight
 control its 34 body joints: walking on flat ground, walking on stairs with an elevation
-map, and getting up from the back or the front. A state machine switches between them,
-so Lite Pro gets up by itself after a fall.
+map, getting up from the back or the front, and sitting down on a seat and standing up.
+A state machine switches between them, so Lite Pro gets up by itself after a fall and
+can walk to the Lite Pro seat, sit, and stand again.
 MuJoCo simulates the robot, stairs, and furniture in the browser. The default
 playground is the furnished Hephaestus Tower roof apartment and mezzanine,
 exported from the calibrated V20 Blender project. The surrounding highrise is
@@ -44,8 +45,8 @@ Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
 The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
 the local server. The application runs without a Python server, API key, GPU,
 external inference endpoint, or cross-origin isolation headers.
-The first page load transfers approximately 50 MB of uncompressed robot and runtime assets (four policies and the
-full lite-description meshes) plus 40 MB
+The first page load transfers approximately 50 MB of uncompressed robot and runtime assets (five policies, two chair
+clips and the full lite-description meshes) plus 40 MB
 of bundled room models and finish textures.
 The browser can cache these assets for later loads.
 
@@ -58,17 +59,17 @@ The player shows physical policy recordings with the synchronized elevation map.
 It does not load MuJoCo or ONNX Runtime. Playback starts paused and stops outside the viewport.
 The **Motion** control stops diagram animations. The page also respects the system preference for reduced motion.
 
-To regenerate the two seeded recordings (a stair descent and a get-up), run:
+To regenerate the three seeded recordings (a stair descent, a get-up, and sitting down and standing up), run:
 
 ```bash
 CENTORIA_MAP=demo node scripts/record_explainer.js
 ```
 
-The script runs in the demo apartment, whose straight stair the page shows, and checks
-that the descent finishes without a fall and the get-up ends walking. It writes poses,
-elevation maps, the active policy, the stair geometry, and source metadata to
-`public/assets/explainer/`. The page loads the descent first and fetches the get-up
-when you select it.
+The script runs in the demo apartment, whose straight stair and seat the page shows, and checks
+that the descent finishes without a fall, the get-up ends walking, and the robot sits, stands up and walks on.
+It writes poses, elevation maps, the active policy, the stair and seat geometry, and source metadata to
+`public/assets/explainer/`. The page loads the descent first and fetches the other clips
+when you select them.
 
 ### Asset library
 
@@ -167,6 +168,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Q / E | Strafe left / right |
 | Shift + movement key | Double movement and turning commands while held |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
+| T, **Sit**, or a click on the seat | Walk to the Lite Pro seat and sit; T again stands up |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
 | V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
@@ -187,8 +189,8 @@ Shift doubles manual travel speed and the turn limit. Pressing Shift alone does 
 Open **Teleport** and select a floor to move the robot directly, including to the mezzanine.
 Drag the robot icon or its map marker onto an open spot. You can also click the map.
 Teleport clears the route, velocity, and policy memory, preserves pause state, and rejects blocked floor or voids.
-When you release a movement input, the controller requests zero velocity.
-The policy continues to balance the robot, which can still take small steps or drift.
+When you release a movement input, the controller requests zero velocity. Standing still, the walking
+policy shuffles about 7 cm/s, so the robot then holds the place where it came to rest, with small corrective steps.
 
 **Shoulder** is the default camera. It follows closely behind the figure's right
 shoulder and turns with its heading. Position and heading ease smoothly; walls and
@@ -219,6 +221,9 @@ Select Resume to continue.
 - The walking policies handle flat ground and stairs. Theta* supplies the global route.
 - After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
   Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
+- Each map has one **Lite Pro seat**, sized like the seat the sit policy trained on (35 cm high, with a backrest):
+  east of the main lounge in Hephaestus, and in the living room's south half in the demo apartment. The apartments'
+  sofas and armchairs (41–48 cm) are higher than the chair clips for a 1.2 m robot allow.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
 Cross-floor routes attempt the original stair path. The asset library uses
@@ -270,7 +275,7 @@ commands. The earlier G1 measurements remain separately labeled as historical.
 
 ## Policy and simulation
 
-Four policies from Fluctlight (`tracker/ppo`, trained with PPO in mjlab) drive Lite Pro.
+Five policies from Fluctlight (`tracker/ppo`, trained with PPO in mjlab) drive Lite Pro.
 `src/robot_controller.js` picks one each control step:
 
 | Policy | Drives | Reads |
@@ -278,13 +283,14 @@ Four policies from Fluctlight (`tracker/ppo`, trained with PPO in mjlab) drive L
 | `walk` (flat v3) | Flat ground; follows speed and turn commands | command, 5 frames of body history |
 | `walk_stairs` (stairs v4) | Stairs, when its map shows a step ahead | the same, plus a 21 × 21 elevation map |
 | `getup_supine`, `getup_prone` (v2) | After a fall, by the side it lies on | 5 frames of body history |
+| `sit` (sit v6, head) | Sitting down on the seat, seated, standing up | a chair clip's frame, the seat's place, body state |
 
 ```text
 WASD / route → vx, vy, yaw rate (ramped) and a 0.75 m root height
 Body state → five frames of gravity, gyro, joints, and previous actions
 Elevation map → 21 × 21 downward rays, 10 cm apart, walkable surfaces only
     ↓
-state machine: walk ⇄ walk on stairs → fall → get up → walk
+state machine: walk ⇄ walk on stairs → fall → get up → walk; walk → sit down → seated → stand up → walk
     ↓
 544 observations (+ map) → CNN + MLP → 34 joint targets, 50 Hz
     ↓
@@ -293,7 +299,7 @@ Per-joint PD + motor torque–speed limits + 5–10 ms command delay
 MuJoCo rigid-body dynamics and contacts, 200 Hz → Three.js poses
 ```
 
-The robot model, the ONNX files and a contract per policy come from Fluctlight's
+The robot model, the ONNX files, a contract per policy, and the sit policy's two chair clips come from Fluctlight's
 `export-browser`. The runtime builds every input from the contract, and replays recorded
 mjlab steps to prove it: observations, elevation maps and actions match to about 1e-5.
 See [policy integration](docs/POLICY.md) for the contract, the switching rules, results,
@@ -312,8 +318,8 @@ npm run build
 
 The simulation regression uses the same controller as the browser worker. It first
 replays the mjlab fixtures, then checks manual locomotion, wall and furniture contacts,
-compound collision ray probes, pause, reset, getting up face up and face down, and
-invalid policy output. Automatic routes cover doorways, furniture avoidance, elevator
+compound collision ray probes, pause, reset, getting up face up and face down,
+invalid policy output, and walking to the seat, sitting down and standing up (in both maps). Automatic routes cover doorways, furniture avoidance, elevator
 transfers, and holding after arrival; stair routes run and report their outcome. Those
 transfer regressions run on the explicit demo fixture. The additional Hephaestus run
 checks real floor/table/glazing rays, the mezzanine void, the elevation map with and
@@ -332,7 +338,8 @@ src/hephaestus_data.js         Generated source metadata, floor masks, and asset
 src/hephaestus_physics.js      Generated convex contacts, worker-only bundle
 public/assets/hephaestus/      Optimized room/tower GLBs and native finish bakes
 src/fluctlight_policy.js       Policy contracts: observations, elevation map, motors, contacts
-src/robot_controller.js        State machine: walking, stairs, falls, and get-ups
+src/robot_controller.js        State machine: walking, stairs, falls, get-ups, and sitting
+src/seat.js                    The Lite Pro seat of each map and the walk that lines up with it
 src/policy_constants.js        Generated constants from the Fluctlight bundle
 src/locomotion.js              Timing, joint names, keyboard commands, and heading
 src/simulation.js              Physical stepping, reset, and routing
@@ -345,6 +352,7 @@ scripts/import_fluctlight.py   Import and verify a Fluctlight browser bundle
 scripts/prepare_visual_assets.js Render-only mesh simplification
 scripts/verify_policy_fixtures.js Replay the mjlab fixtures through the runtime
 scripts/verify_simulation.js   Headless MuJoCo + ONNX physics checks
+scripts/sit_check.js           Walk to the seat, sit, stand up: shared by both maps' checks
 ```
 
 The bundled assets are ready to use. To swap in a newly trained checkpoint, export a

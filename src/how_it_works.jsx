@@ -15,7 +15,8 @@ const HOST = 'https://arxiv.org/abs/2502.08378';
 const CHAPTERS = [['motion', 'The motion'], ['control', 'The control loop'], ['learning', 'The learning'],
   ['recovery', 'The recovery'], ['terrain', 'The stairs'], ['navigation', 'The route'], ['evidence', 'The evidence']];
 const POLICY_LABELS = { walk: 'Walk · flat ground', walk_stairs: 'Walk · stairs', falling: 'Falling · motors hold',
-  getup_supine: 'Get up · from the back', getup_prone: 'Get up · from the front' };
+  getup_supine: 'Get up · from the back', getup_prone: 'Get up · from the front',
+  sit_down: 'Sit · chair clip, sitting down', seated: 'Sit · holding the seated frame', stand_up: 'Sit · chair clip, standing up' };
 
 function SectionHeading({ number, label, title, children }) {
   return <div className="ex-section-heading">
@@ -66,6 +67,7 @@ function MotionPlayer({ motion_enabled }) {
         <div className="ex-segmented" role="group" aria-label="Recorded clip">
           <button aria-pressed={direction === 'down'} onClick={() => change_direction('down')} disabled={frame.loading}>Stairs ↘</button>
           <button aria-pressed={direction === 'getup'} onClick={() => change_direction('getup')} disabled={frame.loading}>Get up ↑</button>
+          <button aria-pressed={direction === 'sit'} onClick={() => change_direction('sit')} disabled={frame.loading}>Sit ↓</button>
         </div>
       </div>
       <div className="ex-stage-label"><span>BERKELEY HUMANOIDS</span><strong>Lite Pro</strong><small>{POLICY_LABELS[frame.policy] || 'Fluctlight PPO'}</small></div>
@@ -90,8 +92,8 @@ function MotionPlayer({ motion_enabled }) {
           }} /></label>
       <output className="ex-time">{frame.time.toFixed(1)} <span>/ {frame.duration.toFixed(1)} s</span></output>
     </div>
-    <figcaption>Press play or drag the timeline. Both recordings run the playground’s policies with physical contacts, in the demo
-      apartment’s straight stair (11 cm risers).<br />The 3D view shows the stairs and the ground floor only. The label names the policy in control.</figcaption>
+    <figcaption>Press play or drag the timeline. The recordings run the playground’s policies with physical contacts in the demo
+      apartment: its straight stair (11 cm risers), its living-room floor, and the Lite Pro seat.<br />The 3D view shows the stairs, the seat and the ground floor only. The label names the policy in control.</figcaption>
   </figure>;
 }
 
@@ -104,7 +106,7 @@ const LOOP_STAGES = [
     detail: 'The stairs policy also reads a 21 × 21 elevation map: 441 downward rays, 10 cm apart, heights relative to the ground underfoot.' },
   { name: 'Infer', metric: '50 updates / second', title: 'The policy selects joint targets.',
     text: 'A convolutional neural network (CNN) encodes the map. A multilayer perceptron (MLP) combines it with the command and the history.',
-    detail: 'Each ONNX file includes its input normalization. A controller picks the policy: flat walking, stairs, or getting up.' },
+    detail: 'Each ONNX file includes its input normalization. A controller picks the policy: flat walking, stairs, sitting, or getting up.' },
   { name: 'Act', metric: '34 joint targets', title: 'The motors apply torque.',
     text: 'Each action is an offset from the standing pose, with a joint-specific scale. A proportional–derivative (PD) controller converts the error into torque.',
     detail: 'The motor model limits torque as speed rises, as in training. Commands include the trained delay of 5–10 milliseconds.' },
@@ -196,12 +198,13 @@ function Learning() {
         </div>
       </div>
     </div>
-    <div className="ex-joint-section"><div><h3>Four policies. 34 body joints.</h3>
+    <div className="ex-joint-section"><div><h3>Five policies. 34 body joints.</h3>
       <p>Each policy controls the legs, waist, arms, and neck. The model fixes the fingers.</p></div>
       <div className="ex-joints">{[['Legs', 14], ['Waist', 3], ['Arms', 14], ['Neck', 3]].map(([name, count]) =>
         <div key={name}><span>{name} <b>{count}</b></span><div>{Array.from({ length: count }, (_, index) => <i key={index} />)}</div></div>)}</div>
     </div>
-    <p className="ex-footnote">The two get-up policies, face up and face down, follow <a href={HOST} target="_blank" rel="noreferrer">HoST</a>: they start from settled lying poses and earn rewards for an upright, high pelvis, then the standing pose.</p>
+    <p className="ex-footnote">The two get-up policies, face up and face down, follow <a href={HOST} target="_blank" rel="noreferrer">HoST</a>: they start from settled lying poses and earn rewards for an upright, high pelvis, then the standing pose.
+      The sit policy tracks motion-captured chair clips (BONES-SEED, retargeted to Lite Pro) on a seat whose height, place, softness and friction change every episode, and it reads where the seat is as the robot would estimate it.</p>
   </section>;
 }
 
@@ -210,6 +213,7 @@ const RECOVERY_STATES = [
   ['Fall', 'Tilt over 57° or the pelvis 0.25 m low', 'The thresholds that ended a walking episode in training. The motors hold the joints where they are until the body comes to rest.'],
   ['Get up', 'Face up or face down', 'Gravity in the pelvis frame tells the side. That get-up policy stands the robot in about a second; a wedged attempt retries after 6 s.'],
   ['Stand', 'Pelvis above 0.69 m and upright', 'After a second standing still, or three seconds standing, walking resumes with a zero command and a fresh history.'],
+  ['Sit', 'On the Lite Pro seat', 'The robot walks to the seat, turns its back to it and backs up. One tracking policy then plays a sit-down clip placed on the seat, holds its last frame, and plays a stand-up clip when asked.'],
 ];
 function Recovery() {
   const [state, set_state] = useState(1);
@@ -320,16 +324,18 @@ function Evidence() {
       Results depend on the checkpoint, terrain, command, and test. The playground does not establish a general success rate.
     </SectionHeading>
     <div className="ex-evidence-grid"><div className="ex-report-card"><span className="ex-kicker">MJLAB EVALUATION · HELD-OUT STARTS</span>
-      <h3>The four checkpoints</h3><p>Batch tests in the training simulator, from starts the policies did not train on.</p>
+      <h3>The five checkpoints</h3><p>Batch tests in the training simulator, from starts the policies did not train on.</p>
       <div className="ex-result-bar"><div><span>Flat walk below 1 m/s, no fall in 5 s</span><strong>98%</strong></div><i><b style={{ width: '98%' }} /></i></div>
       <div className="ex-result-bar"><div><span>Stairs down, 2–18 cm, crossed</span><strong>93–100%</strong></div><i><b style={{ width: '96%' }} /></i></div>
       <div className="ex-result-bar"><div><span>Stairs up, 11 cm and taller, crossed</span><strong>0%</strong></div><i><b style={{ width: '0%' }} /></i></div>
       <div className="ex-result-bar"><div><span>Get up from held-out lying poses</span><strong>100%</strong></div><i><b style={{ width: '100%' }} /></i></div>
+      <div className="ex-result-bar"><div><span>Sit down on a chair clip’s seat</span><strong>85%</strong></div><i><b style={{ width: '85%' }} /></i></div>
+      <div className="ex-result-bar"><div><span>Stand up from it</span><strong>86%</strong></div><i><b style={{ width: '86%' }} /></i></div>
       <p className="ex-footnote">These are not success rates for this apartment. A newer stairs policy that keeps its heading on a climb is in training.</p>
     </div><div className="ex-checks-card"><span className="ex-kicker">THIS PLAYGROUND</span><h3>What we check</h3>
       <ul><li><span>01</span><div><strong>Training agreement</strong><p>Recorded mjlab steps replay in the browser runtime: observations, elevation maps and actions match to 1e-5.</p></div></li>
-        <li><span>02</span><div><strong>Physical routes</strong><p>Seeded tests cover routes on each floor, elevator rides, walls and furniture, and getting up face up and face down.</p></div></li>
-        <li><span>03</span><div><strong>Known limits</strong><p>The stairs policy turns away from tall steps. Get-ups need about 1.5 m of free floor. Straight walks drift slowly in heading.</p></div></li></ul>
+        <li><span>02</span><div><strong>Physical routes</strong><p>Seeded tests cover routes on each floor, elevator rides, walls and furniture, getting up face up and face down, and sitting down on the seat and standing up in both apartments.</p></div></li>
+        <li><span>03</span><div><strong>Known limits</strong><p>The stairs policy turns away from tall steps. Get-ups need about 1.5 m of free floor. Straight walks drift slowly in heading. The sit policy needs a seat of its trained kind: the apartments’ sofas are too high.</p></div></li></ul>
       <p className="ex-footnote">All results are from simulation. None of these policies has run on the physical robot.</p>
     </div></div>
     <div className="ex-reference-row"><span>GO DEEPER</span>
@@ -348,6 +354,7 @@ function PlaygroundControls() {
       <div><dt>Move manually</dt><dd>In Shoulder, WASD moves relative to the camera. Q/E also move sideways. The robot turns toward travel. In other views, A/D turns. Hold Shift for twice the speed.</dd></div>
       <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
+      <div><dt>Sit down</dt><dd>Press T, select Sit, or click the Lite Pro seat. The robot walks there, lines up and sits. Press T again to stand up.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>
       <div><dt>Enter the world</dt><dd>Select Play. Satellite views zoom from the Bay Area to NVIDIA Building K, then open the apartment. Light and dark themes select day and night. Select Controls to open the panels.</dd></div>
       <div><dt>Change the camera</dt><dd>Move the mouse to look around. Alt releases or captures the cursor. Drag also works when it is free. Scroll to zoom. The figure blurs and fades near the lens. Press V to cycle views.</dd></div>
@@ -380,7 +387,7 @@ function HowItWorks() {
     <main id="ex-content">
       <section className="ex-hero"><span className="ex-kicker"><i /> A GUIDE TO THE PLAYGROUND</span>
         <h1>How Lite Pro<br /><span>finds its footing.</span></h1>
-        <p>A goal. An elevation map. Learned policies that walk and get up.<br />Explore what turns your input into a step.</p>
+        <p>A goal. An elevation map. Learned policies that walk, sit and get up.<br />Explore what turns your input into a step.</p>
         <a className="ex-hero-link" href="#motion">Explore the motion <span aria-hidden="true">↓</span></a>
       </section>
       <div className="ex-content"><MotionPlayer motion_enabled={motion_enabled} />
@@ -402,7 +409,7 @@ function HowItWorks() {
       </div>
     </main>
     <footer className="ex-footer"><a className="brand" href={SITE_BASE}><Icon name="robot" size={20} />Centoria</a>
-      <span>Lite Pro · Fluctlight PPO · MuJoCo</span><span>Policies: Fluctlight, trained on LAFAN1 (CC BY-NC-ND 4.0) · Robot: <a href={`${SITE_BASE}assets/lite_pro/ROBOT_LICENSE`}>MIT</a></span>
+      <span>Lite Pro · Fluctlight PPO · MuJoCo</span><span>Policies: Fluctlight, trained on LAFAN1 (CC BY-NC-ND 4.0) and BONES-SEED chair clips · Robot: <a href={`${SITE_BASE}assets/lite_pro/ROBOT_LICENSE`}>MIT</a></span>
     </footer>
   </div>;
 }

@@ -2,7 +2,7 @@
  "name": "getup_prone",
  "task": "Lite-Pro-Getup-Prone-RandomMotors",
  "checkpoint": "2026-11-24_04-54-07_getup_prone_v2/model_9999.pt",
- "fluctlight_commit": "060d710aa76075ca164c21bafb78e2a7e032afa9",
+ "fluctlight_commit": "e0c54afe05f091532841c4a009ecf9d1e9beb349",
  "onnx": "getup_prone.onnx",
  "onnx_sha256": "bd35694a9982d3ea601402a6145b86cf9b6a3b9455f52d2d2815ea92f91a572c",
  "inputs": [
@@ -646,5 +646,6 @@
    0,
    1.0
   ]
- }
+ },
+ "motion": null
 }

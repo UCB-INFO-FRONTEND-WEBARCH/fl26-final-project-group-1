@@ -16,6 +16,18 @@ export function hold_position(position, target, heading, speed_limit = 0.12) {
   return [dx * Math.cos(heading) + dy * Math.sin(heading), -dx * Math.sin(heading) + dy * Math.cos(heading), 0];
 }
 
+/**
+ * Commands (vx, vy in the heading frame) that keep the robot on a point. The walking policy ignores commands under
+ * about 0.1 m/s, and standing or turning in place it shuffles several centimetres a second, so each correction is at
+ * least `floor`, and none is sent within `tolerance`.
+ */
+export function hold_point(position, target, heading, { tolerance = 0.05, gain = 1.2, floor = 0.1, limit = [0.25, 0.2] } = {}) {
+  const dx = target[0] - position[0], dy = target[1] - position[1];
+  const c = Math.cos(heading), s = Math.sin(heading);
+  const push = (error, max) => Math.abs(error) < tolerance ? 0 : Math.sign(error) * Math.min(max, Math.max(floor, gain * Math.abs(error)));
+  return [push(c * dx + s * dy, limit[0]), push(-s * dx + c * dy, limit[1])];
+}
+
 function stair_segment(from, to) {
   if(IS_HEPHAESTUS) {
     const a=stair_projection(from).progress,b=stair_projection(to).progress;
@@ -54,6 +66,7 @@ export class Navigation {
     this.segments = [];
   }
   cancel() {
+    this.turn_anchor = null;
     if (this.state.status === 'idle') return;
     this.segments = [];
     this.state = { ...IDLE_NAVIGATION, version: this.state.version + 1 };
@@ -180,7 +193,15 @@ export class Navigation {
     this.state.remaining = remaining + this.segments.slice(this.index + 1).reduce((sum, next) => sum + (next.path ? path_length(next.path) : 0), 0);
     if (remaining < this.best_remaining - 0.08) { this.best_remaining = remaining; this.last_progress = time; }
     if (time - this.last_progress > 12) { this.fail('The robot could not make progress. Choose a new destination.'); return [0, 0, 0]; }
-    return steer(position, target, heading, this.speed);
+    const command = steer(position, target, heading, this.speed);
+    // Turning in place, the walking policy also slides sideways (30 cm in a half turn), out of narrow aisles: hold the
+    // point where the turn began.
+    if (command[0] === 0 && command[1] === 0) {
+      this.turn_anchor ??= [position[0], position[1]];
+      return [...hold_point(position, this.turn_anchor, heading), command[2]];
+    }
+    this.turn_anchor = null;
+    return command;
   }
   follow_stairs(position, heading, time, path) {
     if(IS_HEPHAESTUS) return this.follow_native_stairs(position,heading,time,path);

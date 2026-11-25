@@ -1,13 +1,14 @@
 // Replays the mjlab play rollouts that `export-browser` recorded, and checks that this runtime builds the same
 // observation, elevation map and action at every step. The robot stands on a plane, as in the fixture tasks, or on
-// the tile of stairs that a policy with an elevation map was also recorded on.
+// the tile of stairs that a policy with an elevation map was also recorded on. A sit policy's fixture plays one chair
+// clip on its nominal seat; each step records the clip frame, the clip's placement and the seat.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import load_mujoco from '@mujoco/mujoco';
 import * as ort from 'onnxruntime-web/wasm';
 import { load_robot_files } from '../src/robot_assets.js';
-import { LiteProBody, FluctlightPolicy, WALKABLE_GROUP } from '../src/fluctlight_policy.js';
+import { LiteProBody, FluctlightPolicy, MotionClips, Reference, WALKABLE_GROUP } from '../src/fluctlight_policy.js';
 import { POLICY } from '../src/policy_constants.js';
 
 const asset_base = new URL('../public/assets/lite_pro/', import.meta.url);
@@ -47,10 +48,13 @@ for (const [name, stem] of fixtures) {
   const session = await ort.InferenceSession.create(
     new Uint8Array(await readFile(new URL(`policies/${contract.onnx}`, asset_base))), { executionProviders: ['wasm'] });
   const body = new LiteProBody(mujoco, model, contract);
-  const policy = new FluctlightPolicy(mujoco, model, body, session, contract, { deterministic: true });
+  const clips = contract.motion
+    ? new MotionClips(contract.motion, new Uint8Array(await readFile(new URL(`policies/${contract.motion.file}`, asset_base))))
+    : null;
+  const policy = new FluctlightPolicy(mujoco, model, body, session, contract, { deterministic: true, clips });
   policy.reset();
   const command_size = contract.observations[0].name === 'velocity_command' ? contract.observations[0].size : 0;
-  let obs_error = 0, map_error = 0, action_error = 0;
+  let obs_error = 0, map_error = 0, action_error = 0, flips = 0;
   for (const [step, frame] of fixture.frames.entries()) {
     mujoco.mj_resetData(model, state);
     state.qpos.set(frame.root_qpos, body.root_qpos);
@@ -58,20 +62,40 @@ for (const [name, stem] of fixtures) {
     body.joint_qpos.forEach((a, i) => { state.qpos[a] = frame.joint_pos[i]; });
     body.joint_qvel.forEach((a, i) => { state.qvel[a] = frame.joint_vel[i]; });
     mujoco.mj_forward(model, state);
-    const obs = policy.observe(state, command_size ? frame.obs.slice(0, command_size) : null);
+    let input = command_size ? frame.obs.slice(0, command_size) : null;
+    if (fixture.clip) {
+      // The fixture's env held only this clip, so its frame index is the clip's own. Play has no estimate errors.
+      const { frame: index, yaw, offset, seat, seat_estimate_error, odometry_error } = frame.reference;
+      assert.ok([...seat_estimate_error, ...odometry_error].every((v) => v === 0), `${stem}: the fixture has estimate errors`);
+      input = new Reference(clips, fixture.clip, { yaw, offset }, seat);
+      input.frame = index;
+    }
+    const obs = policy.observe(state, input);
     obs_error = Math.max(obs_error, max_diff(obs, frame.obs));
     // mjlab's first map on the stairs tile predates the robot's move there, and so does its first action.
     const valid = step >= (fixture.map_valid_from ?? 0);
     const heights = policy.map?.heights ?? new Float32Array(frame.actor_map?.length ?? 0);
-    if (frame.actor_map && valid) map_error = Math.max(map_error, max_diff(heights, frame.actor_map));
+    // A ray near the robot that meets a stair edge can hit the tread in one simulator and the riser or the next tread
+    // in the other (mjlab casts in float32). It moves the ground height, so every cell shifts by one offset. Such a
+    // step checks the grid up to that offset, and its action is not compared.
+    let flipped = false;
+    if (frame.actor_map && valid) {
+      const offset = heights[0] - frame.actor_map[0];
+      const residual = heights.reduce((m, h, k) => Math.max(m, Math.abs(h - frame.actor_map[k] - offset)), 0);
+      flipped = Math.abs(offset) > 1e-4 && residual < 1e-4;
+      flips += flipped;
+      map_error = Math.max(map_error, flipped ? residual : max_diff(heights, frame.actor_map));
+    }
     const target = await policy.act();
-    if (valid) action_error = Math.max(action_error, max_diff(policy.last_action, frame.action));
+    if (valid && !flipped) action_error = Math.max(action_error, max_diff(policy.last_action, frame.action));
     assert.ok(target.every(Number.isFinite));
     // Continue from the recorded action, so one step's rounding does not carry into the next.
     policy.last_action.set(frame.action);
   }
   console.log(`${stem}: ${fixture.frames.length} steps, max |diff| observation ${obs_error.toExponential(2)}, ` +
-    `map ${map_error.toExponential(2)}, action ${action_error.toExponential(2)}`);
+    `map ${map_error.toExponential(2)}, action ${action_error.toExponential(2)}` +
+    (flips ? ` (${flips} steps with a stair-edge ray flip in the ground height)` : ''));
+  assert.ok(flips <= 0.05 * fixture.frames.length, `${name}: too many ground-height flips`);
   assert.ok(obs_error < 1e-4, `${name}: the observation differs from mjlab`);
   assert.ok(map_error < 1e-4, `${name}: the elevation map differs from mjlab`);
   assert.ok(action_error < 1e-3, `${name}: the action differs from mjlab`);

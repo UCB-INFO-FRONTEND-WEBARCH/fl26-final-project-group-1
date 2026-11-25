@@ -2,7 +2,7 @@
  "name": "walk",
  "task": "Lite-Pro-Velocity-Motion-Flat",
  "checkpoint": "2026-11-22_17-36-15_velocity_flat_v3/model_7999.pt",
- "fluctlight_commit": "060d710aa76075ca164c21bafb78e2a7e032afa9",
+ "fluctlight_commit": "e0c54afe05f091532841c4a009ecf9d1e9beb349",
  "onnx": "walk.onnx",
  "onnx_sha256": "030624fccec0c3686385d19751433876c3072342ecc270fdef7f79bdd68faf15",
  "inputs": [
@@ -705,5 +705,6 @@
    0,
    1.0
   ]
- }
+ },
+ "motion": null
 }

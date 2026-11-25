@@ -26,6 +26,8 @@ let frame_in_flight = false;
 let recycled_buffer = null;
 let force_frame = true;
 let pending_goal = null;
+// 'sit' or 'stand', applied between physics batches as goals are.
+let pending_seat = null;
 
 function report_loading(message) {
   self.postMessage({ type: 'loading', message });
@@ -90,9 +92,16 @@ async function pump() {
       self.postMessage({ type: 'teleport_result', ok: true, floor: target.floor });
     }
     if (pending_goal && simulation.accepts_commands) {
+      simulation.cancel_approach();
       simulation.navigation.set_goal(simulation.state.qpos, pending_goal, simulation.step_count * PHYSICS_DT);
       pending_goal = null;
       simulation.command = [0, 0, 0];
+      force_frame = true;
+    }
+    if (pending_seat) {
+      if (pending_seat === 'sit') simulation.request_sit();
+      else simulation.request_stand();
+      pending_seat = null;
       force_frame = true;
     }
     if (simulation.paused || simulation.fallen) {
@@ -131,7 +140,7 @@ async function initialize() {
   mujoco.FS.writeFile('/robot/apartment.xml', make_scene_xml());
   const model = mujoco.MjModel.from_xml_path('/robot/apartment.xml');
 
-  report_loading('Loading walking and get-up policies');
+  report_loading('Loading walking, get-up and sitting policies');
   ort.env.wasm.numThreads = 1;
   ort.env.wasm.proxy = false;
   ort.env.wasm.wasmPaths = { wasm: ort_wasm_url, mjs: ort_module_url };
@@ -141,7 +150,8 @@ async function initialize() {
       executionProviders: ['wasm'],
       graphOptimizationLevel: 'all',
     });
-    return [name, { session, contract }];
+    const clips = contract.motion ? await fetch_file(`policies/${contract.motion.file}`) : null;
+    return [name, { session, contract, ...(clips ? { clips } : {}) }];
   })));
   report_loading(HAS_ELEVATOR?'Preparing floor routes and elevator controls':'Preparing Hephaestus floor routes and stairs');
   simulation = new Simulation(mujoco, model, policies, make_navigation_maps());
@@ -169,6 +179,8 @@ self.onmessage = (event) => {
       simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = null;
+      // A movement key ends the walk to the seat; a key release does not.
+      if (message.command.some((value) => value !== 0)) simulation.cancel_approach();
       simulation.navigation.cancel();
       simulation.command = simulation.accepts_commands ? message.command : [0, 0, 0];
       force_frame = true;
@@ -176,10 +188,17 @@ self.onmessage = (event) => {
     case 'camera_command':
       simulation.teleport_requested = null;
       pending_goal = null;
+      // Camera-relative movement ends the walk to the seat; a release does not.
+      if (message.motion && Math.hypot(message.motion[0], message.motion[1]) > 0) simulation.cancel_approach();
       simulation.navigation.cancel();
       simulation.camera_motion = simulation.accepts_commands ? message.motion : null;
       simulation.command = [0, 0, 0];
       force_frame = true;
+      break;
+    case 'sit':
+    case 'stand':
+      pending_goal = null;
+      pending_seat = message.type;
       break;
     case 'goal':
       simulation.camera_motion = null;
@@ -194,6 +213,7 @@ self.onmessage = (event) => {
       simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = null;
+      simulation.cancel_approach();
       simulation.navigation.cancel();
       simulation.command = [0, 0, 0];
       force_frame = true;
@@ -219,6 +239,7 @@ self.onmessage = (event) => {
       break;
     case 'reset':
       pending_goal = null;
+      pending_seat = null;
       simulation.request_reset();
       force_frame = true;
       break;

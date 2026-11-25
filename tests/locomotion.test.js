@@ -150,3 +150,110 @@ test('gravity in the body frame tells a face-up fall from a face-down one', () =
 test('heading retains MuJoCo wxyz quaternion ordering', () => {
   assert.ok(Math.abs(heading_from_quaternion([0, 0, 0.73, Math.SQRT1_2, 0, 0, Math.SQRT1_2]) - Math.PI / 2) < 1e-6);
 });
+
+test('the sit policy carries its chair clips, and each clip its seat', async () => {
+  const contract = await json(POLICY.policies.sit);
+  const { MotionClips } = await import('../src/fluctlight_policy.js');
+  const bytes = await readFile(new URL(`policies/${contract.motion.file}`, base));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), contract.motion.sha256);
+  const clips = new MotionClips(contract.motion, new Uint8Array(bytes));
+  assert.equal(clips.names('sit_down').length, 1);
+  assert.equal(clips.names('stand_up').length, 1);
+  assert.deepEqual(contract.observations.map((term) => term.name),
+    ['command', 'motion_anchor_ori_b', 'base_ang_vel', 'joint_pos', 'joint_vel', 'actions', 'seat_estimate', 'motion_anchor_pos_estimate']);
+  assert.equal(contract.observations[0].size, 9 * (contract.motion.body_names.length - 1));
+  for (const name of Object.keys(clips.clips)) {
+    const clip = clips.clips[name];
+    assert.ok(clip.frames > 50 && clip.seated_from !== null, name);
+    // Quaternions are unit, and the clip is on its floor.
+    const q = clips.field(name, 0, 'root_quat');
+    assert.ok(Math.abs(Math.hypot(...q) - 1) < 1e-4, name);
+    assert.ok(clips.field(name, 0, 'root_pos')[2] > 0.3, name);
+  }
+});
+
+test('the Lite Pro seat is the trained seat, within the clips\' seat offsets', async () => {
+  const contract = await json(POLICY.policies.sit);
+  const { SEAT, SEAT_SIZE, seat_boxes, seat_footprint, to_seat } = await import('../src/seat.js');
+  const { seat: trained, clips } = contract.motion;
+  assert.equal(SEAT_SIZE.width, trained.width);
+  assert.equal(SEAT_SIZE.backrest_thickness, trained.backrest_thickness);
+  assert.equal(SEAT_SIZE.backrest_height, trained.backrest_height);
+  for (const [name, clip] of Object.entries(clips)) {
+    const offset = SEAT_SIZE.height - clip.seat.height;
+    assert.ok(offset >= trained.offset_range.height[0] && offset <= trained.offset_range.height[1], `${name} seat height`);
+    const back = SEAT_SIZE.depth - clip.seat.depth;
+    assert.ok(back >= trained.backrest_gap[0] - 0.01 && back <= trained.backrest_gap[1], `${name} backrest gap`);
+  }
+  const [block, back] = seat_boxes();
+  assert.ok(Math.abs(block.center[2] - SEAT_SIZE.height / 2) < 1e-9);
+  assert.ok(Math.abs(back.center[2] + back.size[2] / 2 - SEAT_SIZE.height - SEAT_SIZE.backrest_height) < 1e-9);
+  // The footprint spans the front edge to the back of the backrest.
+  const local = seat_footprint().map((p) => to_seat(SEAT, p));
+  assert.ok(Math.abs(Math.max(...local.map((p) => p[0]))) < 1e-9);
+  assert.ok(Math.abs(Math.min(...local.map((p) => p[0])) + SEAT_SIZE.depth + SEAT_SIZE.backrest_thickness) < 1e-9);
+});
+
+test('a placed clip keeps the sit terms unchanged when the robot and the seat move with it', async () => {
+  const contract = await json(POLICY.policies.sit);
+  const { MotionClips, Reference, heading_of } = await import('../src/fluctlight_policy.js');
+  const clips = new MotionClips(contract.motion, new Uint8Array(await readFile(new URL(`policies/${contract.motion.file}`, base))));
+  const name = clips.names('sit_down')[0];
+  const seat = [2, -1, 0.35, 0.7];
+  const on_seat = Reference.on_seat(clips, name, seat, 0);
+  const placed = on_seat.clip_seat();
+  for (let i = 0; i < 4; i++) assert.ok(Math.abs(placed[i] - [2, -1, clips.clips[name].seat.height, 0.7][i]) < 1e-6);
+  const on_root = Reference.on_root(clips, name, [1, 3, -2], 0, seat);
+  const root = on_root.root_pos(0);
+  assert.ok(Math.hypot(root[0] - 1, root[1] - 3) < 1e-6);
+  assert.ok(Math.abs(heading_of(on_root.root_quat(0)) + 2) < 1e-6);
+
+  // Turn the clip, a robot standing at its root and the seat by the same yaw: the four sit terms stay the same.
+  const n = contract.joint_names.length;
+  const body = { joint_names: contract.joint_names, root_qpos: 0, root_qvel: 0, gyro: 0,
+    joint_qpos: Array.from({ length: n }, (_, i) => 7 + i), joint_qvel: Array.from({ length: n }, (_, i) => 6 + i) };
+  const values = (yaw) => {
+    const reference = Reference.on_root(clips, name, [0.3, -0.2, yaw], 0, null);
+    const q = reference.root_quat(5), p = reference.root_pos(5);
+    const anchor_q = reference.anchor_quat(9), anchor_p = reference.anchor_pos(9);
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    reference.seat = [0.3 + c * -0.4, -0.2 + s * -0.4, 0.35, yaw + 0.1];
+    const state = { qpos: new Float64Array(7 + n), qvel: new Float64Array(6 + n), sensordata: new Float64Array(3),
+      xpos: new Float64Array(3), xquat: new Float64Array(4) };
+    state.qpos.set([...p, ...q]);
+    state.xpos.set(anchor_p);
+    state.xquat.set(anchor_q);
+    const policy = Object.create(FluctlightPolicy.prototype);
+    Object.assign(policy, { body, contract, anchor: 0, last_action: new Float32Array(n) });
+    reference.frame = 7;
+    return ['motion_anchor_ori_b', 'motion_anchor_pos_estimate', 'seat_estimate'].map((term) => policy.term_value(term, state, reference));
+  };
+  const a = values(0.2), b = values(2.4);
+  for (let t = 0; t < a.length; t++) for (let i = 0; i < a[t].length; i++) assert.ok(Math.abs(a[t][i] - b[t][i]) < 1e-5, `term ${t} ${i}`);
+});
+
+test('the seat approach turns, backs up to the stand-off, and sits on arrival', async () => {
+  const { SEAT, SeatApproach, APPROACH, from_seat, to_seat } = await import('../src/seat.js');
+  const start = [...from_seat(SEAT, -0.01, 0), SEAT.yaw];
+  const navigation = { state: { status: 'idle' }, set_goal() { this.state = { status: 'walking' }; }, cancel() {}, update: () => [0.5, 0, 0] };
+  const approach = new SeatApproach(SEAT, start, navigation);
+  assert.ok(Math.abs(to_seat(SEAT, approach.target)[0] - (APPROACH.stand_off - 0.01)) < 1e-9);
+  // From across the room: the route first.
+  approach.begin([...from_seat(SEAT, 3, 2), 0], 0);
+  assert.equal(approach.phase, 'route');
+  navigation.state.status = 'arrived';
+  approach.update([...from_seat(SEAT, APPROACH.staging, 0)], SEAT.yaw + Math.PI, 0, 0.02, 0);
+  assert.equal(approach.phase, 'align');
+  // Facing the seat: only turn.
+  const turn = approach.update([...from_seat(SEAT, APPROACH.staging, 0)], SEAT.yaw + Math.PI, 0, 0.02, 0);
+  assert.equal(turn[0], 0);
+  assert.notEqual(turn[2], 0);
+  // Back to the seat, in front of the target: back up.
+  const back = approach.update([...from_seat(SEAT, 0.5, 0)], SEAT.yaw, 0, 0.02, 0);
+  assert.ok(back[0] < 0 && Math.abs(back[1]) < 1e-9);
+  // On the target but still moving fast: keep holding; slow: sit.
+  approach.update(approach.target, SEAT.yaw, 0, 0.02, 0.5);
+  assert.equal(approach.phase, 'align');
+  approach.update(approach.target, SEAT.yaw, 0, 0.02, 0.05);
+  assert.equal(approach.phase, 'ready');
+});

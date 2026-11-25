@@ -5,12 +5,19 @@
 The policies come from Fluctlight (`tracker/ppo`), Berkeley Humanoids' policy repository, whose code is MIT-licensed.
 `public/assets/lite_pro/manifest.json` records the Fluctlight commit, each checkpoint, and every file's hash.
 
-- `public/assets/lite_pro/policies/*.onnx` are the exported actors of the walking (`walk`, `walk_stairs`) and get-up
-  (`getup_supine`, `getup_prone`) policies; `*.json` are their runtime contracts. `src/fluctlight_policy.js` and
+- `public/assets/lite_pro/policies/*.onnx` are the exported actors of the walking (`walk`, `walk_stairs`), get-up
+  (`getup_supine`, `getup_prone`) and sit (`sit`) policies; `*.json` are their runtime contracts. `src/fluctlight_policy.js` and
   `src/robot_controller.js` run them; both are written for this repository.
 - The walking policies learned from the [LAFAN1](https://github.com/ubisoft/ubisoft-laforge-animation-dataset)
-  locomotion clips (Ubisoft La Forge, CC BY-NC-ND 4.0), retargeted to Lite Pro. No motion data ships with the app.
+  locomotion clips (Ubisoft La Forge, CC BY-NC-ND 4.0), retargeted to Lite Pro. No LAFAN1 motion data ships with the
+  app.
 - The get-up policies follow the reward design of [HoST](https://arxiv.org/abs/2502.08378) (MIT); no HoST code is used.
+- The sit policy (`sit`) tracks motion-captured chair clips from **BONES-SEED**, retargeted to Lite Pro by Berkeley
+  Humanoids (`Lite-Motion-Retargeting`). Two clips ship with the app, because the policy reads the clip at run time:
+  `public/assets/lite_pro/policies/sit.clips.bin` holds, per frame, the clip's goal pose (as the policy reads it),
+  the reference chest and pelvis poses, and the reference joints of `sit_on_chair_start_R_003_A101` (sitting down)
+  and `sit_on_chair_stop_R_001_A101` (standing up). The project owner included them for this course prototype; they
+  are not covered by this repository's MIT license.
 - The Lite Pro MJCF and meshes come from
   [lite_description](https://github.com/berkeley-humanoids/lite_description) 0.5.0, under MIT; its full license is in
   `public/assets/lite_pro/ROBOT_LICENSE`. `robot.xml` is the model as mjlab compiles it for the walking task, with the
@@ -19,7 +26,7 @@ The policies come from Fluctlight (`tracker/ppo`), Berkeley Humanoids' policy re
   `tests/fixtures/fluctlight/` holds the mjlab rollouts that `scripts/verify_policy_fixtures.js` replays.
 - `visuals.bin` and `visuals.json` are derived render meshes, simplified offline with
   meshoptimizer at a 4 mm error target. Rays and physics use the imported meshes.
-- `public/assets/explainer/` contains poses and elevation maps from two seeded runs of these policies in the demo
+- `public/assets/explainer/` contains poses and elevation maps from three seeded runs of these policies in the demo
   apartment. `scripts/record_explainer.js` generates these recordings; `motion.json` records the source commit and the
   checkpoints.
 
