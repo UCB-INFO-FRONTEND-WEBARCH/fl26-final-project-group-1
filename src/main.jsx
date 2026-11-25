@@ -475,12 +475,12 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         on_exit();
         return;
       }
-      if (phase_ref.current !== 'playing') return;
       if (event.key === 'Alt') {
         event.preventDefault();
         if (!event.repeat) toggle_cursor();
         return;
       }
+      if (phase_ref.current !== 'playing') return;
       if (event.target.closest?.('[role="dialog"]')) return;
       if (
         event.target instanceof HTMLInputElement ||
