@@ -50,6 +50,11 @@ kitchen, and perimeter placements remain from V20. See [seating](SEATING.md) and
 - Full-height physics remains independent of the Orbit/Top-down wall cutaway.
   Camera blockers come from source collision bodies. Actual floor triangles
   preserve slab boundaries and the open mezzanine void.
+- Render depth is ordered at floor and wall seams: base slabs sit behind architectural finishes and trim.
+  Authored opaque construction culls internal back faces; glass, cutouts, lamps, foliage, and imported furniture
+  retain their authored sides. This changes raster depth only, not mesh placement, textures, or collision geometry.
+  Wide cameras move their near plane out with view distance to resolve thin layers. Shoulder view retains its
+  5 cm near plane for close camera clearance.
 - 4,002 native convex collision bodies remain after the lounge edit. The original optimization reduced 16,283 bodies
   to 4,216 by omitting tiny
   contact hardware and nonstructural finish details with solid substrates.

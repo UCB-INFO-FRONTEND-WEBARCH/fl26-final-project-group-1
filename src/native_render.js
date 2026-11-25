@@ -1,4 +1,46 @@
+import { FrontSide } from 'three';
+
 const originals = new WeakMap();
+
+/** Separate authored finish layers without moving the source geometry or changing collision surfaces. */
+export function stabilize_native_surfaces(root) {
+  const variants = new Map();
+  root.traverse(object => {
+    if (!object.isMesh) return;
+    let owner = object;
+    while (owner && !owner.userData.map_role) owner = owner.parent;
+    const role = owner?.userData.map_role;
+    const prepare = source => {
+      // Imported furniture and foliage can contain intentional sheets and mirrored faces.
+      if (role === 'furniture' || object.isInstancedMesh || source.transparent ||
+        source.transmission > 0 || source.alphaTest > 0) return source;
+      const name = source.name;
+      const solid = /^(V1[34] ·|P6 · champagne frames|Architecture ·)/.test(name) &&
+        !source.emissive?.getHex();
+      const layer = role === 'floor' ? 1 :
+        /honed limestone|warm buff brick|oiled oak skirting|champagne frames|solid oak tread/.test(name) ? 2 : 0;
+      if (!solid && !layer) return source;
+      if ((!solid || source.side === FrontSide) && (!layer || (source.polygonOffset &&
+        source.polygonOffsetFactor === 0 && source.polygonOffsetUnits === -4 * layer))) return source;
+      if (!variants.has(source)) variants.set(source, new Map());
+      const key = `${solid}/${layer}`;
+      const copies = variants.get(source);
+      if (!copies.has(key)) {
+        const material = source.clone();
+        if (solid) material.side = FrontSide;
+        if (layer) {
+          material.polygonOffset = true;
+          // Slope-scaled offsets can pull a wide floor through thin rugs and furniture.
+          material.polygonOffsetFactor = 0;
+          material.polygonOffsetUnits = -4 * layer;
+        }
+        copies.set(key, material);
+      }
+      return copies.get(key);
+    };
+    object.material = Array.isArray(object.material) ? object.material.map(prepare) : prepare(object.material);
+  });
+}
 
 export function configure_native_materials(root, fast) {
   root.traverse(object => {
