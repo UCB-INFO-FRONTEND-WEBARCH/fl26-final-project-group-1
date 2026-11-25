@@ -44,6 +44,10 @@ export function seat_boxes(seat = SEAT, floor_height = 0) {
 
 /** The seat's footprint on its floor, for the route planner. */
 export function seat_footprint(seat = SEAT) {
+  if (seat.bounds) {
+    const [lo, hi] = seat.bounds;
+    return [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]];
+  }
   const [width, depth] = SEATING_ASSETS[seat.article].size;
   const c = Math.cos(seat.model_yaw), s = Math.sin(seat.model_yaw);
   return [[-width / 2, -depth / 2], [width / 2, -depth / 2], [width / 2, depth / 2], [-width / 2, depth / 2]]
@@ -58,7 +62,7 @@ export function nearby_seat(position, floor, maps, seats = SEATS) {
     const [x, y] = to_seat(seat, position);
     const reach = Math.hypot(x, y);
     if (x < 0.05 || x > 1.6 || Math.abs(y) > 0.8 || reach >= distance) continue;
-    const staging = from_seat(seat, APPROACH.staging, 0);
+    const staging = from_seat(seat, seat.staging ?? APPROACH.staging, 0);
     if (maps && !maps[floor]?.line_clear(position, staging, true)) continue;
     nearest = seat;
     distance = reach;
@@ -98,7 +102,8 @@ export class SeatApproach {
     Object.assign(this, { seat, start, navigation });
     const [x, y] = to_seat(seat, start);
     this.target = [...from_seat(seat, x + APPROACH.stand_off, y), start[2]];
-    this.staging = [...from_seat(seat, APPROACH.staging, 0)];
+    this.staging_distance = seat.staging ?? APPROACH.staging;
+    this.staging = [...from_seat(seat, this.staging_distance, 0)];
     this.phase = 'route';
     this.message = 'Walking to the seat.';
     this.phase_time = 0;
@@ -107,11 +112,11 @@ export class SeatApproach {
   /** Begin: plan the route to the staging point, or skip it when the robot already stands near the seat. */
   begin(position, time) {
     const [x, y] = to_seat(this.seat, position);
-    if (x > 0.05 && x < APPROACH.staging + 0.4 && Math.abs(y) < 0.6) {
+    if (x > 0.05 && x < this.staging_distance + 0.4 && Math.abs(y) < 0.6) {
       this.set_phase('align');
       return;
     }
-    this.navigation.set_goal(position, [...this.staging, this.seat.floor], time);
+    this.navigation.set_goal(position, [...this.staging, this.seat.floor], time, this.seat.precise_approach);
     if (this.navigation.state.status === 'blocked') this.fail(this.navigation.state.message);
   }
 

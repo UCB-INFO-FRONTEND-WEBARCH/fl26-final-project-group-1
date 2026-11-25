@@ -71,12 +71,23 @@ test('teleport can reach the mezzanine while rejecting the open void and real so
 
 test('all five catalog chairs have connected approaches on their own floor', () => {
  const maps=make_navigation_maps();
- assert.equal(SEATS.length,5);
+ assert.equal(SEATS.filter(seat=>!seat.existing).length,5);
  assert(SEATS.some(s=>s.floor===1));
- for(const seat of SEATS){
+ for(const seat of SEATS.filter(seat=>!seat.existing)){
   const stage=from_seat(seat,.85,0);
   assert(maps[seat.floor].free(stage),seat.id);
   assert(maps[seat.floor].plan(seat.floor?[-15,-2]:SPAWN,stage),`${seat.id}: disconnected staging point`);
   assert.equal(nearby_seat([...stage,seat.floor*FLOOR_HEIGHT+.73],seat.floor,maps)?.id,seat.id);
+ }
+});
+
+test('all six lounge sofas reuse their real geometry and have a tracking-clear approach', () => {
+ const map=make_navigation_maps()[0],sofas=SEATS.filter(seat=>seat.kind==='Sofa');
+ assert.equal(sofas.length,6);
+ for(const sofa of sofas){
+  const stage=from_seat(sofa,sofa.staging,0);
+  assert(map.free(stage,true),sofa.id);
+  assert(map.plan(SPAWN,stage,true),`${sofa.id}: disconnected approach`);
+  assert.equal(nearby_seat(stage,0,[map])?.id,sofa.id);
  }
 });

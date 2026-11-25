@@ -76,7 +76,7 @@ export class Navigation {
     this.state = { ...this.state, version: this.state.version + 1, status: 'blocked', message,
       goal, path: [], remaining: 0 };
   }
-  set_goal(position, goal, time) {
+  set_goal(position, goal, time, tracking = false) {
     const started = performance.now();
     if (!Array.isArray(goal) || ![3, 4].includes(goal.length) || !goal.every(Number.isFinite) || ![0, 1].includes(goal[2])) {
       this.fail('Choose a destination on a floor.', null); return;
@@ -96,14 +96,14 @@ export class Navigation {
     }
     const floor = floor_of(position);
     const destination_floor = goal[2];
-    if (!stair_goal && !this.maps[destination_floor].free(goal)) {
+    if (!stair_goal && !this.maps[destination_floor].free(goal, tracking)) {
       this.fail('Choose open floor with enough room around the robot.', goal); return;
     }
     if (Math.abs(goal[0] - ELEVATOR.center[0]) < 1 && Math.abs(goal[1] - ELEVATOR.center[1]) < 1) {
       this.fail('Choose a room destination; the elevator is called automatically.', goal); return;
     }
     const walk = (from, to, level, boarding = false) => ({ type: 'walk', floor: level,
-      path: this.maps[level].plan(from, to), boarding });
+      path: this.maps[level].plan(from, to, tracking), boarding, tracking });
     const landing = level => [...(level ? STAIRS.upper_landing : STAIRS.lower_landing), level * FLOOR_HEIGHT];
     const start_on_stairs = on_stairs(position);
     const surface = [position[0], position[1], stair_height(position)];
@@ -173,13 +173,13 @@ export class Navigation {
     if (distance(position, path.at(-1)) < (segment.boarding ? 0.15 : 0.22)) { this.next(time); return [0, 0, 0]; }
     const map = this.maps[segment.floor];
     for (let index = path.length - 1; index >= this.waypoint; index--) {
-      if (map.line_clear(position, path[index])) { this.waypoint = index; break; }
+      if (map.line_clear(position, path[index], segment.tracking)) { this.waypoint = index; break; }
     }
     if (this.waypoint < path.length - 1 && distance(position, path[this.waypoint]) < 0.25 &&
         map.line_clear(position, path[this.waypoint + 1], true)) this.waypoint++;
     let target = path[this.waypoint];
     if (!map.line_clear(position, target, true)) {
-      const recovery = !segment.boarding && this.replans < 4 && time - this.last_replan > 1 && map.plan(position, path.at(-1));
+      const recovery = !segment.boarding && this.replans < 4 && time - this.last_replan > 1 && map.plan(position, path.at(-1), segment.tracking);
       if (!recovery) { this.fail('The robot left its safe route. Choose a new destination.'); return [0, 0, 0]; }
       path = segment.path = recovery;
       this.waypoint = 1;
@@ -193,7 +193,7 @@ export class Navigation {
     this.state.remaining = remaining + this.segments.slice(this.index + 1).reduce((sum, next) => sum + (next.path ? path_length(next.path) : 0), 0);
     if (remaining < this.best_remaining - 0.08) { this.best_remaining = remaining; this.last_progress = time; }
     if (time - this.last_progress > 12) { this.fail('The robot could not make progress. Choose a new destination.'); return [0, 0, 0]; }
-    const command = steer(position, target, heading, this.speed);
+    const command = steer(position, target, heading, this.speed, segment.tracking ? .3 : .6);
     // Turning in place, the walking policy also slides sideways (30 cm in a half turn), out of narrow aisles: hold the
     // point where the turn began.
     if (command[0] === 0 && command[1] === 0) {

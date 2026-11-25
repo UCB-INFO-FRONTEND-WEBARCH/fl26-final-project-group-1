@@ -1,5 +1,6 @@
-import { IS_HEPHAESTUS } from './world.js';
+import { IS_HEPHAESTUS, MAP } from './world.js';
 import { FLOOR_HEIGHT } from './building.js';
+import { SCENE_FURNITURE } from './furniture_layout.js';
 
 // Anchor coordinates are measured on the unscaled catalog meshes after grounding in Z-up.
 // The front support and the support under the hips both stay within the clip's trained height range.
@@ -20,7 +21,7 @@ const placements = IS_HEPHAESTUS ? [
   { id: 'upper_armchair', article: '90434310', front: [-2.6, -5.9], yaw: Math.PI / 2, floor: 1 },
 ];
 
-export const SEATS = placements.map(placement => {
+const armchairs = placements.map(placement => {
   const product = SEATING_PRODUCTS[placement.article];
   const model_yaw = placement.yaw - product.yaw;
   const c = Math.cos(model_yaw), s = Math.sin(model_yaw);
@@ -30,4 +31,29 @@ export const SEATS = placements.map(placement => {
     label: product.name };
 });
 
+// These sofas already exist in the room and have their own authored collision meshes.
+// Seat heights exceed the clips' training range; each enabled anchor is checked with the real policy and contacts.
+const sofa_anchors = [
+  ['sofa_north', 'KIVIK sofa with chaise · Main lounge north', [.35, 2.599], -Math.PI / 2],
+  ['sofa_south', 'KIVIK sofa with chaise · Main lounge south', [-.35, -2.599], Math.PI / 2],
+  ['sofa_north_east', 'V20 / KIVIK north / east return', [2.5632, 1.8], Math.PI],
+  ['sofa_north_west', 'V20 / KIVIK north / west return', [-2.5632, 2.5], 0],
+  ['sofa_south_east', 'V20 / KIVIK south / east return', [2.5632, -2.5], Math.PI],
+  ['sofa_south_west', 'V20 / KIVIK south / west return', [-2.5632, -1.8], 0],
+];
+const sofas = IS_HEPHAESTUS ? sofa_anchors.map(([id, prefix, front, yaw]) => {
+  const item = MAP.furniture.find(item => item.name.startsWith(prefix));
+  return { id, name: id, label: 'KIVIK', kind: 'Sofa', existing: true, front, yaw, floor: item.floor,
+    height: .485, width: .75, depth: .53, staging: .5, precise_approach: true,
+    bounds: item.bounds, collision_source: item.name, position: item.bounds[0] };
+}) : SCENE_FURNITURE.filter(item => item.article === '39440593').map(item => ({
+  id: `${item.name}_seat`, name: `${item.name}_seat`, label: 'KIVIK', kind: 'Sofa', existing: true,
+  article: item.article, front: [item.position[0] + .4, item.position[1] - .46], yaw: -Math.PI / 2,
+  floor: Math.round(item.position[2] / FLOOR_HEIGHT), height: .46, width: .75, depth: .53,
+  staging: .75, precise_approach: true, collision_prefix: `${item.name}_`, position: item.position,
+  bounds: [[item.position[0] - 1.15, item.position[1] - .48, item.position[2]],
+    [item.position[0] + 1.15, item.position[1] + .48, item.position[2] + .85]],
+}));
+
+export const SEATS = [...armchairs, ...sofas];
 export const SEAT = SEATS[0];

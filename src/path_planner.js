@@ -172,16 +172,18 @@ export class NavigationMap {
     return best;
   }
 
-  plan(start, goal) {
+  plan(start, goal, tracking = false) {
     start = start.slice(0, 2);
     goal = goal.slice(0, 2);
-    if (!this.free(goal)) return null;
-    if (!this.free(start)) {
+    const blocked = tracking ? this.tracking_blocked : this.blocked;
+    if (!this.free(goal, tracking)) return null;
+    if (!this.free(start, tracking)) {
+      if (tracking) return null;
       const exit = this.exit_point(start);
       const rest = exit && this.plan(exit, goal);
       return rest ? [start, ...rest] : null;
     }
-    if (this.line_clear(start, goal)) return [start, goal];
+    if (this.line_clear(start, goal, tracking)) return [start, goal];
     const first = this.index(start);
     const last = this.index(goal);
     const costs = new Float64Array(this.blocked.length).fill(Infinity);
@@ -205,7 +207,7 @@ export class NavigationMap {
         const path = [points[0]];
         for (let i = 0; i < points.length - 1;) {
           let next = points.length - 1;
-          while (next > i + 1 && !this.line_clear(points[i], points[next])) next--;
+          while (next > i + 1 && !this.line_clear(points[i], points[next], tracking)) next--;
           path.push(points[next]);
           i = next;
         }
@@ -218,12 +220,12 @@ export class NavigationMap {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         if ((!dx && !dy) || column + dx < 0 || column + dx >= this.width || row + dy < 0 || row + dy >= this.height) continue;
         const next = current + dy * this.width + dx;
-        if (this.blocked[next] || closed[next]) continue;
-        if (dx && dy && (this.blocked[current + dx] || this.blocked[current + dy * this.width])) continue;
+        if (blocked[next] || closed[next]) continue;
+        if (dx && dy && (blocked[current + dx] || blocked[current + dy * this.width])) continue;
         const target = this.point(next);
         const parent = parents[current];
         const ancestor = this.point(parent);
-        const through = this.line_clear(ancestor, target) ? parent : current;
+        const through = this.line_clear(ancestor, target, tracking) ? parent : current;
         const candidate = costs[through] + distance(through === parent ? ancestor : point, target);
         if (candidate >= costs[next]) continue;
         costs[next] = candidate;
@@ -236,7 +238,7 @@ export class NavigationMap {
 }
 
 export function make_navigation_maps() {
-  const seat = floor => SEATS.filter(seat => seat.floor === floor).map(seat_footprint);
+  const seat = floor => SEATS.filter(seat => !seat.existing && seat.floor === floor).map(seat_footprint);
   if(IS_HEPHAESTUS) return [0,1].map(floor=>new NavigationMap(
     seat(floor),MAP.bounds,.1,.52,.3,MAP.floor_areas[floor]));
   const boxes = [...SCENE_WALLS, ...SHAFT_BOXES];
