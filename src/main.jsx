@@ -1,7 +1,7 @@
 import { IS_HEPHAESTUS, MAP, HAS_ELEVATOR, DEFAULT_TRANSFER, MAP_SIZE, MAP_TITLE } from './world.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { command_from_keys } from './locomotion.js';
+import { command_from_keys, camera_motion_from_keys } from './locomotion.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN } from './scene_layout.js';
 import { Icon } from './icons.jsx';
 import { SiteHeader } from './site_header.jsx';
@@ -47,6 +47,13 @@ const MOVEMENT_KEYS = new Set([
   'ArrowRight',
 ]);
 const CAMERA_MODES = ['shoulder', 'follow', 'orbit', 'top'];
+
+function capture_cursor() {
+  if (document.pointerLockElement) return;
+  const rejected = error => console.warn('Mouse capture unavailable:', error.message);
+  try { document.body.requestPointerLock?.()?.catch(rejected); }
+  catch (error) { rejected(error); }
+}
 
 function MiniMap({ telemetry, floor, on_destination, on_teleport, teleport_mode, children }) {
   const svg_ref = useRef(null);
@@ -197,6 +204,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const [character_error, set_character_error] = useState('');
   const [phase, set_phase] = useState('intro');
   const [controls_open, set_controls_open] = useState(false);
+  const [cursor_locked, set_cursor_locked] = useState(Boolean(document.pointerLockElement));
   const [teleport_open, set_teleport_open] = useState(false);
   const [teleport_floor, set_teleport_floor] = useState(0);
   const [teleport_message, set_teleport_message] = useState('Drag the robot onto open floor, or click a spot.');
@@ -222,7 +230,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
 
   function send_command() {
     if (!ready_ref.current) return;
-    worker_ref.current?.postMessage({
+    const view = view_ref.current;
+    worker_ref.current?.postMessage(view?.mode === 'shoulder' ? {
+      type: 'camera_command',
+      motion: camera_motion_from_keys(keys_ref.current, view.movement_heading(), speed_ref.current, shift_ref.current),
+    } : {
       type: 'command',
       command: command_from_keys(keys_ref.current, speed_ref.current, shift_ref.current),
     });
@@ -241,6 +253,12 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     if (shift_ref.current === held) return;
     shift_ref.current = held;
     if (keys_ref.current.size) send_command();
+  }
+
+  function toggle_cursor() {
+    release_keys();
+    if (document.pointerLockElement) document.exitPointerLock();
+    else capture_cursor();
   }
 
   function navigate(goal) {
@@ -307,6 +325,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     }
     view_ref.current?.set_camera(mode);
     set_camera(mode);
+    if (keys_ref.current.size) send_command();
   }
 
   function cycle_camera() {
@@ -361,7 +380,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         const { SceneView } = await import('./scene_view.js');
         if (!active) return;
         const arrival = preview.release();
-        view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer);
+        view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer, () => {
+          if (keys_ref.current.size) send_command();
+        });
         view_ref.current = view;
         view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
@@ -454,6 +475,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         on_exit();
         return;
       }
+      if (event.key === 'Alt') {
+        event.preventDefault();
+        if (!event.repeat) toggle_cursor();
+        return;
+      }
       if (phase_ref.current !== 'playing') return;
       if (event.target.closest?.('[role="dialog"]')) return;
       if (
@@ -495,6 +521,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       }
     };
     const lose_focus = () => release_keys();
+    const cursor_change = () => {
+      set_cursor_locked(Boolean(document.pointerLockElement));
+      if (!document.pointerLockElement) release_keys();
+    };
     const visibility_change = () => {
       if (document.hidden) {
         release_keys();
@@ -505,6 +535,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     window.addEventListener('keyup', key_up);
     window.addEventListener('blur', lose_focus);
     document.addEventListener('visibilitychange', visibility_change);
+    document.addEventListener('pointerlockchange', cursor_change);
     return () => {
       active = false;
       ready_ref.current = false;
@@ -514,6 +545,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       window.removeEventListener('keyup', key_up);
       window.removeEventListener('blur', lose_focus);
       document.removeEventListener('visibilitychange', visibility_change);
+      document.removeEventListener('pointerlockchange', cursor_change);
+      if (document.pointerLockElement) document.exitPointerLock();
       worker?.terminate();
       view?.dispose();
       preview?.dispose();
@@ -578,7 +611,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                   key={mode}
                   className={camera === mode ? 'selected' : ''}
                   aria-pressed={camera === mode}
-                  title={mode === 'shoulder' ? 'Over-the-shoulder view follows your heading' : undefined}
+                  title={mode === 'shoulder' ? 'Drag to look around · move relative to the camera' : undefined}
                   onClick={() => change_camera(mode)}
                 >
                   {mode === 'follow' && <Icon name="camera" size={15} />}{' '}
@@ -633,7 +666,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 <b>Z</b>
               </span>
               Click a floor to walk there <span className="mouse-hint">
-                {camera === 'shoulder' ? 'Follows your heading · scroll to zoom' : 'Drag to orbit · scroll to zoom'}
+                Drag to orbit · scroll to zoom
               </span>
             </div>
             <div className="scene-zoom" role="group" aria-label="Scene zoom">
@@ -733,7 +766,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                     <ControlKey
                       key={code}
                       code={code}
-                      title={title}
+                      title={camera === 'shoulder' && ['KeyA', 'KeyD'].includes(code)
+                        ? code === 'KeyA' ? 'Move left' : 'Move right' : title}
                       pressed={pressed}
                       on_control={control_key}
                     />
@@ -748,7 +782,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               </span>
               <span>
                 <kbd>A</kbd>
-                <kbd>D</kbd> Turn
+                <kbd>D</kbd> {camera === 'shoulder' ? 'Move' : 'Turn'}
               </span>
               <span>
                 <kbd>Q</kbd>
@@ -854,7 +888,12 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             <button onClick={on_exit} aria-label="Exit to site"><Icon name="close" size={18} /></button>
           </div>
         </div>
-        {!controls_open && <div className="game-key-hint"><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span><span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></div>}
+        <div className="game-key-hint">
+          {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span>
+            <span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></>}
+          <button onClick={toggle_cursor} aria-pressed={cursor_locked} title="Alt toggles mouse capture">
+            <kbd>ALT</kbd> {cursor_locked ? 'Cursor' : 'Capture mouse'}</button>
+        </div>
       </>}
     </div>
   );
@@ -911,12 +950,14 @@ function App() {
     return () => { arrival_ref.current?.then(preview => preview.dispose()).catch(() => {}); };
   }, []);
   function exit() {
+    if (document.pointerLockElement) document.exitPointerLock();
     set_entered(false);
     set_landing_visible(true);
     arrival_ref.current = null;
     preload_arrival();
   }
   function play() {
+    capture_cursor();
     preload_arrival();
     set_entered(true);
   }

@@ -162,20 +162,28 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 
 | Input | Action |
 | --- | --- |
-| W / S or ↑ / ↓ | Walk forward / backward |
-| A / D or ← / → | Turn left / right |
+| W / S or ↑ / ↓ | Move along the camera view in Shoulder; forward / backward in other views |
+| A / D or ← / → | Move left / right in Shoulder; turn in other views |
 | Q / E | Strafe left / right |
 | Shift + movement key | Double movement and turning commands while held |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
 | Space | Pause / resume physics |
 | R | Reset robot, controller memory, trail, and session counters |
 | V (or C) | Cycle shoulder / follow / orbit / top-down cameras |
-| Mouse drag / right-drag / scroll | Orbit / pan / zoom in Follow and Orbit; scroll to zoom in Shoulder |
+| Alt | Release / capture the mouse; Escape also releases it |
+| Mouse drag / right-drag / scroll | Look around / look around / zoom in Shoulder; orbit / pan / zoom in Follow and Orbit |
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
-The speed slider sets forward and backward speed from 0.2 to 0.8 m/s.
-Backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
-Shift doubles these manual command values after the normal caps. Pressing Shift alone does not cancel a route.
+Play captures the mouse. Move it to look around; press Alt to free the cursor for menus and map clicks.
+Press Alt again or select **Capture mouse** to resume looking. Drag also works while the cursor is free.
+In Shoulder view, WASD moves relative to the camera; Q/E also move sideways. Diagonal input keeps the
+same travel speed. The robot turns toward travel, and the camera keeps its world heading while it follows.
+Drag to look around; scroll to zoom. Near the body, only the figure blurs and fades. It is hidden before
+the lens enters its torso or head. The blur pass runs only within this close range.
+
+The speed slider sets movement speed from 0.2 to 0.8 m/s. In other camera views,
+backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
+Shift doubles manual travel speed and the turn limit. Pressing Shift alone does not cancel a route.
 Open **Teleport** and select a floor to move the robot directly, including to the mezzanine.
 Drag the robot icon or its map marker onto an open spot. You can also click the map.
 Teleport clears the route, velocity, and policy memory, preserves pause state, and rejects blocked floor or voids.
