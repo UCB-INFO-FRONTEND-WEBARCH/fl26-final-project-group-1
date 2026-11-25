@@ -1,5 +1,5 @@
 import {NavigationOverlay} from './navigation_overlay.js';
-import {configure_native_materials,freeze_native_transforms,plant_cells} from './native_render.js';
+import {configure_native_materials,freeze_native_transforms,plant_cells,stabilize_native_surfaces} from './native_render.js';
 import {load_native_finishes,apply_native_finishes} from './native_finishes.js';
 import { IS_HEPHAESTUS, MAP } from './world.js';
 import * as THREE from 'three';
@@ -16,6 +16,7 @@ import { FigureFocus, figure_opacity } from './figure_focus.js';
 import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { aerial_pixel_ratio } from './arrival_geography.js';
+import { update_camera_depth } from './camera_depth.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
 import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPAWN_YAW } from './scene_layout.js';
 import { SEATS } from './seat.js';
@@ -400,6 +401,7 @@ export class SceneView {
         const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
         if(signal.aborted){dispose_model(gltf.scene);return;}
         const upright=new THREE.Group();upright.rotation.x=Math.PI/2;upright.add(gltf.scene);apply_native_finishes(upright,finishes);
+        stabilize_native_surfaces(gltf.scene);
         const clipped = new Map();
         gltf.scene.traverse(o=>{
           if(o.userData.context_band)this.native_context_bands.push(o);
@@ -619,6 +621,7 @@ export class SceneView {
     }
     this.last_follow_position.copy(this.robot_position);
     if (mode !== 'shoulder') this.controls.update();
+    update_camera_depth(this.camera, this.controls.target, mode);
   }
 
   start_arrival(preview, on_level, on_complete, on_reveal) {
@@ -923,6 +926,7 @@ export class SceneView {
         if (this.mode === 'shoulder') this.on_camera_change?.();
       }
     }
+    camera_changed = update_camera_depth(this.camera, this.controls.target, this.mode) || camera_changed;
     if (document.hidden || (this.paused && !this.needs_render && !camera_changed)) return;
     if (this.arrival_map) this.arrival_map.render(this.renderer, this.scene, this.camera, this.arrival, this.reduced_motion ? 0 : seconds);
     else {
