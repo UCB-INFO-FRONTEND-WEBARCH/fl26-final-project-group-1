@@ -1,0 +1,478 @@
+{
+  "source": "https://github.com/berkeley-humanoids/Fluctlight (tracker/ppo, export-browser)",
+  "commit": "e0c54afe05f091532841c4a009ecf9d1e9beb349",
+  "robot": {
+    "file": "robot.xml",
+    "task": "Lite-Pro-Velocity-Motion-Flat",
+    "sha256": "756dc65e890d72cf468746cfe303e6895099436c4017d4378826f685de0c00f4"
+  },
+  "policies": {
+    "walk": {
+      "task": "Lite-Pro-Velocity-Motion-Flat",
+      "checkpoint": "2026-11-22_17-36-15_velocity_flat_v3/model_7999.pt",
+      "onnx_sha256": "030624fccec0c3686385d19751433876c3072342ecc270fdef7f79bdd68faf15"
+    },
+    "walk_stairs": {
+      "task": "Lite-Pro-Velocity-Motion",
+      "checkpoint": "2026-11-23_21-16-43_velocity_stairs_v4/model_7999.pt",
+      "onnx_sha256": "3789cebd0fb170b1ca0980b5236b3189a43b48290fe6dba0274922e7faecacf0"
+    },
+    "getup_supine": {
+      "task": "Lite-Pro-Getup-Supine-RandomMotors",
+      "checkpoint": "2026-11-24_04-52-37_getup_supine_v2/model_9999.pt",
+      "onnx_sha256": "0e6b2d46ce4faa73b12b52398b922170243d810b3244f1b08a12c056138c190a"
+    },
+    "getup_prone": {
+      "task": "Lite-Pro-Getup-Prone-RandomMotors",
+      "checkpoint": "2026-11-24_04-54-07_getup_prone_v2/model_9999.pt",
+      "onnx_sha256": "bd35694a9982d3ea601402a6145b86cf9b6a3b9455f52d2d2815ea92f91a572c"
+    },
+    "sit": {
+      "task": "Lite-Pro-Sit-Head",
+      "checkpoint": "2026-11-23_21-00-30_sit_v6a_head/model_7999.pt",
+      "onnx_sha256": "83dd01ee51cfd478ed6bbe9e29ca82b83601722fb1cf01a59d8a74f629e6ad65"
+    }
+  },
+  "files": [
+    {
+      "file": "ROBOT_LICENSE",
+      "bytes": 1054,
+      "sha256": "9876efadd7f64d2ac72dcf0ac8276f7fe5fadf73b6e417897aab663a8909c0ad"
+    },
+    {
+      "file": "meshes/chest_visual.stl",
+      "bytes": 1504084,
+      "sha256": "b10fd170036888260eb1d101ee24b3fd39d49accf4a0a1495afbb5eaa60eee8d"
+    },
+    {
+      "file": "meshes/head_visual.stl",
+      "bytes": 332184,
+      "sha256": "9389ccfda6fe3acc64247aac3d02559c92dfb46132416f627288876a8f0098b6"
+    },
+    {
+      "file": "meshes/left_ankle_pitch_visual.stl",
+      "bytes": 25384,
+      "sha256": "1b36b7d68cd83269cd5decbe6c3890e2926ef227d8aa9691b98aba7552c1f631"
+    },
+    {
+      "file": "meshes/left_ankle_yaw_visual.stl",
+      "bytes": 524684,
+      "sha256": "f33c0d703711965196d1e830f73e712c63e07684bde944dbc150c60dd1b11aa0"
+    },
+    {
+      "file": "meshes/left_elbow_pitch_visual.stl",
+      "bytes": 656584,
+      "sha256": "9092b6ab4330b6447512f64c6def524367e8f4e489b9a5dad177719df73e30ec"
+    },
+    {
+      "file": "meshes/left_finger1_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "9573a4099c6d0642d8144d011c3ce6035caeede660316f210435e8df3ff11f1f"
+    },
+    {
+      "file": "meshes/left_finger1_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "2b31153158d8ec519633ed6f7c9014ce6688fc87b3521fc97a364707f66ed182"
+    },
+    {
+      "file": "meshes/left_finger1_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "719d35dfbd486b21eda3cfa3d9734092048b75507645db368bb351a562415db6"
+    },
+    {
+      "file": "meshes/left_finger1_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "cbc14e26fe5ed7a1a9c7675327892bb474fdda6d8afcbbbc9df58c16c18b8222"
+    },
+    {
+      "file": "meshes/left_finger2_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "9d68c16620299e7025178007f0944a9652fd443308c43b0a0e2025f448b8165d"
+    },
+    {
+      "file": "meshes/left_finger2_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "f1fc40159b560a5dff5217af41d7d46f4f3ee8dc22f0ffa58e8459d2ed170aa3"
+    },
+    {
+      "file": "meshes/left_finger2_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "649be705ea9623fb2332154b9f486335323ff722131b84d29670f48ff6089448"
+    },
+    {
+      "file": "meshes/left_finger2_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "76795058daaf910c5debad3186cf2af913c7263231835d3e634fcdfe5a34a693"
+    },
+    {
+      "file": "meshes/left_finger3_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "bef58878f1635d30624448f4955c0a59cf3093ca5d6fa968f5a4255a47973038"
+    },
+    {
+      "file": "meshes/left_finger3_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "6e7401ac5a5d04e9525f37fd6ccd212357b0776fbad691d094cf4b789faab850"
+    },
+    {
+      "file": "meshes/left_finger3_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "48c8ca7cf09f313160153169b75262fc1f264c7b7bb7805627667266ad97585a"
+    },
+    {
+      "file": "meshes/left_finger3_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "f10307cb2bf140cba6566fe8670232d7e37b09834e8d8297537d878fc2eb3882"
+    },
+    {
+      "file": "meshes/left_finger4_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "e543f4be038e16c5c8cf7a180b393cc3f5e53a94043c9a1d432ebffd913c2192"
+    },
+    {
+      "file": "meshes/left_finger4_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "1b3e535d726dc3062bbef99f939569c2c5fb5679fd3cbd9727ebebd748466be2"
+    },
+    {
+      "file": "meshes/left_finger4_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "002eb36350227c23e361d9c1b283b8aaa4c3592d0b9416d28a3d4a902cee9dd0"
+    },
+    {
+      "file": "meshes/left_finger4_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "e6c32a08a5196359d939082bb5c6cb3ea8aa7c2fd1f428ad51b49807bbbf21f6"
+    },
+    {
+      "file": "meshes/left_finger5_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "a6c7547906ff9da337703b99262824c43e315ae58adf0fdf60a294ad24a31a36"
+    },
+    {
+      "file": "meshes/left_finger5_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "f8000a66ab0cffc941756019631306d50d1deb4110f8b30f6628344b0295445f"
+    },
+    {
+      "file": "meshes/left_finger5_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "d80b64240c9046efbef2c6e4a90bf16f51183b1530548b9979cc810105cbee20"
+    },
+    {
+      "file": "meshes/left_finger5_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "03db0bc370ebcad8b91bef02500c8dd359c573a9370f0f7708a9a9943eaee659"
+    },
+    {
+      "file": "meshes/left_foot_visual.stl",
+      "bytes": 587184,
+      "sha256": "bf3fa480642afee39337df621cc31cd4e5407054a96196fd156a793ba41db292"
+    },
+    {
+      "file": "meshes/left_hand_visual.stl",
+      "bytes": 446084,
+      "sha256": "46f962245dd2a78332e1f0fb6746860736fc72408118bf1605f53dbad7eab07c"
+    },
+    {
+      "file": "meshes/left_hip_pitch_visual.stl",
+      "bytes": 407884,
+      "sha256": "9321bbd23b54d5709505a2346bb3a8bb0aa75c6efc1d8992166b4476c0ae6650"
+    },
+    {
+      "file": "meshes/left_hip_roll_visual.stl",
+      "bytes": 557084,
+      "sha256": "f1a5dde7ab5bc3165397dcea191baafa39a9a2978794e53453261f0de386754b"
+    },
+    {
+      "file": "meshes/left_hip_yaw_visual.stl",
+      "bytes": 455784,
+      "sha256": "fb1af74702ce8ce1847ad2e0ba8fa58a5fd46890513554e4ae9e22bcfb8e859e"
+    },
+    {
+      "file": "meshes/left_knee_pitch_visual.stl",
+      "bytes": 398584,
+      "sha256": "4e6374d2a2457162f97a390d7b69090e5e24dbe5558272c81bad186334d3ec81"
+    },
+    {
+      "file": "meshes/left_shoulder_pitch_visual.stl",
+      "bytes": 79084,
+      "sha256": "a3e1c8d2359c6fa443d1294effbd6029aa9a510842ea00cc98f4b02c9379e7dc"
+    },
+    {
+      "file": "meshes/left_shoulder_roll_visual.stl",
+      "bytes": 567984,
+      "sha256": "8e6bb4919b69b11367460ea353517c8fb305c24668798bb703b5be4d98683dc1"
+    },
+    {
+      "file": "meshes/left_shoulder_yaw_visual.stl",
+      "bytes": 222384,
+      "sha256": "697c14361bff8f22f9b0635a6075da871e6d32fae0ceb63733839b768d356835"
+    },
+    {
+      "file": "meshes/left_wrist_roll_visual.stl",
+      "bytes": 54584,
+      "sha256": "9d7bc96f04a88fc342c6c06ce4b16dc18b78ba465a6e696b90adfd373b1b75e4"
+    },
+    {
+      "file": "meshes/left_wrist_yaw_visual.stl",
+      "bytes": 500284,
+      "sha256": "02b32c93b525e6529fe4d382cf0ba4e87f57a203ac17d8dce5c65038218b06ea"
+    },
+    {
+      "file": "meshes/neck_roll_visual.stl",
+      "bytes": 51284,
+      "sha256": "bff503512eb6f8cbd3d7c930c94be2b8de3daf27032b6b715ac448f94b368e2e"
+    },
+    {
+      "file": "meshes/neck_yaw_visual.stl",
+      "bytes": 35784,
+      "sha256": "adef3efd8dd88b3473145b9d2c094a886661432f54084e31e4ba9fb77353ad75"
+    },
+    {
+      "file": "meshes/pelvis_visual.stl",
+      "bytes": 2018784,
+      "sha256": "d182755e5935c87d81d6fa01163a0ced7b72c8adca05dabd4542ee22f59c49da"
+    },
+    {
+      "file": "meshes/right_ankle_pitch_visual.stl",
+      "bytes": 25384,
+      "sha256": "360d2acf637538b0e732ba6f0daca8f7b7e4e2404de7dda867a9981800cbdd55"
+    },
+    {
+      "file": "meshes/right_ankle_yaw_visual.stl",
+      "bytes": 524084,
+      "sha256": "1daf0205d17791d26a0748dce6719b0f0740eedaeda7dcc20985a5136e9356db"
+    },
+    {
+      "file": "meshes/right_elbow_pitch_visual.stl",
+      "bytes": 656384,
+      "sha256": "cd6731e4f26e577192b13daf9050be40375f137f9e20e07ef2de74d984b4e8cb"
+    },
+    {
+      "file": "meshes/right_finger1_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "db7bab4bf5b43942ad8a49fd2ff65a3219a7ff15a5e859c0afe32a3dea6ec6d2"
+    },
+    {
+      "file": "meshes/right_finger1_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "1530dc3554f19d55e0a0f85b0facd3164209ba5479523134638bc90cc9cfd955"
+    },
+    {
+      "file": "meshes/right_finger1_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "da6c2c1f3632e4ac1ee0ec5d85eba757b8cfc8b0dc39b093a2ec9ff8e5877b74"
+    },
+    {
+      "file": "meshes/right_finger1_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "f5d1fe17a1b9c5bccac562fb6d613f4211bbfb62927bb195accd6d48b581b11e"
+    },
+    {
+      "file": "meshes/right_finger2_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "9a130428093eedcf38c37df73518f1e686b6d0968d2c80c6adb5ff34c4ba953e"
+    },
+    {
+      "file": "meshes/right_finger2_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "14d11c4ccef25794e9fa28e799cf679b43d11297e00392fe3ef3c527de48c932"
+    },
+    {
+      "file": "meshes/right_finger2_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "f99fc19059263e29ffe4643fac604114673a4bf0c83a7655865245d4ee100ebe"
+    },
+    {
+      "file": "meshes/right_finger2_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "b78aa97a2cfc5f1a93d6a2695a6b46de737cf579aaa47b6aa2a97f056b4c0060"
+    },
+    {
+      "file": "meshes/right_finger3_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "de19c9526e898ea0c76fecd27daea6bbe8752f7b8224353fbdaa3d0010b17af7"
+    },
+    {
+      "file": "meshes/right_finger3_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "123c1d4e4f00045297c8a571e4026d03fda92a49272fb6379956d41594e9e4d8"
+    },
+    {
+      "file": "meshes/right_finger3_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "1eedbee0893278c37787fcf4e60f0937cc8ba3bc122c674b5dfbe0759de2e1f9"
+    },
+    {
+      "file": "meshes/right_finger3_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "4771336fa7b257874d812c4b671656e5a3fc91643b634989b92807d0ef849e28"
+    },
+    {
+      "file": "meshes/right_finger4_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "73d4b92e14d904ae9c59fb293591a23ed95393ffd9cb03235b9ffd3c7e27b233"
+    },
+    {
+      "file": "meshes/right_finger4_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "a1d8c68aa0a4b52bf9f475fa57c0b3220a9561de5f66d81586c46eb0971e468f"
+    },
+    {
+      "file": "meshes/right_finger4_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "9583da320bb41a31d49555313c4aca0b98f181b2c260417c105eff41237320e8"
+    },
+    {
+      "file": "meshes/right_finger4_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "bf3257ecb15b903284f93cb16647c1191c802a6b8bb5104d402dea9a1a908d12"
+    },
+    {
+      "file": "meshes/right_finger5_j1_visual.stl",
+      "bytes": 684,
+      "sha256": "960ef3659e47d080f90689ac54ca70e8cbb223968933799ae39b13fadc8d1ac3"
+    },
+    {
+      "file": "meshes/right_finger5_j2_visual.stl",
+      "bytes": 684,
+      "sha256": "4e3f9d579ef9c7e518570cfd616e7697d1dcb09bb33200a7aa1828ac78037ae1"
+    },
+    {
+      "file": "meshes/right_finger5_j3_visual.stl",
+      "bytes": 684,
+      "sha256": "2af41827da71791afe2383a666124cff7ae0671418ad8bca4350e52e4c8c63af"
+    },
+    {
+      "file": "meshes/right_finger5_j4_visual.stl",
+      "bytes": 884,
+      "sha256": "2ecf33dd87a67950e36c52d785d3be5b9074a71e8753066d2a908f8d23bed69f"
+    },
+    {
+      "file": "meshes/right_foot_visual.stl",
+      "bytes": 586984,
+      "sha256": "967d9804ff0ddec69a441e809165a35aadbc2a4b24dd34fdd36a7229d6b80717"
+    },
+    {
+      "file": "meshes/right_hand_visual.stl",
+      "bytes": 446084,
+      "sha256": "b800af143335554a16961744e40b31c8d796aded546f8055b6eddc2ba39a6511"
+    },
+    {
+      "file": "meshes/right_hip_pitch_visual.stl",
+      "bytes": 408184,
+      "sha256": "c111a7bcefd82dac18771ac294eb3215d7ba1c3481247829d457bad960dc2337"
+    },
+    {
+      "file": "meshes/right_hip_roll_visual.stl",
+      "bytes": 557184,
+      "sha256": "7544fb6eca0bbb8de7e52b2ae4177373f212553cf62808378d4b9f1df7182972"
+    },
+    {
+      "file": "meshes/right_hip_yaw_visual.stl",
+      "bytes": 455684,
+      "sha256": "2d08390b67ba1bbab24af3951657b1c8927b5147deaf1352dbb7735e4bbbd1da"
+    },
+    {
+      "file": "meshes/right_knee_pitch_visual.stl",
+      "bytes": 398184,
+      "sha256": "1ec8e5161b12656ca5de5fb332392fc2f72110640ef1bec9ffd55e6bd510951b"
+    },
+    {
+      "file": "meshes/right_shoulder_pitch_visual.stl",
+      "bytes": 79084,
+      "sha256": "2bfd55b797e7c04e89bc4d6ae2299f1e663eb4353a98d940bfdeeb037f393606"
+    },
+    {
+      "file": "meshes/right_shoulder_roll_visual.stl",
+      "bytes": 567684,
+      "sha256": "73d7e7c5ef3cbdb1a8be03fc4d7d39ac4d6286ba1a0ae9a0b1f9bd978155be80"
+    },
+    {
+      "file": "meshes/right_shoulder_yaw_visual.stl",
+      "bytes": 222384,
+      "sha256": "61f0f1e804e221c8c67a5ff3b0214b940c176c33f56a363aac7f7abbb8713bd1"
+    },
+    {
+      "file": "meshes/right_wrist_roll_visual.stl",
+      "bytes": 54584,
+      "sha256": "3dba854852efbdcd08eb5a31cc0999cce73a4565525d731c2ef0708824fb8040"
+    },
+    {
+      "file": "meshes/right_wrist_yaw_visual.stl",
+      "bytes": 500684,
+      "sha256": "d44678ab67ae8d359f8d079438101de59612cc5d21a4f2b7158442d14b044ea1"
+    },
+    {
+      "file": "meshes/waist_roll_visual.stl",
+      "bytes": 14484,
+      "sha256": "184dbbb67a38c7e0592f642cf78516e731e0b22b8d2c96c31161843f33652481"
+    },
+    {
+      "file": "meshes/waist_yaw_visual.stl",
+      "bytes": 28884,
+      "sha256": "a9b40731a54afb0b4a80215e433908360e21547662b3393bfecb5ffbad70957e"
+    },
+    {
+      "file": "policies/getup_prone.json",
+      "bytes": 7568,
+      "sha256": "d32c12b24327f0d56562f9432e57236b2eed1bd4c6d3cd0ed376422872b1b6b8"
+    },
+    {
+      "file": "policies/getup_prone.onnx",
+      "bytes": 1791847,
+      "sha256": "bd35694a9982d3ea601402a6145b86cf9b6a3b9455f52d2d2815ea92f91a572c"
+    },
+    {
+      "file": "policies/getup_supine.json",
+      "bytes": 7572,
+      "sha256": "5ec1685a9dc7a7b371c2f35d1e698ca3fdce68507228cd7305bbaa14fa960bd5"
+    },
+    {
+      "file": "policies/getup_supine.onnx",
+      "bytes": 1791847,
+      "sha256": "0e6b2d46ce4faa73b12b52398b922170243d810b3244f1b08a12c056138c190a"
+    },
+    {
+      "file": "policies/sit.clips.bin",
+      "bytes": 155584,
+      "sha256": "fe0dfa369d30f6414da659fb91bce42ae50951f2355a32eb2060a62fea3bb471"
+    },
+    {
+      "file": "policies/sit.json",
+      "bytes": 10629,
+      "sha256": "d836368953839599de2130bb22f3649a0f272263ab7f7009db5367f40896d719"
+    },
+    {
+      "file": "policies/sit.onnx",
+      "bytes": 1186840,
+      "sha256": "83dd01ee51cfd478ed6bbe9e29ca82b83601722fb1cf01a59d8a74f629e6ad65"
+    },
+    {
+      "file": "policies/walk.json",
+      "bytes": 8570,
+      "sha256": "d73fcb3af5301dfe9456523848251d8e3e265f566f7b3147a73895824ef87dc0"
+    },
+    {
+      "file": "policies/walk.onnx",
+      "bytes": 1951903,
+      "sha256": "030624fccec0c3686385d19751433876c3072342ecc270fdef7f79bdd68faf15"
+    },
+    {
+      "file": "policies/walk_stairs.json",
+      "bytes": 8580,
+      "sha256": "c4292122157e69db5abfc495b195a6fefa40861f1844e619a1fffe34e519edb8"
+    },
+    {
+      "file": "policies/walk_stairs.onnx",
+      "bytes": 1951903,
+      "sha256": "3789cebd0fb170b1ca0980b5236b3189a43b48290fe6dba0274922e7faecacf0"
+    },
+    {
+      "file": "robot.xml",
+      "bytes": 66592,
+      "sha256": "756dc65e890d72cf468746cfe303e6895099436c4017d4378826f685de0c00f4"
+    }
+  ]
+}

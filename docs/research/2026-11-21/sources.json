@@ -1,0 +1,93 @@
+{
+  "research_date": "2026-11-21",
+  "research_timezone": "America/Los_Angeles",
+  "local_revision": "a24f7c23d8cf0b1a518918e1692b06d300f11dd7",
+  "local_verification": [
+    "npm test: 22/22 passed",
+    "node scripts/verify_policy_parity.js: depth/image/observation/action/pose max error 0 over 24 steps",
+    "node docs/research/2026-11-21/repro_probe.mjs: see repro_probe.json"
+  ],
+  "microduck_space_revision": "efedf47f4d4ae52d17ad2e108a5b8795d41537a3",
+  "mjswan_revision": "28373d0a2bebde00f8fb47fabf508b18aac51344",
+  "other_repository_heads": {
+    "runrobotics/runrobot": {
+      "branch": "main",
+      "sha": "b918f759554c023b6ab69498ef0b64af0cb1763e"
+    },
+    "Daniel-rmc/ManiLoop": {
+      "branch": "main",
+      "sha": "c4dcb6a9c1f46923095213dc7eba989e55e63cd3"
+    },
+    "apple-aiml-research/ml-halo": {
+      "branch": "main",
+      "sha": "35d8334e9f7dc3e2b7a7737a9a3ec34f170c809f"
+    },
+    "noah-wardlow/so101-policy-lab": {
+      "branch": "main",
+      "sha": "944fb2056b3d2a37932cd04b01d52608e8156c54"
+    }
+  },
+  "source_snapshots": [
+    {
+      "snapshot": "halo",
+      "bytes": 445403,
+      "sha256": "1f27f296c3532135e9178f421991d59cc0d3481733070b788e58fd6207d25459",
+      "url": "https://apple-aiml-research.github.io/ml-halo/"
+    },
+    {
+      "snapshot": "halo-log.js",
+      "bytes": 1367049,
+      "sha256": "0d5e6d92cdc3f54c37cf08c8b4167860d74ced77c242561bb74d77efd449b91e",
+      "url": "https://apple-aiml-research.github.io/ml-halo/assets/log-demo/log.js?v=20261102d"
+    },
+    {
+      "snapshot": "halo-trace.js",
+      "bytes": 6998,
+      "sha256": "fcdc92c80bfd6400fae4f2db3c6aa117ab06d42db7584da98c91d83d58ffd2ee",
+      "url": "https://apple-aiml-research.github.io/ml-halo/assets/log-demo/trace.js?v=20261027"
+    },
+    {
+      "snapshot": "microduck-custom-policy.js",
+      "bytes": 14939,
+      "sha256": "771ebef618a91958160ddcd829e7a4d49840d506d640dc63db9aacd19b6f151e",
+      "url": "https://huggingface.co/spaces/pollen-robotics/microduck-simulator/raw/efedf47f4d4ae52d17ad2e108a5b8795d41537a3/app/src/game/custom-policy.js"
+    },
+    {
+      "snapshot": "microduck-game.js",
+      "bytes": 103753,
+      "sha256": "b3275b273f9078f100e9e45723a4195d20e5b0ee1764359eff74b514634bc7e1",
+      "url": "https://huggingface.co/spaces/pollen-robotics/microduck-simulator/raw/efedf47f4d4ae52d17ad2e108a5b8795d41537a3/app/src/game/game.js"
+    },
+    {
+      "snapshot": "mjswan-engine.md",
+      "bytes": 31059,
+      "sha256": "0d4a3ba78e8be8ac5ce9d4465b2b4e2f8e978454244f36caf717c355d29bea46",
+      "url": "https://raw.githubusercontent.com/ttktjmt/mjswan/28373d0a2bebde00f8fb47fabf508b18aac51344/docs/docs/api/engine.md"
+    },
+    {
+      "snapshot": "mjswan-mjlab.md",
+      "bytes": 11321,
+      "sha256": "e7b7004a2930a15c987c30fa951b3659d2baab800999fc242c6e92b394f39dfe",
+      "url": "https://raw.githubusercontent.com/ttktjmt/mjswan/28373d0a2bebde00f8fb47fabf508b18aac51344/docs/docs/guides/mjlab.md"
+    },
+    {
+      "snapshot": "supermimic",
+      "bytes": 26146,
+      "sha256": "90ecb509837ee1e53e5c02fb8c98c377bf62f7a3b874fb526e07c778d1abcebe",
+      "url": "https://supermimic.github.io/demo/"
+    },
+    {
+      "snapshot": "supermimic-main.js",
+      "bytes": 14923,
+      "sha256": "2a5e6b83cbb19c51870353b7c5a166a87d8d5efb586a1856d7e78e574b35fa7c",
+      "url": "https://supermimic.github.io/demo/main.js"
+    },
+    {
+      "snapshot": "supermimic-worker.mjs",
+      "bytes": 6606,
+      "sha256": "a424d0d0a018c24ebd209c5e4461de4471edcc122881c12f415487c297465aac",
+      "url": "https://supermimic.github.io/demo/worker.mjs"
+    }
+  ],
+  "limits": "Source inspection and documentation survey; no external package integration or comparative performance benchmark. Website hashes identify inspected bytes, not an immutable public URL. Other repository heads record revisions available during the survey; moving documentation may change independently."
+}
