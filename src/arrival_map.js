@@ -140,6 +140,7 @@ export class ArrivalMap {
     this.ready = false;
     this.details_ready = false;
     this.textures = [];
+    this.allocated_textures = [];
     this.geometry = new THREE.PlaneGeometry(2, 2);
     this.map_material = new THREE.ShaderMaterial({
       vertexShader: QUAD_VERTEX, fragmentShader: MAP_FRAGMENT, depthTest: false, depthWrite: false,
@@ -158,8 +159,7 @@ export class ArrivalMap {
     this.composite.add(new THREE.Mesh(this.geometry, this.cloud_material));
   }
 
-  async load_texture(base, index, signal) {
-    const image = this.manifest.images[index];
+  async load_texture(base, image, signal) {
     const response = await fetch(`${base}${image.file}`, { signal });
     if (!response.ok) throw new Error(`The ${image.label} image could not load.`);
     const bitmap = await createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
@@ -167,7 +167,8 @@ export class ArrivalMap {
     const texture = new THREE.Texture(bitmap);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    this.textures[index] = texture;
+    this.allocated_textures.push(texture);
+    return texture;
   }
 
   async load_lights(base, file, signal) {
@@ -182,9 +183,11 @@ export class ArrivalMap {
     const response = await fetch(`${base}manifest.json`, { signal });
     if (!response.ok) throw new Error('The satellite map could not load.');
     this.manifest = await response.json();
-    const [, geometry] = await Promise.all([
-      this.load_texture(base, 0, signal), this.load_lights(base, this.manifest.lights.overview.file, signal),
+    const [overview, geometry] = await Promise.all([
+      this.load_texture(base, this.manifest.images[0], signal),
+      this.load_lights(base, this.manifest.lights.overview.file, signal),
     ]);
+    this.textures[0] = overview;
     this.light_material = new THREE.ShaderMaterial({
       vertexShader: LIGHT_VERTEX, fragmentShader: LIGHT_FRAGMENT, transparent: true,
       blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
@@ -201,10 +204,11 @@ export class ArrivalMap {
   }
 
   async load_details(base, signal) {
-    const [, , , geometry] = await Promise.all([
-      ...[1, 2, 3].map(index => this.load_texture(base, index, signal)),
+    const [images, geometry] = await Promise.all([
+      Promise.all(this.manifest.images.slice(1).map(image => this.load_texture(base, image, signal))),
       this.load_lights(base, this.manifest.lights.file, signal),
     ]);
+    this.textures.push(...images);
     this.lights.geometry.dispose();
     this.lights.geometry = geometry;
     this.map_material.uniforms.uImages.value = this.textures;
@@ -257,7 +261,7 @@ export class ArrivalMap {
     this.cloud_material.dispose();
     this.lights?.geometry.dispose();
     this.light_material?.dispose();
-    for (const texture of this.textures) {
+    for (const texture of this.allocated_textures) {
       texture?.source.data.close();
       texture?.dispose();
     }

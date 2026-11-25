@@ -42,6 +42,7 @@ const SITTING = new Set([MODE.SIT_DOWN, MODE.SEATED, MODE.STAND_UP]);
 const SIT_FALL = { tilt: 1.0, height: 0.2 };
 // After the stand-up clip ends, the robot has this long to stand still before walking takes over anyway.
 const STAND_UP_GRACE_S = 2.0;
+const STAND_HANDOFF = { progress: .6, hold_s: .14, vertical_speed: .35 };
 
 const FALL_TILT = 1.0; // rad, velocity task FALL_TILT
 const FALL_DROP = 0.25; // m below the commanded root height, velocity task FALL_DROP
@@ -67,6 +68,8 @@ export class RobotController {
       if (!policies[name]) throw new Error(`The ${name} policy is missing.`);
     }
     this.body = new LiteProBody(mujoco, model, policies.walk.contract);
+    this.foot_sides = new Map([...this.body.geoms].flatMap(([name, id]) =>
+      /\/(left|right)_foot_collision_/.test(name) ? [[id, name.includes('/left_') ? 1 : 2]] : []));
     this.motors = new Motors(this.body, random);
     this.clips = policies.sit ? new MotionClips(policies.sit.contract.motion, policies.sit.clips) : null;
     this.policies = Object.fromEntries(Object.entries(policies).map(([name, { session, contract }]) =>
@@ -186,6 +189,30 @@ export class RobotController {
     return Math.hypot(v[0], v[1], v[2]) < speed && Math.hypot(v[3], v[4], v[5]) < spin;
   }
 
+  /** Both feet must contact walkable ground before an early stand-to-walk handoff. */
+  feet_grounded() {
+    let sides = 0;
+    for (let i = 0; i < this.state.ncon; i++) {
+      const contact = this.state.contact.get(i);
+      if (this.model.geom_group[contact.geom1] === WALKABLE_GROUP) sides |= this.foot_sides.get(contact.geom2) ?? 0;
+      if (this.model.geom_group[contact.geom2] === WALKABLE_GROUP) sides |= this.foot_sides.get(contact.geom1) ?? 0;
+      contact.delete();
+      if (sides === 3) return true;
+    }
+    return false;
+  }
+
+  resume_walking() {
+    const yaw = this.root_pose()[2], c = Math.cos(yaw), s = Math.sin(yaw);
+    const v = this.state.qvel.subarray(this.body.root_qvel, this.body.root_qvel + 6);
+    const momentum = [Math.max(-.4, Math.min(.8, c * v[0] + s * v[1])),
+      Math.max(-.3, Math.min(.3, -s * v[0] + c * v[1])), Math.max(-.5, Math.min(.5, v[5]))];
+    this.reference = null;
+    this.switch_between_steps(MODE.WALK, 'walk');
+    // Brake through the existing command ramp, preserving the velocity at policy transfer.
+    this.command = momentum;
+  }
+
   /** Pick the mode for this control step. */
   update_mode(posture, dt) {
     this.mode_time += dt;
@@ -201,15 +228,15 @@ export class RobotController {
         // Same policy and histories: it keeps tracking the clip's last, seated frame.
         this.mode = MODE.SEATED;
         this.mode_time = 0;
-      } else if (this.mode === MODE.STAND_UP && this.reference.done) {
+      } else if (this.mode === MODE.STAND_UP) {
         const standing = posture.height > STAND.height && posture.upright > STAND.upright;
-        this.stand_time = standing ? this.stand_time + dt : 0;
+        const grounded = standing && Math.abs(this.state.qvel[this.body.root_qvel + 2]) < STAND_HANDOFF.vertical_speed && this.feet_grounded();
+        this.stand_time = grounded ? this.stand_time + dt : 0;
         this.still_time = standing && this.at_rest(STAND) ? this.still_time + dt : 0;
-        this.done_time = (this.done_time ?? 0) + dt;
-        if (this.still_time >= 0.3 || (standing && this.done_time >= STAND_UP_GRACE_S)) {
-          this.reference = null;
-          this.enter(MODE.WALK, 'walk');
-        }
+        if (this.reference.done) this.done_time += dt;
+        const early = this.reference.frame >= this.reference.last_frame * STAND_HANDOFF.progress &&
+          this.stand_time >= STAND_HANDOFF.hold_s;
+        if (early || (this.reference.done && (this.still_time >= .3 || (standing && this.done_time >= STAND_UP_GRACE_S)))) this.resume_walking();
       }
       return;
     }

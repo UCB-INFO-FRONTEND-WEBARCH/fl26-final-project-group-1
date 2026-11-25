@@ -74,9 +74,9 @@ at least 0.1 m/s, since the policy ignores smaller commands.
 controller turns the robot's back to the seat and backs it up to where the
 sit-down clip starts (see [policy integration](POLICY.md)).
 The nearby F prompt selects only supported furniture on the robot's floor with a clear approach.
-Each seat remains a physical obstacle in both the planning and tracking maps. Six native KIVIK sofa anchors use
-tracking clearance to reach a 50 cm staging point, then a bounded standing-pose alignment before the real sit policy.
-See [seating](SEATING.md) for this assist's limits; ordinary navigation retains its wider planning clearance.
+Each seat remains a physical obstacle in both the planning and tracking maps. Two compatible low sofas replace the
+tall KIVIK seating. Their walking approaches use the same 85 cm staging distance as armchairs, without position
+snaps. See [seating](SEATING.md). Removed furniture is also removed from navigation and camera blockers.
 
 The elevator has a gravity-compensated slide joint and a separate position servo.
 Travel is limited to 0.3 m/s with gradual acceleration. Landing gates close when

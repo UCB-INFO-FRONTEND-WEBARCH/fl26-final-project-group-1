@@ -2,8 +2,8 @@
 
 The default playground replaces the temporary apartment with the calibrated V20
 Hephaestus scene. Its GLBs, native finish bakes, navigation masks, and collision
-data are bundled, so it needs no IKEA catalog host to enter the room. The separate
-Asset library and the explicit earlier demo still use their existing asset host.
+data are bundled. Compatible armchairs, the replacement lounge sofas, the Asset library, and the earlier demo use
+the external IKEA asset host.
 
 ## Source and scale
 
@@ -22,15 +22,15 @@ Z-up frame once. There is no room rescaling or independent furniture rescaling.
 | Apartment slab bounding rectangle | 37.68 × 18.06 m; actual footprint is nonrectangular |
 | Mezzanine elevation above apartment | 3.60 m |
 | Main room ceiling above apartment | 6.60 m |
-| Central sofa aisle | approximately 1.50 m |
-| Six KIVIK-inspired Tripo sofas | approximately 2.800 × 1.629 × 0.829 m each |
-| Four IKEA LISTERBY tables | approximately 1.400 × 0.600 × 0.365 m each |
+| Source V20 sofa aisle | approximately 1.50 m before the lounge edit |
+| Runtime BONDHOLMEN sofa frames | two, approximately 1.384 × 0.810 × 0.737 m each, with KUDDARNA pads |
+| Runtime main-lounge LISTERBY tables | two, approximately 1.400 × 0.600 × 0.365 m each |
 | Shared carpet | 8.20 × 9.50 m |
 | L stair | twenty 0.18 m risers, 0.29 m going, 1.30 m flight width |
 
-The existing blue seating, yellow cushions, warm finishes, wardrobes, workspaces,
-kitchen, and their placements come from V20. IKEA and Tripo source assets are
-reused; no new generation credits were spent. See [third-party notes](../THIRD_PARTY.md).
+The runtime lounge replaces the six tall KIVIK-inspired sofas with two compatible real-size BONDHOLMEN/KUDDARNA
+assemblies. Two coffee tables and their loose decorations are removed. Warm finishes, wardrobes, workspaces,
+kitchen, and perimeter placements remain from V20. See [seating](SEATING.md) and [third-party notes](../THIRD_PARTY.md).
 
 ## Runtime representation
 
@@ -39,7 +39,7 @@ reused; no new generation credits were spent. See [third-party notes](../THIRD_P
   330 authored instances with instanced rendering.
 - The large scene GLBs use meshopt compression, 16-bit position quantization,
   static role batching, render LODs, and embedded image maps capped at 1024 pixels.
-  Models plus four native finish tiles total 39,957,586 bytes (38.11 MiB).
+  Native models plus four finish tiles total 40,022,742 bytes (38.17 MiB), excluding external catalog seating.
   The complete lower facade is a separate context band, visible in Building
   view. Plants use 8 m culling batches indoors and shared overview batches in
   Building view. Fast Building view omits interior furniture; Quality restores it.
@@ -50,13 +50,14 @@ reused; no new generation credits were spent. See [third-party notes](../THIRD_P
 - Full-height physics remains independent of the Orbit/Top-down wall cutaway.
   Camera blockers come from source collision bodies. Actual floor triangles
   preserve slab boundaries and the open mezzanine void.
-- 4,216 convex collision bodies replace 16,283 initial bodies after omitting tiny
+- 4,002 native convex collision bodies remain after the lounge edit. The original optimization reduced 16,283 bodies
+  to 4,216 by omitting tiny
   contact hardware and nonstructural finish details with solid substrates.
   Furniture uses connected-component CoACD at a 15 mm target. One failed ALEX
   template uses recorded conservative convex component hulls. Glazing retains
   source-object barrier envelopes. These are fixed contact approximations.
-  Runtime geoms are grouped into fixed 4 m spatial bodies for faster head-camera
-  ray rejection. Their surfaces, transforms, and contact settings are unchanged.
+  Runtime geoms are grouped into fixed 4 m spatial bodies for faster head-camera ray rejection. Replacement seating
+  adds its own source-mesh colliders. Removed furniture has no residual contact, navigation or camera blockers.
 - Theta* receives floor polygons eroded by 0.52 m planning / 0.30 m tracking radii
   plus half a 10 cm cell diagonal, minus inflated obstacles. Render geometry,
   physics, and navigation share one source transform.
@@ -108,10 +109,24 @@ masks, physics module, plant prototypes, and checksummed manifest together.
 Compaction promotes converted WebP textures to standard JPEG/PNG bindings and
 repairs named UV references to the retained UV layer. It preserves valid textures.
 
+For the runtime lounge edit, use the unedited lower GLB as input. The version before the edit is available at
+`2a17559`. The checked-in region list removes complete furniture and decoration components from the joined mesh;
+it excludes the carpet and floor. It also filters their collision bodies, then rebuilds navigation and camera data:
+
+```bash
+git show 2a17559:public/assets/hephaestus/lower.glb > local_assets/hephaestus/lower-v20.glb
+node scripts/hephaestus/declutter_lounge.js local_assets/hephaestus/lower-v20.glb
+python scripts/hephaestus/update_lounge_navigation.py
+python scripts/prepare_seating.py
+```
+
+The navigation rebuild needs NumPy and Shapely; render filtering uses the existing Three.js and meshoptimizer
+packages. The edited lower GLB has zero Khronos validator errors (11 warnings, versus 13 in the original).
+
 ## Validation
 
-`npm test` runs 44 shared/demo tests and four Hephaestus asset/layout/navigation
-tests, including route rendering, material restoration, and camera handoff.
+`npm test` runs shared/demo and Hephaestus asset/layout/navigation checks, including route rendering, material
+restoration, camera handoff, and the grounded stand-to-walk transfer.
 `npm run test:simulation` first checks unchanged upstream controller parity,
 then the original full demo regressions (including lift and physical straight
 stairs), then the new-map real MuJoCo/ONNX checks. The latter probe carpet,

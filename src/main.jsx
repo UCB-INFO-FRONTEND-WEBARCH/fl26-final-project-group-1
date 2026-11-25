@@ -833,7 +833,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           <button onClick={on_exit}>Back to site <span>↗</span></button>
         </div>}
         <div className="arrival-credit">
-          <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-standard-services/global-imagery-browse-services-gibs" target="_blank" rel="noreferrer">NASA GIBS</a>
+          <a href="https://s2maps.eu" target="_blank" rel="noreferrer">Sentinel-2 cloudless</a><span> by </span>
+          <a href="https://eox.at" target="_blank" rel="noreferrer">EOX</a><span> · modified Copernicus Sentinel 2016 &amp; 2017</span>
           <span> / </span><a href="https://www.usgs.gov/programs/national-geospatial-program/national-map" target="_blank" rel="noreferrer">USGS · USDA</a>
           <span> / </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
         </div>

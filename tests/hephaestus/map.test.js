@@ -9,7 +9,7 @@ import {Navigation} from '../../src/navigation.js';
 import {FLOOR_HEIGHT,STAIRS,STAIR_PATH,on_stairs,stair_height,stair_projection} from '../../src/building.js';
 import {make_scene_xml,SPAWN} from '../../src/scene_layout.js';
 import {teleport_position} from '../../src/teleport.js';
-import {SEATS,SeatApproach,from_seat,nearby_seat} from '../../src/seat.js';
+import {SEATS,from_seat,nearby_seat} from '../../src/seat.js';
 
 test('default map retains V20 metric provenance and declares its real connectors',()=>{
  assert.equal(IS_HEPHAESTUS,true);assert.equal(HAS_ELEVATOR,false);assert.equal(MAP.units,'metres');
@@ -71,9 +71,9 @@ test('teleport can reach the mezzanine while rejecting the open void and real so
 
 test('all five catalog chairs have connected approaches on their own floor', () => {
  const maps=make_navigation_maps();
- assert.equal(SEATS.filter(seat=>!seat.existing).length,5);
+ assert.equal(SEATS.filter(seat=>seat.kind==='Armchair').length,5);
  assert(SEATS.some(s=>s.floor===1));
- for(const seat of SEATS.filter(seat=>!seat.existing)){
+ for(const seat of SEATS.filter(seat=>seat.kind==='Armchair')){
   const stage=from_seat(seat,.85,0);
   assert(maps[seat.floor].free(stage),seat.id);
   assert(maps[seat.floor].plan(seat.floor?[-15,-2]:SPAWN,stage),`${seat.id}: disconnected staging point`);
@@ -81,29 +81,23 @@ test('all five catalog chairs have connected approaches on their own floor', () 
  }
 });
 
-test('all six lounge sofas reuse their real geometry and have a tracking-clear approach', () => {
+test('two compatible lounge sofas have open walking approaches and replace the tall native sofas', () => {
  const map=make_navigation_maps()[0],sofas=SEATS.filter(seat=>seat.kind==='Sofa');
- assert.equal(sofas.length,6);
+ assert.equal(sofas.length,2);
+ assert.equal(MAP.furniture.filter(f=>f.product==='kivik').length,0);
+ assert.equal(HEPHAESTUS_PHYSICS.filter(p=>p.source.includes('KIVIK')).length,0);
  for(const sofa of sofas){
-  const stage=from_seat(sofa,sofa.staging,0);
-  assert(map.free(stage,true),sofa.id);
-  assert(map.plan(SPAWN,stage,true),`${sofa.id}: disconnected approach`);
+  const stage=from_seat(sofa,.85,0);
+  assert(map.free(stage),sofa.id);
+  assert(map.plan(SPAWN,stage),`${sofa.id}: disconnected approach`);
   assert.equal(nearby_seat(stage,0,[map])?.id,sofa.id);
  }
 });
 
-test('sofa alignment cannot skip a floor transfer or cross blocked furniture', () => {
- const maps=make_navigation_maps(),sofa=SEATS.find(seat=>seat.id==='sofa_north');
- const stage=from_seat(sofa,sofa.staging,0);
- const start=[...sofa.front,sofa.yaw];
- const nearby=new SeatApproach(sofa,start,new Navigation(maps,null));
- nearby.begin([...stage,.73],0);
- assert.equal(nearby.phase,'ready');
- for(const position of [[...stage,FLOOR_HEIGHT+.73],[...from_seat(sofa,-.2,0),.73]]){
-  const approach=new SeatApproach(sofa,start,new Navigation(maps,null));
-  approach.begin(position,0);
-  assert.notEqual(approach.phase,'ready');
+test('removed lounge furniture leaves no invisible navigation or teleport barriers', () => {
+ const maps=make_navigation_maps();
+ for(const point of [[2.7,1.8],[-2.7,2.5],[2.7,-2.5],[-2.7,-1.8],[.8,1.3],[-.8,-1.3]]){
+  assert(maps[0].free(point),point.join(','));
+  assert(teleport_position([...point,0],maps),point.join(','));
  }
- assert.equal(nearby_seat(from_seat(sofa,.81,0),0,maps,[sofa]),null);
- assert.equal(nearby_seat(from_seat(sofa,.5,.46),0,maps,[sofa]),null);
 });

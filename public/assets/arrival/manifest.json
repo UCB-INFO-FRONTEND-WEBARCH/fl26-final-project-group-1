@@ -36,7 +36,7 @@
     "license": "ODbL-1.0",
     "source": "https://www.openstreetmap.org/copyright"
   },
-  "imagery_credit": "NASA GIBS / USGS / USDA \u00b7 \u00a9 OpenStreetMap contributors",
+  "imagery_credit": "Sentinel-2 cloudless by EOX (Copernicus 2016 & 2017) / USGS / USDA \u00b7 \u00a9 OpenStreetMap contributors",
   "imagery_source": "https://www.usgs.gov/programs/national-geospatial-program/national-map",
   "images": [
     {
@@ -48,8 +48,18 @@
         -24549.287,
         33141.696
       ],
-      "source": "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&FORMAT=image%2Fjpeg&CRS=EPSG%3A3857&BBOX=-13711015.385122165%2C4414477.448837536%2C-13491015.385122165%2C4634477.448837536&WIDTH=1536&HEIGHT=1536&TIME=2024-07-16",
-      "sha256": "ac4061bf1706fd56047aadc9476eaf7f315df4cf0849ccc9c13cde9bed691701"
+      "pixels": [
+        4000,
+        4000
+      ],
+      "source": "https://tiles.maps.eox.at/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=s2cloudless_3857&STYLES=&FORMAT=image%2Fjpeg&SRS=EPSG%3A3857&BBOX=-13711015.385122165%2C4414477.448837536%2C-13491015.385122165%2C4634477.448837536&WIDTH=4000&HEIGHT=4000",
+      "sha256": "1198801d015019d84149023962eb962ff15e963545e76ee34bac22df7a28b58b",
+      "license": "CC-BY-4.0",
+      "acquisition_years": [
+        2016,
+        2017
+      ],
+      "attribution": "Sentinel-2 cloudless - https://s2maps.eu by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2016 & 2017)"
     },
     {
       "name": "santa-clara",
@@ -59,6 +69,10 @@
       "center": [
         0.0,
         0.0
+      ],
+      "pixels": [
+        1536,
+        1536
       ],
       "source": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox=-13596466.097817523%2C4471335.752904907%2C-13556466.097817523%2C4511335.752904907&bboxSR=3857&imageSR=3857&size=1536%2C1536&format=jpg&f=image&bandIds=0%2C1%2C2&interpolation=RSP_BilinearInterpolation&compressionQuality=88",
       "sha256": "40b9cd9e7abe43842de11bcce89271535f4dd24d9b0db4d7192a342983a953c8"
@@ -72,6 +86,10 @@
         0.0,
         0.0
       ],
+      "pixels": [
+        1536,
+        1536
+      ],
       "source": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox=-13579466.097817523%2C4488335.752904907%2C-13573466.097817523%2C4494335.752904907&bboxSR=3857&imageSR=3857&size=1536%2C1536&format=jpg&f=image&bandIds=0%2C1%2C2&interpolation=RSP_BilinearInterpolation&compressionQuality=88",
       "sha256": "d06fe5c6afa0b77b5a1d66eebf0d0b493056febfdf6d68d98ba2dddf9c99624e"
     },
@@ -83,6 +101,10 @@
       "center": [
         0.0,
         0.0
+      ],
+      "pixels": [
+        1536,
+        1536
       ],
       "source": "https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPImagery/ImageServer/exportImage?bbox=-13576916.097817523%2C4490885.752904907%2C-13576016.097817523%2C4491785.752904907&bboxSR=3857&imageSR=3857&size=1536%2C1536&format=jpg&f=image&bandIds=0%2C1%2C2&interpolation=RSP_BilinearInterpolation&compressionQuality=88",
       "sha256": "2ec21a43a0a1be77422cf58646d226877af72aa8840af33163e5ada757ecc280"

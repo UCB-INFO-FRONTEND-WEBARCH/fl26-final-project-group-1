@@ -4,6 +4,11 @@ export const SATELLITE_STOP_IMAGES = [0, 1, 3];
 // Keep Santa Clara inside the local-road lighting coverage; show twice the area width at Building K.
 const STOP_SCOPE_SCALE = [1, 0.325, 2];
 
+/** Keep aerial detail at up to 1.5x display scale without applying the 3D scene's 1MP cap. */
+export function aerial_pixel_ratio(width, height, device_ratio = 1) {
+  return Math.min(device_ratio, 1.5, Math.sqrt(4_000_000 / Math.max(width * height, 1)));
+}
+
 export function satellite_frame(manifest, level, progress, aspect) {
   const focus = manifest.target.focus;
   const span_at_stop = index => {

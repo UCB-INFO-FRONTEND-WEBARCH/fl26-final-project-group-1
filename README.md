@@ -146,7 +146,7 @@ Use **Exit to site** to return to the landing page and stop the simulation.
 The sun/moon button switches the site theme. Light mode uses daytime imagery;
 dark mode uses a blue night grade with stylized street lights following
 OpenStreetMap roads. The initial theme follows the system; a manual choice is saved.
-The arrival uses bundled NASA GIBS and USGS/USDA images, with no runtime map API key.
+The arrival uses a bundled 4000 px Sentinel-2 cloudless overview and USGS/USDA close-up imagery, with no runtime map API key.
 `python3 scripts/prepare_arrival_assets.py` downloads the images and prepares the
 compact light geometry. Source URLs, coordinates, licenses, and hashes are in
 `public/assets/arrival/manifest.json`.
@@ -207,8 +207,8 @@ Select Resume to continue.
 ## Scene and robot
 
 - The nonrectangular apartment slab spans 37.68 × 18.06 m; the mezzanine is 3.60 m above it.
-- Original V20 placements and metre scale: six blue sofas in two U arrangements,
-  four LISTERBY tables, PAX wardrobes, workspaces, kitchen, and perimeter furnishings.
+- The lounge has two real-size BONDHOLMEN sofas with KUDDARNA pads and two LISTERBY tables, with clear approaches
+  and exits. PAX wardrobes, workspaces, kitchen, and perimeter furnishings retain their V20 placements.
 - IKEA-derived and existing Tripo assets retain their source materials, with
   portable PBR approximations and render LODs. Native oak and brick finishes are
   baked from the Blender material graphs. Plants use 330 authored instances.
@@ -223,9 +223,8 @@ Select Resume to continue.
 - After a fall, the get-up policy for the side Lite Pro lies on stands it up, and walking resumes.
   Getting up needs about 1.5 m of free floor; beside furniture or on stairs it can take several tries.
 - Five real-scale **ULRIKSBERG** armchairs support sitting in Hephaestus: three downstairs and two on the mezzanine.
-  The demo has one on each floor. The six blue main-lounge **KIVIK sofas** also offer F to sit and stand, with a short
-  standing-pose alignment before the real sit policy. Other seating remains decorative. See [seating](docs/SEATING.md)
-  for dimensions, validation, and the sofa approach limit.
+  The demo has one on each floor. Two **BONDHOLMEN sofas** also offer F to sit and stand. All enabled seats use a
+  physical walking approach and real furniture contact. See [seating](docs/SEATING.md) for dimensions and validation.
 - The HUD keeps the site's blue accents and rounded panels. Game references inform key badges, prompts, and layout.
   The local minimap stays at the bottom left; M expands it to nearly the full screen. Figure cards sit at the bottom right.
 
@@ -241,7 +240,7 @@ meshes generated with CoACD. MuJoCo uses convex shapes for mesh contacts; a sing
 object hull would fill gaps under desks and between legs.
 See the [MuJoCo collision documentation](https://mujoco.readthedocs.io/en/stable/computation.html).
 
-`src/hephaestus_physics.js` stores 4,216 source-derived convex bodies. Exact floor
+`src/hephaestus_physics.js` stores 4,002 source-derived convex bodies. Exact floor
 triangles preserve the mezzanine void; 15 mm CoACD furniture decomposition keeps
 leg gaps. Tiny hardware and nonstructural finish contacts are omitted; the
 underlying construction remains. A recorded connected-component hull fallback

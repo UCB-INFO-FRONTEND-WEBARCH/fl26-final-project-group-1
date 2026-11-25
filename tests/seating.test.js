@@ -32,7 +32,7 @@ test('every sitting location has a clear staging point and remains a real naviga
     const staging = from_seat(seat, seat.staging ?? .85, 0);
     assert.ok(maps[seat.floor].free(staging, seat.precise_approach), `${seat.id}: staging is blocked`);
     assert.equal(maps[seat.floor].free(seat.position), false);
-    assert.equal(seat_pose(seat)[2], seat.floor * FLOOR_HEIGHT + seat.height);
+    assert.equal(seat_pose(seat)[2], (seat.floor_z ?? seat.floor * FLOOR_HEIGHT) + seat.height);
     assert.equal(seat_footprint(seat).length, 4);
     if (!seat.existing) assert.ok(seating_bodies().some(h => h.name.startsWith(`seat_${seat.id}_`)));
     else assert.ok(seat.collision_source || seat.collision_prefix);

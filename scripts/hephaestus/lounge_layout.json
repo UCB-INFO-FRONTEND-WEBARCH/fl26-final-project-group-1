@@ -1,0 +1,12 @@
+{
+  "removed": [
+    {"name": "north KIVIK replacement", "bounds": [[-1.44, 1.88, -0.01], [1.44, 3.59, 1.4]]},
+    {"name": "south KIVIK replacement", "bounds": [[-1.44, -3.59, -0.01], [1.44, -1.88, 1.4]]},
+    {"name": "north-east return", "bounds": [[1.85, 0.72, -0.01], [3.55, 3.59, 1.4]]},
+    {"name": "north-west return", "bounds": [[-3.55, 0.72, -0.01], [-1.85, 3.59, 1.4]]},
+    {"name": "south-east return", "bounds": [[1.85, -3.59, -0.01], [3.55, -0.72, 1.4]]},
+    {"name": "south-west return", "bounds": [[-3.55, -3.59, -0.01], [-1.85, -0.72, 1.4]]},
+    {"name": "north-east coffee table", "bounds": [[0.07, 0.98, -0.01], [1.53, 1.65, 1.2]]},
+    {"name": "south-west coffee table", "bounds": [[-1.53, -1.65, -0.01], [-0.07, -0.98, 1.2]]}
+  ]
+}

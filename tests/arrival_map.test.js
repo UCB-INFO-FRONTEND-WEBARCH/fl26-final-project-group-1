@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { satellite_frame, SATELLITE_STOP_IMAGES } from '../src/arrival_geography.js';
+import { satellite_frame, SATELLITE_STOP_IMAGES, aerial_pixel_ratio } from '../src/arrival_geography.js';
 import { resolve_theme } from '../src/theme.js';
 
 const base = new URL('../public/assets/arrival/', import.meta.url);
@@ -21,6 +21,24 @@ test('aerial images and road lights match their recorded source hashes', async (
       }
     }
   }
+});
+
+test('the first aerial view uses high-resolution source imagery and retains display detail through handoff', async () => {
+  assert.deepEqual(manifest.images[0].pixels, [4000,4000]);
+  assert.match(manifest.images[0].source, /s2cloudless_3857/);
+  const jpeg = await readFile(new URL(manifest.images[0].file, base));
+  let dimensions;
+  for (let offset=2;offset<jpeg.length;) {
+    const marker = jpeg[offset+1], length = jpeg.readUInt16BE(offset+2);
+    if ([0xc0,0xc1,0xc2].includes(marker)) {
+      dimensions = [jpeg.readUInt16BE(offset+7),jpeg.readUInt16BE(offset+5)]; break;
+    }
+    offset += length+2;
+  }
+  assert.deepEqual(dimensions,[4000,4000]);
+  assert.equal(aerial_pixel_ratio(1920,1080,1), 1);
+  assert.equal(aerial_pixel_ratio(1280,720,2), 1.5);
+  assert.ok(3840 * 2160 * aerial_pixel_ratio(3840,2160,2) ** 2 <= 4_000_001);
 });
 
 test('geographic zoom levels meet without jumps and converge on the Building K roof', () => {

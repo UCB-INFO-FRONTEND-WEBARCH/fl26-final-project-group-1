@@ -1,57 +1,50 @@
 # Furniture seating
 
-The runtime uses the existing Fluctlight sit and stand policy on real furniture colliders. Armchairs use a walking
-approach. The six main-lounge KIVIK sofas use a short standing-pose alignment before the same policy takes over.
-Models retain their original scale. No joint animation or invisible support block is added.
+The robot walks to a measured seat anchor, turns, backs up, and runs the Fluctlight sit policy. F stands it up.
+Sitting does not reset or teleport the robot. Furniture keeps its real dimensions and uses colliders generated from
+the same catalog meshes as the renderer. No invisible support blocks or joint animation are added.
 
-## Catalog match
+## Compatible furniture
 
-The shipped sit and stand clips use seat heights of 35.89 and 35.99 cm. Their training contract permits a height
-offset of −4 to +1 cm: both clips cover support heights from 31.99 to 36.89 cm.
+The shipped sit and stand clips use seat heights of 35.89 and 35.99 cm. Their common training range is
+31.99–36.89 cm. The selected furniture supports the seated hips inside that range:
 
-The selected [ULRIKSBERG armchair, 904.343.10](https://www.ikea.com/gb/en/p/ulriksberg-armchair-rattan-anthracite-90434310/)
-has a published 37 cm seat height and a 60 cm seat width. Measurements on the supplied GLB put the front support at
-36.7 cm and support under the seated hips near 33.2 cm. Both lie within the contract's range. The model stays at its
-original scale; renderer and physics share its ground origin, rotation, and placement.
+| Furniture | Measured support | Placement |
+| --- | --- | --- |
+| ULRIKSBERG armchair, 904.343.10 | 36.7 cm at the front, 33.2 cm under the hips | Five locations in Hephaestus, including two upstairs; two in the demo |
+| BONDHOLMEN sofa, 505.581.85, with two KUDDARNA pads, 005.472.36 | About 35 cm at the anchor and 33.3 cm under the hips | Two main-lounge sofas in Hephaestus |
 
-SOTENÄS was rejected because its seat slopes below the supported range under the hips. GAMLEHULT met the height
-requirement and supported sitting, but its stand-up checks fell. It is not enabled.
+The sofa pads retain their original geometry and scale. Their offsets and 0.08 rad tilt follow the wooden seat's
+slope. Sofa feet sit on the source carpet, 28.8 mm above the slab; the policy reference uses that same floor height.
+Each source model has 32 convex hulls. Visual placement and collision placement share the component transforms,
+and source SHA-256 checks reject a downloaded model that differs from its prepared colliders.
 
-`src/seating_layout.js` defines five armchair locations in Hephaestus, including two upstairs, and two in the demo map.
-`src/seating_assets.js` stores 32 convex hulls from the catalog mesh. The hulls preserve the leg, arm, and back
-geometry. A source SHA-256 check prevents a visual asset from loading with different collision geometry.
+The previous tall KIVIK sofas and four side returns are removed. Their seat height was outside the policy range;
+the earlier alignment assist caused a visible position jump. The lounge now has two sofas and two coffee tables.
+Removed furniture, books, and cushions are omitted from the render mesh, contacts, navigation, and camera blockers.
 
-Hephaestus also offers one sitting anchor on each of its six existing blue KIVIK sofas. Their measured support height
-is about 48.5 cm, outside the clips' training range. Walking approaches stalled at the sofa fronts. These interactions
-therefore align the robot to a standing pose 20 cm in front of the seat, with a maximum displacement of 70 cm, then
-run the unchanged sit policy. This is a game interaction assist, not evidence of an autonomous sofa approach.
-The native sofa collision meshes are reused without adding duplicate hulls. Other sofas and office chairs are not enabled.
+## Interaction and policy handoff
 
-## Interaction
+The F pane selects one seat within 1.7 m, on the robot's floor, with the robot in front and a clear tracking path
+to its staging point. The robot walks to a point 85 cm in front of the seat, then uses the walking policy to align
+with the clip start. F cancels an approach or stands up from the active seat. Clicking supported seating can also
+request a route from farther away. Pause preserves an approach; teleport and reset clear it.
 
-The contextual pane offers **F · Sit down** when the robot is within 1.7 m of the seat front, in front of the chair,
-on the same floor, and has a clear tracking path to the staging point. Only one nearby seat is selected. F cancels
-an approach or stands up from the active seat. Sofa prompts use a shorter 80 cm reach and 45 cm lateral limit.
-Clicks on supported armchairs can request a route from farther away.
+The stand clip can keep driving forward after the robot is upright. Waiting for its final frame caused falls on
+open seating. The controller now transfers to walking after 60% of the clip, once the robot is upright at standing
+height, has low vertical speed, and both feet stay on walkable ground for 0.14 s. The walking command starts from
+the measured body velocity and brakes through its existing rate limit. Policy weights and motion clips are unchanged.
 
-Staging is 85 cm in front of the seat, outside the navigation clearance. The pose controller then backs up to the
-clip start. Chair footprints remain obstacles; the robot uses real contact to sit and stand. Teleport and reset
-clear the active seat. Pause preserves an approach. Sofa routes use the tighter tracking clearance to reach a staging
-point 50 cm in front of the seat. Alignment is limited to the selected floor and preserves simulation time, elevator
-state, pause state, and fall/get-up history.
-
-The HUD uses game-style key badges, prompts, and placement with Centoria's blue accents and rounded panels.
-The minimap sits at the bottom left; M expands it. Figure cards sit at the bottom right. Hold Alt to free the cursor; releasing
-Alt requests capture again. Browsers that reject Pointer Lock retain free-cursor dragging.
+The HUD uses blue key badges and rounded panels. M expands the bottom-left minimap. Hold Alt to free the cursor;
+releasing it requests capture again. Browsers that reject Pointer Lock retain free-cursor dragging.
 
 ## Validation and regeneration
 
-`node scripts/verify_seating.js` checks every location in the selected world: clear staging, approach or assisted
-alignment, seated contact with the selected furniture's actual hulls, stand-up, and walking away without a new fall.
-Each sofa is checked with two random seeds and a four-second seated hold. Checks also verify that robot-only placement
-preserves the world and recovery history. Set `CENTORIA_MAP=hephaestus SEAT_ID=sofa` to run only the six native sofas.
-The full simulation workflow runs both maps, alongside the existing multi-seed walk-up and navigation regressions.
+`node scripts/verify_seating.js` checks every location in the selected world: walking approach, continuous root
+position, contact on the actual furniture, stand-up, two seconds standing without input, and walking over one metre
+clear without a fall. Each sofa uses four seeds and a ten-second seated hold. Set
+`CENTORIA_MAP=hephaestus SEAT_ID=sofa` to run only the lounge sofas.
 
-With the furniture preparation dependencies installed, run `python scripts/prepare_seating.py` to regenerate the
-colliders from ignored `local_assets/ikea/raw/90434310/model.glb`. Catalog GLBs remain in the external asset library;
-they are not added to the repository or Pages artifact.
+`python scripts/prepare_seating.py` regenerates the three catalog collider sets from ignored
+`local_assets/ikea/raw/<article>/model.glb`. Models stay in the external asset library.
+See [map preparation](HEPHAESTUS.md) for the matching lounge render and navigation update.

@@ -39,8 +39,8 @@
     },
     {
       "file": "lower.glb",
-      "bytes": 22363800,
-      "sha256": "081d2762bb80ea3498056e7e830e074a9d32afd1306e2bfa84e8ae99c502ec0f"
+      "bytes": 22428956,
+      "sha256": "01924529ecfdbbb73442aaa412e7340097d1e0688ec32c26c7131a61f50cf13e"
     },
     {
       "file": "oak_color.png",
@@ -86,7 +86,7 @@
   ],
   "collision_detail": {
     "original_bodies": 16283,
-    "runtime_bodies": 4216,
+    "runtime_bodies": 4002,
     "omitted": {
       "Nonstructural finish detail; substrate retained": 820,
       "Sub-contact-scale hardware": 10920
@@ -99,6 +99,133 @@
   "render_detail": {
     "context_bands": "Roof context always available; lower tower facade shown in Building view",
     "triangle_partition": "Source attributes preserved; no additional simplification",
-    "plants": "330 authored placements in 8m culling cells; shared overview batches in Building view"
+    "plants": "330 authored placements in 8m culling cells; shared overview batches in Building view",
+    "lounge": "Two sofas and two coffee tables; matching visuals, contacts, navigation and camera blockers."
+  },
+  "lounge_layout": {
+    "sofas": 2,
+    "coffee_tables": 2,
+    "removed": [
+      {
+        "name": "north KIVIK replacement",
+        "bounds": [
+          [
+            -1.44,
+            1.88,
+            -0.01
+          ],
+          [
+            1.44,
+            3.59,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "south KIVIK replacement",
+        "bounds": [
+          [
+            -1.44,
+            -3.59,
+            -0.01
+          ],
+          [
+            1.44,
+            -1.88,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "north-east return",
+        "bounds": [
+          [
+            1.85,
+            0.72,
+            -0.01
+          ],
+          [
+            3.55,
+            3.59,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "north-west return",
+        "bounds": [
+          [
+            -3.55,
+            0.72,
+            -0.01
+          ],
+          [
+            -1.85,
+            3.59,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "south-east return",
+        "bounds": [
+          [
+            1.85,
+            -3.59,
+            -0.01
+          ],
+          [
+            3.55,
+            -0.72,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "south-west return",
+        "bounds": [
+          [
+            -3.55,
+            -3.59,
+            -0.01
+          ],
+          [
+            -1.85,
+            -0.72,
+            1.4
+          ]
+        ]
+      },
+      {
+        "name": "north-east coffee table",
+        "bounds": [
+          [
+            0.07,
+            0.98,
+            -0.01
+          ],
+          [
+            1.53,
+            1.65,
+            1.2
+          ]
+        ]
+      },
+      {
+        "name": "south-west coffee table",
+        "bounds": [
+          [
+            -1.53,
+            -1.65,
+            -0.01
+          ],
+          [
+            -0.07,
+            -0.98,
+            1.2
+          ]
+        ]
+      }
+    ]
   }
 }
