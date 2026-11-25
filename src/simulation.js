@@ -1,5 +1,5 @@
 import { SPAWN, SPAWN_YAW } from './scene_layout.js';
-import { PHYSICS_DT, CONTROL_DECIMATION, DEFAULT_ANGLES, heading_from_quaternion } from './locomotion.js';
+import { PHYSICS_DT, CONTROL_DECIMATION, DEFAULT_ANGLES, heading_from_quaternion, command_from_camera_motion } from './locomotion.js';
 import { validate_model } from './robot_assets.js';
 import { RobotController, MODE } from './robot_controller.js';
 import { Elevator } from './elevator.js';
@@ -37,6 +37,7 @@ export class Simulation {
   get mode() { return this.controller.mode; }
 
   request_reset() {
+    this.camera_motion = null;
     this.teleport_requested = null;
     this.navigation?.cancel();
     this.command = [0, 0, 0];
@@ -60,6 +61,7 @@ export class Simulation {
   }
 
   reset(start = SPAWN, yaw = SPAWN_YAW) {
+    this.camera_motion = null;
     this.place(start, yaw);
     this.controller.reset();
     this.step_count = 0;
@@ -75,6 +77,7 @@ export class Simulation {
   request_teleport(goal) {
     const position = teleport_position(goal, this.navigation?.maps);
     if (!position) return false;
+    this.camera_motion = null;
     this.teleport_requested = { position, floor: goal[2], yaw: heading_from_quaternion(this.state.qpos) };
     this.reset_requested = false;
     this.command = [0, 0, 0];
@@ -107,6 +110,8 @@ export class Simulation {
   walking_command() {
     if (this.navigation && ['walking', 'waiting', 'riding', 'arrived'].includes(this.navigation.state.status)) {
       this.command = this.navigation.update(this.state.qpos, heading_from_quaternion(this.state.qpos), this.step_count * PHYSICS_DT);
+    } else if (this.camera_motion) {
+      this.command = command_from_camera_motion(this.camera_motion, heading_from_quaternion(this.state.qpos));
     }
     this.elevator?.advance(this.state, 0);
     const riding = this.elevator?.moving && this.elevator.occupied(this.state.qpos);
@@ -130,6 +135,7 @@ export class Simulation {
         await this.controller.control(this.walking_command(), step_dt);
         if (was_walking && this.controller.mode !== MODE.WALK) {
           // A fall drops the route and the manual command; walking resumes standing still.
+          this.camera_motion = null;
           this.command = [0, 0, 0];
           this.navigation?.cancel();
         }
@@ -144,6 +150,7 @@ export class Simulation {
       completed++;
       this.distance += Math.hypot(this.state.qpos[0] - previous_x, this.state.qpos[1] - previous_y);
       if (!this.state.qpos.every(Number.isFinite) || this.diverged()) {
+        this.camera_motion = null;
         this.fallen = true;
         this.command = [0, 0, 0];
         this.navigation?.cancel();

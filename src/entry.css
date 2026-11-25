@@ -64,6 +64,10 @@
 .game-status { color: #7b8995; font-size: 10px; margin-right: 8px; }
 .game-key-hint { display: flex; gap: 28px; position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); color: #81909e; font-size: 10px; white-space: nowrap; pointer-events: none; }
 .game-key-hint kbd { font-size: 9px; margin-right: 5px; color: #657789; }
+.game-key-hint button { pointer-events: auto; border: 0; padding: 0; background: none; color: inherit; font: inherit; }
+@media (max-width: 560px) {
+  .game-key-hint > span:nth-child(4) { display: none; }
+}
 .game-shell.playing .game-bar, .game-shell.playing .game-key-hint { animation: game-hud-in 650ms both; }
 @keyframes game-hud-in { from { opacity: 0; } to { opacity: 1; } }
 .game-shell.controls-open .floor-switch, .game-shell.controls-open .camera-switch,

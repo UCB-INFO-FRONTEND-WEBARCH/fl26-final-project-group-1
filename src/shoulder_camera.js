@@ -5,6 +5,8 @@ export class ShoulderCamera {
     this.camera = camera;
     this.target = target;
     this.distance = 2.6;
+    this.orbit_yaw = 0;
+    this.orbit_pitch = 0;
     this.obstacles = [];
     this.anchor = new THREE.Vector3();
     this.pivot = new THREE.Vector3();
@@ -22,7 +24,12 @@ export class ShoulderCamera {
   }
 
   zoom(factor) {
-    this.distance = THREE.MathUtils.clamp(this.distance * factor, 1.4, 4.5);
+    this.distance = THREE.MathUtils.clamp(this.distance * factor, 0.35, 4.5);
+  }
+
+  orbit(yaw, pitch) {
+    this.orbit_yaw = Math.atan2(Math.sin(this.orbit_yaw + yaw), Math.cos(this.orbit_yaw + yaw));
+    this.orbit_pitch = THREE.MathUtils.clamp(this.orbit_pitch + pitch, -0.2, 1.1);
   }
 
   update(position, heading, seconds, snap = false) {
@@ -35,24 +42,28 @@ export class ShoulderCamera {
       this.initialized = true;
     } else {
       this.anchor.lerp(position, 1 - Math.exp(-12 * seconds));
-      // Take the short turn across the -pi/pi boundary. Ignore body roll and pitch.
-      const turn = Math.atan2(Math.sin(heading - this.heading), Math.cos(heading - this.heading));
-      this.heading += turn * (1 - Math.exp(-8 * seconds));
+      // Keep the view in world space while the robot turns toward camera-relative input.
     }
-    const forward_x = Math.cos(this.heading);
-    const forward_y = Math.sin(this.heading);
+    const forward_x = Math.cos(this.heading + this.orbit_yaw);
+    const forward_y = Math.sin(this.heading + this.orbit_yaw);
+    const distance = this.distance * Math.cos(this.orbit_pitch);
+    const close_scale = Math.min(this.distance / 1.4, 1);
     this.pivot.copy(this.anchor);
     this.pivot.z += 0.35;
     this.target.set(this.pivot.x + forward_x * 0.65, this.pivot.y + forward_y * 0.65, this.pivot.z);
     this.desired_position.set(
-      this.anchor.x - forward_x * this.distance + forward_y * 0.55,
-      this.anchor.y - forward_y * this.distance - forward_x * 0.55,
-      this.anchor.z + 0.85,
+      this.anchor.x - forward_x * distance + forward_y * 0.55 * close_scale,
+      this.anchor.y - forward_y * distance - forward_x * 0.55 * close_scale,
+      this.pivot.z + 0.5 * close_scale + this.distance * Math.sin(this.orbit_pitch),
     );
     this.ray.origin.copy(this.pivot);
     this.ray.direction.copy(this.desired_position).sub(this.pivot).normalize();
     let available = this.pivot.distanceTo(this.desired_position);
     for (const bounds of this.obstacles) {
+      if (bounds.containsPoint(this.pivot)) {
+        available = 0;
+        break;
+      }
       if (this.ray.intersectBox(bounds, this.hit)) {
         available = Math.min(available, this.pivot.distanceTo(this.hit));
       }

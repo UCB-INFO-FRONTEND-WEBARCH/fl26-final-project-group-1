@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { command_from_keys, heading_from_quaternion, NUM_ACTIONS, JOINT_NAMES } from '../src/locomotion.js';
+import { command_from_keys, camera_motion_from_keys, command_from_camera_motion,
+  heading_from_quaternion, NUM_ACTIONS, JOINT_NAMES } from '../src/locomotion.js';
 import { FluctlightPolicy, Motors, projected_gravity } from '../src/fluctlight_policy.js';
 import { POLICY } from '../src/policy_constants.js';
 
@@ -48,6 +49,31 @@ test('the bundled policies match the manifest and share one robot', async () => 
   assert.equal(NUM_ACTIONS, 34);
   assert.equal(JOINT_NAMES[0], 'robot/left_hip_pitch');
   assert.equal(POLICY.timestep * POLICY.decimation, 0.02);
+});
+
+test('shoulder keys follow camera axes, normalize diagonals, and preserve Shift and aliases', () => {
+  const keys = codes => new Set(codes);
+  const motion = camera_motion_from_keys(keys(['KeyW']), Math.PI / 2);
+  assert.ok(Math.abs(motion[0]) < 1e-9);
+  assert.ok(Math.abs(motion[1] - 0.6) < 1e-9);
+  assert.deepEqual(camera_motion_from_keys(keys(['KeyA']), 0), camera_motion_from_keys(keys(['KeyQ']), 0));
+  assert.deepEqual(camera_motion_from_keys(keys(['KeyD']), 0), camera_motion_from_keys(keys(['KeyE']), 0));
+  const diagonal = camera_motion_from_keys(keys(['KeyW', 'KeyD']), 0.7);
+  assert.ok(Math.abs(Math.hypot(...diagonal.slice(0, 2)) - 0.6) < 1e-9);
+  assert.deepEqual(camera_motion_from_keys(keys(['KeyW', 'KeyD']), 0.7, 0.6, true), diagonal.map(v => v * 2));
+  assert.deepEqual(camera_motion_from_keys(keys(['KeyW', 'KeyS', 'KeyA', 'KeyE']), 0), [0, 0, 0.7]);
+});
+
+test('a fixed camera goal keeps steering toward world travel direction as the body turns', () => {
+  const motion = camera_motion_from_keys(new Set(['KeyW']), Math.PI / 2);
+  const initial = command_from_camera_motion(motion, 0);
+  assert.ok(initial[0] < 1e-9 && initial[1] > 0 && initial[2] > 0);
+  const aligned = command_from_camera_motion(motion, Math.PI / 2);
+  assert.ok(Math.abs(aligned[0] - 0.6) < 1e-9);
+  assert.ok(Math.abs(aligned[1]) < 1e-9 && Math.abs(aligned[2]) < 1e-9);
+  assert.deepEqual(command_from_camera_motion([0, 0, 0.7], 1.5), [0, 0, 0]);
+  const wrapped = command_from_camera_motion([Math.cos(-Math.PI + 0.01), Math.sin(-Math.PI + 0.01), 0.7], Math.PI - 0.01);
+  assert.ok(wrapped[0] > 0.99 && wrapped[2] > 0 && wrapped[2] < 0.1);
 });
 
 /** A policy over a stub robot whose joint i sits at qpos[7 + i] and qvel[6 + i], with a gyro at sensordata[0..2]. */

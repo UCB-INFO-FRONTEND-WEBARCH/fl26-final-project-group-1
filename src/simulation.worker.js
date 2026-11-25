@@ -166,13 +166,23 @@ self.onmessage = (event) => {
   const message = event.data;
   switch (message.type) {
     case 'command':
+      simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = null;
       simulation.navigation.cancel();
       simulation.command = simulation.accepts_commands ? message.command : [0, 0, 0];
       force_frame = true;
       break;
+    case 'camera_command':
+      simulation.teleport_requested = null;
+      pending_goal = null;
+      simulation.navigation.cancel();
+      simulation.camera_motion = simulation.accepts_commands ? message.motion : null;
+      simulation.command = [0, 0, 0];
+      force_frame = true;
+      break;
     case 'goal':
+      simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = message.goal;
       break;
@@ -181,6 +191,7 @@ self.onmessage = (event) => {
       else self.postMessage({ type: 'teleport_result', ok: false });
       break;
     case 'cancel_navigation':
+      simulation.camera_motion = null;
       simulation.teleport_requested = null;
       pending_goal = null;
       simulation.navigation.cancel();
@@ -192,6 +203,7 @@ self.onmessage = (event) => {
       break;
     case 'transfer':
       if (['elevator', 'stairs'].includes(message.transfer)) {
+        simulation.camera_motion = null;
         pending_goal = null;
         simulation.navigation.cancel();
         simulation.navigation.transfer = message.transfer;
@@ -200,6 +212,7 @@ self.onmessage = (event) => {
       }
       break;
     case 'pause':
+      simulation.camera_motion = null;
       simulation.paused = message.paused;
       simulation.command = [0, 0, 0];
       force_frame = true;

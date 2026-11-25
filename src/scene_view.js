@@ -12,6 +12,7 @@ import { SITE_BASE, IKEA_BASE, model_path } from './asset_paths.js';
 import { ROBOT_POSE_SIZE } from './robot_assets.js';
 import { CHARACTER_ASSET } from './character_asset.js';
 import { ShoulderCamera } from './shoulder_camera.js';
+import { FigureFocus, figure_opacity } from './figure_focus.js';
 import { ArrivalCamera, ARRIVAL_LEVELS } from './arrival_camera.js';
 import { get_theme, THEME_EVENT } from './theme.js';
 import { FLOOR_HEIGHT, ELEVATOR, STAIRS, STAIR_BOXES, STAIR_RAIL_BOXES, SHAFT_BOXES, LIFT_RAILS, BUILDING_BOUNDS, on_stairs, stair_height, upper_slabs } from './building.js';
@@ -35,10 +36,12 @@ function floor_label(text, width, color = '#85858d') {
 }
 
 export class SceneView {
-  constructor(container, on_metrics, on_destination, renderer) {
+  constructor(container, on_metrics, on_destination, renderer, on_camera_change) {
     this.container = container;
     this.on_metrics = on_metrics;
     this.on_destination = on_destination;
+    this.on_camera_change = on_camera_change;
+    this.figure_focus = new FigureFocus();
     this.render_samples = [];
     this.needs_render = true;
     this.paused = false;
@@ -74,6 +77,7 @@ export class SceneView {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
     this.shoulder_camera = new ShoulderCamera(this.camera, this.controls.target);
     this.robot_position = new THREE.Vector3(...SPAWN);
+    this.robot_rotation = new THREE.Quaternion();
     this.robot_heading = SPAWN_YAW;
     this.last_follow_position = this.robot_position.clone();
     this.robot_meshes = [];
@@ -90,10 +94,12 @@ export class SceneView {
     this.trail.renderOrder = 9999;
     this.scene.add(this.trail);
     this.build_room();
+    this.scene.traverse(object => { if (object.isLight) object.layers.enable(1); });
     this.theme_handler = () => this.set_theme(get_theme());
     this.theme_handler();
     window.addEventListener(THEME_EVENT, this.theme_handler);
     this.install_picking();
+    this.install_shoulder_orbit();
     this.set_camera('shoulder');
     this.wheel_handler = event => {
       if (this.mode !== 'shoulder') return;
@@ -424,6 +430,7 @@ export class SceneView {
         material_cache.set(key, new THREE.MeshLambertMaterial({ color }));
       }
       const mesh = new THREE.Mesh(geometry, material_cache.get(key));
+      mesh.layers.enable(1);
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       mesh.matrixAutoUpdate = false;
@@ -437,14 +444,18 @@ export class SceneView {
     if (appearance === 'character' && !this.character) {
       if (!this.character_load) {
         this.character_load = import('./character_view.js').then(({ load_character }) =>
-          load_character(this.character_rig, this.character_abort.signal)).then(character => {
+          load_character(this.character_rig, this.character_abort.signal)).then(async character => {
           if (this.disposed) {
             dispose_model(character.object);
             return;
           }
           this.character = character;
+          character.object.traverse(object => { if (object.isMesh) object.layers.enable(1); });
           character.object.visible = false;
           this.scene.add(character.object);
+          await this.renderer.compileAsync(character.object, this.camera, this.scene);
+          if (!this.disposed) await this.figure_focus.prepare(this.renderer, this.scene, this.camera,
+            [...this.robot_meshes, character.object]);
         }).catch(error => { this.character_load = null; throw error; });
       }
       await this.character_load;
@@ -488,6 +499,8 @@ export class SceneView {
       this.robot_meshes[index].matrixWorldNeedsUpdate = true;
     }
     this.latest_robot_pose.set(transforms.subarray(this.robot_meshes.length * 12));
+    this.robot_rotation.set(this.latest_robot_pose[4], this.latest_robot_pose[5],
+      this.latest_robot_pose[6], this.latest_robot_pose[3]).normalize();
     this.has_robot_pose = true;
     if (this.appearance === 'character') this.character.pose.update(this.latest_robot_pose);
     this.update_figure_visibility();
@@ -594,6 +607,8 @@ export class SceneView {
     // Compile PBR programs while the overview is still holding, before the
     // last zoom reveals the room. KHR_parallel_shader_compile is used if present.
     await this.renderer.compileAsync(this.scene,this.camera);
+    if (this.disposed) return;
+    await this.figure_focus.prepare(this.renderer, this.scene, this.camera, this.robot_meshes);
     if(this.disposed||!this.arrival)return;
     this.arrival_shaders_ready=true;
     this.refresh_arrival_ready();
@@ -658,11 +673,77 @@ export class SceneView {
     if (this.navigation_overlay.update(navigation)) this.needs_render = true;
   }
 
+  movement_heading() {
+    return Math.atan2(this.controls.target.y - this.camera.position.y, this.controls.target.x - this.camera.position.x);
+  }
+
+  install_shoulder_orbit() {
+    const canvas = this.renderer.domElement;
+    let pointer = null;
+    const down = event => {
+      if (this.arrival || document.pointerLockElement || this.mode !== 'shoulder' || !event.isPrimary || ![0, 2].includes(event.button)) return;
+      pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, active: false };
+      canvas.setPointerCapture(event.pointerId);
+    };
+    const move = event => {
+      if (!pointer || pointer.id !== event.pointerId) return;
+      const dx = event.clientX - pointer.x, dy = event.clientY - pointer.y;
+      if (!pointer.active && Math.hypot(dx, dy) <= 6) return;
+      pointer.active = true;
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      this.shoulder_camera.orbit(-dx * Math.PI * 2 / canvas.clientHeight, dy * Math.PI * 2 / canvas.clientHeight);
+      this.needs_render = true;
+    };
+    const up = event => {
+      if (pointer?.id !== event.pointerId) return;
+      pointer = null;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    };
+    const context = event => { if (this.mode === 'shoulder') event.preventDefault(); };
+    const offset = new THREE.Vector3();
+    const locked_move = event => {
+      if (!document.pointerLockElement || this.arrival) return;
+      const yaw = -event.movementX * 0.0025, pitch = event.movementY * 0.0025;
+      if (this.mode === 'shoulder') this.shoulder_camera.orbit(yaw, pitch);
+      else {
+        offset.copy(this.camera.position).sub(this.controls.target);
+        const radius = offset.length();
+        const angle = Math.atan2(offset.y, offset.x) + yaw;
+        const elevation = THREE.MathUtils.clamp(Math.atan2(offset.z, Math.hypot(offset.x, offset.y)) + pitch, 0.04, 1.53);
+        offset.set(Math.cos(angle) * Math.cos(elevation), Math.sin(angle) * Math.cos(elevation), Math.sin(elevation));
+        this.camera.position.copy(this.controls.target).addScaledVector(offset, radius);
+        this.controls.update();
+      }
+      this.needs_render = true;
+    };
+    const locked_wheel = event => {
+      if (!document.pointerLockElement || this.arrival) return;
+      event.preventDefault();
+      const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
+      this.zoom(Math.exp(THREE.MathUtils.clamp(pixels * 0.001, -1, 1)));
+    };
+    const locked_context = event => { if (document.pointerLockElement) event.preventDefault(); };
+    const handlers = [['pointerdown', down], ['pointermove', move], ['pointerup', up],
+      ['pointercancel', up], ['lostpointercapture', up], ['contextmenu', context]];
+    for (const [name, handler] of handlers) canvas.addEventListener(name, handler);
+    document.addEventListener('mousemove', locked_move);
+    document.addEventListener('wheel', locked_wheel, { passive: false });
+    document.addEventListener('contextmenu', locked_context);
+    this.remove_shoulder_orbit = () => {
+      for (const [name, handler] of handlers) canvas.removeEventListener(name, handler);
+      document.removeEventListener('mousemove', locked_move);
+      document.removeEventListener('wheel', locked_wheel);
+      document.removeEventListener('contextmenu', locked_context);
+    };
+  }
+
   install_picking() {
     const canvas = this.renderer.domElement;
     const raycaster = new THREE.Raycaster();
     let press = null;
-    const down = event => { press = event.button === 0 && event.isPrimary ? { x: event.clientX, y: event.clientY, id: event.pointerId } : null; };
+    const down = event => { press = !document.pointerLockElement && event.button === 0 && event.isPrimary
+      ? { x: event.clientX, y: event.clientY, id: event.pointerId } : null; };
     const move = event => {
       if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 6) press = null;
     };
@@ -756,10 +837,21 @@ export class SceneView {
       camera_changed = this.mode === 'shoulder'
         ? this.shoulder_camera.update(this.robot_position, this.robot_heading, seconds)
         : this.controls.update();
+      const heading = this.movement_heading();
+      const turn = heading - (this.last_movement_heading ?? heading);
+      if (this.last_movement_heading === undefined || this.mode !== 'shoulder' ||
+        Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn))) > 0.005) {
+        this.last_movement_heading = heading;
+        if (this.mode === 'shoulder') this.on_camera_change?.();
+      }
     }
     if (document.hidden || (this.paused && !this.needs_render && !camera_changed)) return;
     if (this.arrival_map) this.arrival_map.render(this.renderer, this.scene, this.camera, this.arrival, this.reduced_motion ? 0 : seconds);
-    else this.renderer.render(this.scene, this.camera);
+    else {
+      const figures = this.appearance === 'character' ? [this.character.object] : this.robot_meshes;
+      this.figure_focus.render(this.renderer, this.scene, this.camera, figures,
+        figure_opacity(this.camera.position, this.robot_position, this.robot_rotation));
+    }
     this.needs_render = false;
     this.render_samples.push(performance.now() - started);
     if (time - this.last_fps_time > 700) {
@@ -772,6 +864,8 @@ export class SceneView {
         draw_calls: this.renderer.info.render.calls,
         pixel_ratio: this.renderer.getPixelRatio(),
         arrival_handoff: this.arrival_handoff,
+        camera_heading: this.movement_heading(),
+        figure_opacity: figure_opacity(this.camera.position, this.robot_position, this.robot_rotation),
       });
       this.render_samples = [];
       this.last_fps_time = time;
@@ -791,6 +885,8 @@ export class SceneView {
     this.controls.dispose();
     this.renderer.domElement.removeEventListener('wheel', this.wheel_handler);
     this.remove_picking();
+    this.remove_shoulder_orbit();
+    this.figure_focus.dispose();
     this.sunlight.shadow.map?.dispose();
     dispose_model(this.scene);
     this.environment?.dispose();

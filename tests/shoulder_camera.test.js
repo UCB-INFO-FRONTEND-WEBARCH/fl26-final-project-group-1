@@ -26,7 +26,7 @@ test('the camera stays behind the right shoulder and rotates with the heading in
   assert.ok(view.distanceTo(target.clone().sub(camera.position).normalize()) < 1e-9);
 });
 
-test('smoothing takes the short heading turn and behaves the same at different frame rates', () => {
+test('position smoothing is independent of frame rate and body turns do not rotate the view', () => {
   function simulate(frames) {
     const { controller, camera } = fixture();
     controller.update(new THREE.Vector3(0, 0, 0.73), Math.PI - 0.01, 0, true);
@@ -61,7 +61,7 @@ test('zoom stays bounded and a reset or floor change restores the same relative 
   controller.zoom(1e6);
   assert.ok(controller.distance <= 4.5);
   controller.zoom(1e-6);
-  assert.ok(controller.distance >= 1.4);
+  assert.ok(controller.distance >= 0.35);
   controller.update(ground, 0.6, 0, true);
   const camera_offset = camera.position.clone().sub(ground);
   const target_offset = target.clone().sub(ground);
@@ -72,4 +72,24 @@ test('zoom stays bounded and a reset or floor change restores the same relative 
   controller.initialized = false;
   controller.update(ground, 0.6, 1 / 60);
   assert.ok(camera.position.clone().sub(ground).distanceTo(camera_offset) < 1e-9);
+});
+
+test('dragging orbits around the body, preserves its look direction during movement, and limits pitch', () => {
+  const { camera, target, controller } = fixture();
+  const position = new THREE.Vector3(0, 0, 0.73);
+  controller.update(position, 0, 0, true);
+  const offset = camera.position.clone().sub(position);
+  controller.orbit(Math.PI / 2, 0);
+  controller.update(position, 0, 1 / 60);
+  assert.ok(camera.position.clone().sub(position).distanceTo(offset.applyAxisAngle(camera.up, Math.PI / 2)) < 1e-9);
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  for (let i = 0; i < 60; i++) controller.update(position, Math.PI, 1 / 60);
+  assert.ok(camera.getWorldDirection(new THREE.Vector3()).distanceTo(direction) < 1e-9);
+  assert.ok(target.y > position.y);
+  controller.orbit(100 * Math.PI, 100);
+  controller.update(position, Math.PI, 1 / 60);
+  assert.equal(controller.orbit_pitch, 1.1);
+  assert.ok(camera.position.z > position.z);
+  controller.orbit(0, -100);
+  assert.equal(controller.orbit_pitch, -0.2);
 });
