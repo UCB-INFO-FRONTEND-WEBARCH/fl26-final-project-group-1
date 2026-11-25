@@ -31,8 +31,8 @@ Staging is 85 cm in front of the seat, outside the navigation clearance. The pos
 clip start. Chair footprints remain obstacles; the robot uses real contact to sit and stand. Teleport and reset
 clear the active seat. Pause preserves an approach.
 
-The HUD uses an Endfield-inspired layout with a local minimap, compact action icons, figure cards, and a translucent
-interaction pane. The landing page and satellite arrival remain unchanged. Hold Alt to free the cursor; releasing
+The HUD uses game-style key badges, prompts, and placement with Centoria's blue accents and rounded panels.
+The minimap sits at the bottom left; M expands it. Figure cards sit at the bottom right. Hold Alt to free the cursor; releasing
 Alt requests capture again. Browsers that reject Pointer Lock retain free-cursor dragging.
 
 ## Validation and regeneration

@@ -167,6 +167,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | A / D or ← / → | Move left / right in Shoulder; turn in other views |
 | Q / E | Strafe left / right |
 | Shift + movement key | Double movement and turning commands while held |
+| M | Expand or close the map; Escape also closes it |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
 | F near a supported chair | Line up and sit; F again stands up. Clicking a chair also routes to it |
 | Space | Pause / resume physics |
@@ -183,17 +184,17 @@ same travel speed. The robot turns toward travel, and the camera keeps its world
 Drag to look around; scroll to zoom. Near the body, only the figure blurs and fades. It is hidden before
 the lens enters its torso or head. The blur pass runs only within this close range.
 
-The speed slider sets movement speed from 0.2 to 0.8 m/s. In other camera views,
+Walking starts at 0.8 m/s; Shift requests 1.6 m/s. The speed slider sets movement speed from 0.2 to 0.8 m/s. In other camera views,
 backward commands are capped at 0.4 m/s, lateral commands at 0.3 m/s, and turning at 0.7 rad/s.
 Shift doubles manual travel speed and the turn limit. Pressing Shift alone does not cancel a route.
-Open **Teleport** and select a floor to move the robot directly, including to the mezzanine.
+Press **M** to expand the bottom-left minimap. Click open floor to walk there. Enable **Teleport** and select a floor to move the robot directly, including to the mezzanine.
 Drag the robot icon or its map marker onto an open spot. You can also click the map.
 Teleport clears the route, velocity, and policy memory, preserves pause state, and rejects blocked floor or voids.
 When you release a movement input, the controller requests zero velocity. Standing still, the walking
 policy shuffles about 7 cm/s, so the robot then holds the place where it came to rest, with small corrective steps.
 
 **Shoulder** is the default camera. It follows closely behind the figure's right
-shoulder and turns with its heading. Position and heading ease smoothly; walls and
+shoulder while the mouse sets its view direction. Position and heading ease smoothly; walls and
 furniture shorten the camera distance. Scroll or use +/− to change its distance.
 It works with both Robot and Character and follows stair travel.
 Select Follow, Orbit, or Top-down for a wider view. Selecting another floor switches
@@ -224,7 +225,8 @@ Select Resume to continue.
 - Five real-scale **ULRIKSBERG** armchairs support sitting in Hephaestus: three downstairs and two on the mezzanine.
   The demo has one on each floor. A nearby F pane offers sitting or standing. The other sofas and chairs remain
   decorative because their support heights exceed the shipped clip's range. See [seating](docs/SEATING.md).
-- The in-game HUD uses compact action icons, a local minimap, figure cards, and a contextual interaction pane.
+- The HUD keeps the site's blue accents and rounded panels. Game references inform key badges, prompts, and layout.
+  The local minimap stays at the bottom left; M expands it to nearly the full screen. Figure cards sit at the bottom right.
 
 Clearance-aware Theta* routes and a velocity follower add click-to-go navigation.
 Cross-floor routes attempt the original stair path. The asset library uses
@@ -331,7 +333,8 @@ established; it remains experimental.
 ## Repository layout
 
 ```text
-src/main.jsx                  React controls, telemetry, minimap, and input
+src/main.jsx                  React controls, telemetry, and input
+src/mini_map.jsx              Local/full map, cached floor geometry, and drag/drop
 src/scene_view.js              Three.js scene and camera
 src/scene_layout.js            Shared world geometry and MJCF generation
 src/world.js                   Default map selection and explicit demo fallback

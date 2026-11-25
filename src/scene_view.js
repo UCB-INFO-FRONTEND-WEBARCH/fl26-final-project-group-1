@@ -45,6 +45,8 @@ export class SceneView {
     this.on_camera_change = on_camera_change;
     this.figure_focus = new FigureFocus();
     this.render_samples = [];
+    this.render_count = 0;
+    this.render_suspended = false;
     this.needs_render = true;
     this.paused = false;
     this.quality = 'performance';
@@ -862,7 +864,18 @@ export class SceneView {
     this.needs_render = true;
   }
 
+  /** Keep physics and the map live without redrawing the covered 3D scene. */
+  set_map_open(open) {
+    this.render_suspended = open;
+    this.needs_render = true;
+    this.render_samples = [];
+    this.last_render_time = this.last_fps_time = performance.now();
+    this.on_metrics({ ...this.metrics, render_suspended: open, render_count: this.render_count,
+      ...(open ? { fps: 0, render_ms: 0, p95_ms: 0, draw_calls: 0, triangles: 0 } : {}) });
+  }
+
   render(time) {
+    if (this.render_suspended || document.hidden) return;
     const started = performance.now();
     const seconds = Math.max(0, Math.min((time - this.last_render_time) / 1000, 0.1));
     this.last_render_time = time;
@@ -908,10 +921,11 @@ export class SceneView {
         figure_opacity(this.camera.position, this.robot_position, this.robot_rotation));
     }
     this.needs_render = false;
+    this.render_count++;
     this.render_samples.push(performance.now() - started);
     if (time - this.last_fps_time > 700) {
       const samples = this.render_samples.sort((a, b) => a - b);
-      this.on_metrics({
+      this.metrics = {
         fps: Math.round(samples.length * 1000 / (time - this.last_fps_time)),
         render_ms: samples.reduce((sum, value) => sum + value, 0) / samples.length,
         p95_ms: samples[Math.floor(samples.length * 0.95)],
@@ -921,7 +935,10 @@ export class SceneView {
         arrival_handoff: this.arrival_handoff,
         camera_heading: this.movement_heading(),
         figure_opacity: figure_opacity(this.camera.position, this.robot_position, this.robot_rotation),
-      });
+        render_count: this.render_count,
+        render_suspended: false,
+      };
+      this.on_metrics(this.metrics);
       this.render_samples = [];
       this.last_fps_time = time;
     }

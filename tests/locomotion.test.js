@@ -11,7 +11,8 @@ const base = new URL('../public/assets/lite_pro/', import.meta.url);
 const json = async (path) => JSON.parse(await readFile(new URL(path, base), 'utf8'));
 
 test('keyboard commands stay within the walking range', () => {
-  assert.deepEqual(command_from_keys(new Set(['KeyW'])), [0.6, 0, 0]);
+  assert.deepEqual(command_from_keys(new Set(['KeyW'])), [0.8, 0, 0]);
+  assert.deepEqual(command_from_keys(new Set(['KeyW']), undefined, true), [1.6, 0, 0]);
   assert.deepEqual(command_from_keys(new Set(['KeyS', 'KeyA'])), [-0.4, 0, 0.7]);
   assert.deepEqual(command_from_keys(new Set(['KeyD', 'KeyE'])), [0, -0.3, -0.7]);
   assert.deepEqual(command_from_keys(new Set(['KeyW', 'KeyS', 'KeyA', 'KeyD'])), [0, 0, 0]);
@@ -55,12 +56,12 @@ test('shoulder keys follow camera axes, normalize diagonals, and preserve Shift 
   const keys = codes => new Set(codes);
   const motion = camera_motion_from_keys(keys(['KeyW']), Math.PI / 2);
   assert.ok(Math.abs(motion[0]) < 1e-9);
-  assert.ok(Math.abs(motion[1] - 0.6) < 1e-9);
+  assert.ok(Math.abs(motion[1] - 0.8) < 1e-9);
   assert.deepEqual(camera_motion_from_keys(keys(['KeyA']), 0), camera_motion_from_keys(keys(['KeyQ']), 0));
   assert.deepEqual(camera_motion_from_keys(keys(['KeyD']), 0), camera_motion_from_keys(keys(['KeyE']), 0));
   const diagonal = camera_motion_from_keys(keys(['KeyW', 'KeyD']), 0.7);
-  assert.ok(Math.abs(Math.hypot(...diagonal.slice(0, 2)) - 0.6) < 1e-9);
-  assert.deepEqual(camera_motion_from_keys(keys(['KeyW', 'KeyD']), 0.7, 0.6, true), diagonal.map(v => v * 2));
+  assert.ok(Math.abs(Math.hypot(...diagonal.slice(0, 2)) - 0.8) < 1e-9);
+  assert.deepEqual(camera_motion_from_keys(keys(['KeyW', 'KeyD']), 0.7, 0.8, true), diagonal.map(v => v * 2));
   assert.deepEqual(camera_motion_from_keys(keys(['KeyW', 'KeyS', 'KeyA', 'KeyE']), 0), [0, 0, 0.7]);
 });
 
@@ -69,7 +70,7 @@ test('a fixed camera goal keeps steering toward world travel direction as the bo
   const initial = command_from_camera_motion(motion, 0);
   assert.ok(initial[0] < 1e-9 && initial[1] > 0 && initial[2] > 0);
   const aligned = command_from_camera_motion(motion, Math.PI / 2);
-  assert.ok(Math.abs(aligned[0] - 0.6) < 1e-9);
+  assert.ok(Math.abs(aligned[0] - 0.8) < 1e-9);
   assert.ok(Math.abs(aligned[1]) < 1e-9 && Math.abs(aligned[2]) < 1e-9);
   assert.deepEqual(command_from_camera_motion([0, 0, 0.7], 1.5), [0, 0, 0]);
   const wrapped = command_from_camera_motion([Math.cos(-Math.PI + 0.01), Math.sin(-Math.PI + 0.01), 0.7], Math.PI - 0.01);
