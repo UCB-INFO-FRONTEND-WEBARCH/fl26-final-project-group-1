@@ -401,7 +401,8 @@ export class SceneView {
       const finishes=await load_native_finishes(signal);
       const files=[{file:'lower.glb',layer:'lower'},{file:'upper.glb',layer:'upper'},{file:'roof.glb',layer:'roof'},{file:'context.glb',layer:'context'}];
       const loaded=await Promise.allSettled(files.map(async file=>{
-        const response=await fetch(`${SITE_BASE}assets/hephaestus/${file.file}`,{signal});
+        const version = MAP.files.find(entry => entry.file === file.file).sha256;
+        const response=await fetch(`${SITE_BASE}assets/hephaestus/${file.file}?v=${version}`,{signal});
         if(!response.ok)throw new Error(`Could not load Hephaestus ${file.layer} (HTTP ${response.status}).`);
         const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
         if(signal.aborted){dispose_model(gltf.scene);return;}

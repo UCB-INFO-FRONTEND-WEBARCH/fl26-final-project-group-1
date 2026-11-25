@@ -160,7 +160,7 @@ export class ArrivalMap {
   }
 
   async load_texture(base, image, signal) {
-    const response = await fetch(`${base}${image.file}`, { signal });
+    const response = await fetch(`${base}${image.file}?v=${image.sha256}`, { signal });
     if (!response.ok) throw new Error(`The ${image.label} image could not load.`);
     const bitmap = await createImageBitmap(await response.blob(), { imageOrientation: 'flipY' });
     if (signal.aborted) { bitmap.close(); signal.throwIfAborted(); }
@@ -180,7 +180,7 @@ export class ArrivalMap {
   }
 
   async load_overview(base, signal) {
-    const response = await fetch(`${base}manifest.json`, { signal });
+    const response = await fetch(`${base}manifest.json`, { signal, cache: 'no-cache' });
     if (!response.ok) throw new Error('The satellite map could not load.');
     this.manifest = await response.json();
     const [overview, geometry] = await Promise.all([

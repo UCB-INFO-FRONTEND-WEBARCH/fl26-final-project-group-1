@@ -15,8 +15,13 @@ test('the overview becomes ready while closer images and full road geometry rema
   let bitmap_count = 0;
   const delayed_details = new Promise(resolve => { release_details = resolve; });
   const detail_images = new Promise(resolve => { images_loaded = resolve; });
-  globalThis.fetch = async url => {
-    const file = url.split('/').pop();
+  globalThis.fetch = async (url, options) => {
+    const request = new URL(url, 'https://centoria.test');
+    const file = request.pathname.split('/').pop();
+    if (file === 'manifest.json') assert.equal(options.cache, 'no-cache');
+    if (file.endsWith('.jpg')) {
+      assert.equal(request.searchParams.get('v'), manifest.images.find(image => image.file === file).sha256);
+    }
     requested.push(file);
     if (file === manifest.lights.file) await delayed_details;
     return new Response(await readFile(new URL(file, base)));
