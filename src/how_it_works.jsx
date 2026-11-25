@@ -350,9 +350,10 @@ function PlaygroundControls() {
   return <details className="ex-controls">
     <summary>Playground controls and recovery <span aria-hidden="true">+</span></summary>
     <div><dl>
-      <div><dt>Choose a goal</dt><dd>Click open floor in the scene or floor plan. Select Upper to choose an upstairs goal.</dd></div>
-      <div><dt>Move manually</dt><dd>In Shoulder, WASD moves relative to the camera. Q/E also move sideways. The robot turns toward travel. In other views, A/D turns. Hold Shift for twice the speed.</dd></div>
-      <div><dt>Change the figure</dt><dd>Select Character below the scene to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
+      <div><dt>Choose a goal</dt><dd>Click open floor in the scene. Press M to choose a goal on the floor plan.</dd></div>
+      <div><dt>Move manually</dt><dd>In Shoulder, WASD moves relative to the camera. Q/E also move sideways. The robot turns toward travel. Walking starts at 0.8 m/s; hold Shift for 1.6 m/s. In other views, A/D turns.</dd></div>
+      <div><dt>Open the map</dt><dd>Press M to expand the minimap. Select a floor and click to walk there. Turn on Teleport to place the robot directly. Press M or Escape to close the map.</dd></div>
+      <div><dt>Change the figure</dt><dd>Select Character in the lower-right corner to show the robot’s motion on a character. The robot still supplies physics and contacts.</dd></div>
       <div><dt>Stop a route</dt><dd>Press Escape to cancel navigation. Movement keys take control immediately.</dd></div>
       <div><dt>Sit down</dt><dd>Walk near a supported IKEA chair. The F pane appears. Press F to line up and sit, then F to stand. You can also click a chair to walk to it.</dd></div>
       <div><dt>Pause or reset</dt><dd>Press Space to pause or resume. After a fall, Lite Pro gets up by itself; press R to reset it at the start. Reset clears the route.</dd></div>

@@ -1,5 +1,26 @@
 # Browser performance
 
+## Expanded map, November 24, 2026
+
+The proposed full-screen M map was measured in a production preview at 1280 × 720, Fast graphics,
+Shoulder camera at reset, after loading and shader compilation. The playing view already held 60 FPS,
+so this round targets work hidden by the map. These are short CPU submission samples, not GPU timings.
+
+| Map open | Before | After |
+| --- | ---: | ---: |
+| 3D scene redraws per second | 60 | 0, suspended |
+| CPU submission per 3D frame | 2.57 ms | No 3D submission |
+| Physics real-time factor | 1.003× | 1.002× |
+
+The frame counter stayed at 5,537 through map opening, the held map, and closing. It then advanced
+to 10,722 with 60 FPS after returning to play. Physics and map markers continue updating while the
+covered scene is frozen. Pause state, policy stepping, and worker frame acknowledgements are unchanged.
+The static floor-plan geometry is memoized separately from the robot, route, and interaction markers.
+
+The [raw samples](performance/2026-11-24-map.json) include playing, map-open, map-held, close, and
+resumed states. To check this behavior, run a production preview with `?profile=1`, press M, and
+watch `render_count` and `render_suspended`. Close M to confirm that rendering resumes.
+
 ## Hephaestus Tower / Lite Pro
 
 The default V20 room was measured before and after the navigation, arrival, and

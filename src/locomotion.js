@@ -5,8 +5,9 @@ export const CONTROL_DECIMATION = POLICY.decimation;
 export const NUM_ACTIONS = POLICY.joint_names.length;
 export const DEFAULT_ANGLES = POLICY.default_joint_pos;
 export const JOINT_NAMES = POLICY.joint_names.map(name => `robot/${name}`);
+export const DEFAULT_WALK_SPEED = 0.8;
 
-export function command_from_keys(keys, speed = 0.6, boost = false) {
+export function command_from_keys(keys, speed = DEFAULT_WALK_SPEED, boost = false) {
   const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
   const turn = Number(keys.has('KeyA') || keys.has('ArrowLeft')) - Number(keys.has('KeyD') || keys.has('ArrowRight'));
   const lateral = Number(keys.has('KeyQ')) - Number(keys.has('KeyE'));
@@ -15,7 +16,7 @@ export function command_from_keys(keys, speed = 0.6, boost = false) {
     .map(value => value * multiplier);
 }
 
-export function camera_motion_from_keys(keys, heading, speed = 0.6, boost = false) {
+export function camera_motion_from_keys(keys, heading, speed = DEFAULT_WALK_SPEED, boost = false) {
   const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
   const left = Number(keys.has('KeyA') || keys.has('KeyQ') || keys.has('ArrowLeft')) -
     Number(keys.has('KeyD') || keys.has('KeyE') || keys.has('ArrowRight'));
