@@ -41,10 +41,12 @@ WebAssembly SIMD support, such as Chrome, Edge, or Firefox.
 
 ```bash
 npm install
-npm run dev
+VITE_IKEA_BASE_URL=https://huggingface.co/datasets/T-K-233/ikea-furniture/resolve/a6dea1bba516ec9ce963a56fbe21f8a5741da17d/ npm run dev
 ```
 
 Vite prints the Local URL, normally `http://127.0.0.1:5173`. Open that URL.
+The command uses the same public IKEA asset host as the demo so the playground
+can load its furniture and the Asset Library can load its catalog on a fresh checkout.
 The browser loads the robot, policy, fonts, and WebAssembly (WASM) engines from
 the local server. The application runs without a Python server, API key, GPU,
 external inference endpoint, or cross-origin isolation headers.
@@ -89,7 +91,8 @@ when you select them.
 
 Open `/catalog/`, or select **Asset library** in the header. This React page uses
 the catalog data and product photos from `IKEA_Furniture_and_Local_Catalog.zip`.
-Import the archive once after `npm install`:
+The quick start uses the hosted copy. To serve a local copy, import the archive once
+after `npm install` and run `npm run dev` without `VITE_IKEA_BASE_URL`:
 
 ```bash
 python3 scripts/import_ikea.py /path/to/IKEA_Furniture_and_Local_Catalog.zip
