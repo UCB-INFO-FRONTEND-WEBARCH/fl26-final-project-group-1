@@ -12,8 +12,12 @@ import './how_it_works.css';
 const POLICY_DOC = 'https://github.com/UCB-INFO-FRONTEND-WEBARCH/fl26-final-project-group-1/blob/main/docs/POLICY.md';
 const MJLAB = 'https://github.com/mujocolab/mjlab';
 const HOST = 'https://arxiv.org/abs/2502.08378';
+const HUB = 'https://huggingface.co';
+const POLICY_SEARCH = `${HUB}/api/models?search=humanoid&filter=reinforcement-learning&sort=downloads&direction=-1&limit=6&full=true`;
+const POLICY_DATE = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' });
 const CHAPTERS = [['motion', 'The motion'], ['control', 'The control loop'], ['learning', 'The learning'],
-  ['recovery', 'The recovery'], ['terrain', 'The stairs'], ['navigation', 'The route'], ['evidence', 'The evidence']];
+  ['recovery', 'The recovery'], ['terrain', 'The stairs'], ['navigation', 'The route'], ['evidence', 'The evidence'],
+  ['policy-explorer', 'Policy explorer']];
 const POLICY_LABELS = { walk: 'Walk · flat ground', walk_stairs: 'Walk · stairs', falling: 'Falling · motors hold',
   getup_supine: 'Get up · from the back', getup_prone: 'Get up · from the front',
   sit_down: 'Sit · chair clip, sitting down', seated: 'Sit · holding the seated frame', stand_up: 'Sit · chair clip, standing up' };
@@ -346,6 +350,61 @@ function Evidence() {
   </section>;
 }
 
+function PolicyExplorer() {
+  const [models, set_models] = useState(null);
+  const [error, set_error] = useState(false);
+  const [attempt, set_attempt] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function load_policies() {
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]);
+        const response = await fetch(POLICY_SEARCH, { signal });
+        if (!response.ok) throw new Error(`Hugging Face: ${response.status}`);
+        const results = await response.json();
+        if (!Array.isArray(results)) throw new Error('Invalid Hugging Face model list');
+        if (!controller.signal.aborted) {
+          set_models(results.filter(model => typeof model?.id === 'string' && /^[\w.-]+\/[\w.-]+$/.test(model.id)));
+        }
+      } catch {
+        if (!controller.signal.aborted) set_error(true);
+      }
+    }
+
+    load_policies();
+    return () => controller.abort();
+  }, [attempt]);
+
+  return <section className="ex-section" id="policy-explorer">
+    <SectionHeading number="07" label="HUGGING FACE HUB" title="Policy explorer">
+      Browse public humanoid reinforcement learning policies from Hugging Face. These are examples from other projects.
+    </SectionHeading>
+    {error ? <div className="ex-policy-status">
+      <p role="status">The policy explorer could not reach Hugging Face.</p>
+      <button className="secondary-button" type="button" onClick={() => {
+        set_error(false);
+        set_attempt(previous => previous + 1);
+      }}>Retry</button>
+    </div> : models === null ? <p role="status" className="ex-policy-status">Loading policies from Hugging Face…</p>
+      : models.length === 0 ? <p role="status" className="ex-policy-status">No matching policies found.</p>
+      : <ul className="ex-policy-grid">{models.map(model => {
+        const [owner, name] = model.id.split('/');
+        const href = `${HUB}/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+        const updated = Date.parse(model.lastModified);
+        return <li key={model.id}>
+          <a href={href} target="_blank" rel="noreferrer">{name} <Icon name="external" size={12} /></a>
+          <p>{model.author || owner}</p>
+          {Number.isFinite(updated) && <p>Updated <time dateTime={model.lastModified}>{POLICY_DATE.format(updated)}</time></p>}
+          {Array.isArray(model.siblings) && <a className="ex-policy-files" href={`${href}/tree/main`} target="_blank" rel="noreferrer">
+            Browse files ({model.siblings.length})
+          </a>}
+        </li>;
+      })}</ul>}
+  </section>;
+}
+
 function PlaygroundControls() {
   return <details className="ex-controls">
     <summary>Playground controls and recovery <span aria-hidden="true">+</span></summary>
@@ -390,6 +449,7 @@ function HowItWorks() {
         <h1>How Lite Pro<br /><span>finds its footing.</span></h1>
         <p>A goal. An elevation map. Learned policies that walk, sit and get up.<br />Explore what turns your input into a step.</p>
         <a className="ex-hero-link" href="#motion">Explore the motion <span aria-hidden="true">↓</span></a>
+        <a className="ex-hero-link ex-policy-link" href="#policy-explorer">Browse policies <span aria-hidden="true">↓</span></a>
       </section>
       <div className="ex-content"><MotionPlayer motion_enabled={motion_enabled} />
         <div className="ex-quick-facts"><div><strong>{POLICY.joint_names.length}</strong><span>body joints</span></div>
@@ -402,6 +462,7 @@ function HowItWorks() {
           <Icon name={motion_enabled ? 'pause' : 'play'} size={12} /> Motion {motion_enabled ? 'on' : 'off'}</button>
       </nav>
       <div className="ex-content"><ControlLoop /><Learning /><Recovery /><Terrain /><NavigationExplanation /><Evidence />
+        <PolicyExplorer />
         <PlaygroundControls />
         <section className="ex-end"><span className="ex-kicker">YOUR TURN</span><h2>Give it a direction.</h2>
           <p>Click an open floor to set a goal. Use WASD to take control.</p>
