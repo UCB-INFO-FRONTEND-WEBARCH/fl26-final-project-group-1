@@ -659,7 +659,7 @@ export class SceneView {
     // Compile PBR programs while the overview is still holding, before the
     // last zoom reveals the room. KHR_parallel_shader_compile is used if present.
     await this.renderer.compileAsync(this.scene,this.camera);
-    if (this.disposed) return;
+    if (this.disposed || !this.arrival) return;
     await this.figure_focus.prepare(this.renderer, this.scene, this.camera, this.robot_meshes);
     if(this.disposed||!this.arrival)return;
     this.arrival_shaders_ready=true;
@@ -684,14 +684,21 @@ export class SceneView {
     this.refresh_arrival_ready();
   }
 
-  finish_arrival() {
+  skip_arrival() {
+    if (!this.arrival) return;
+    this.arrival_abort.abort();
+    this.finish_arrival(true);
+  }
+
+  finish_arrival(skipped = false) {
     const position=this.camera.position.clone(),rotation=this.camera.quaternion.clone();
     this.arrival_map.dispose();
     this.arrival_map = this.arrival = this.arrival_opening = null;
     this.camera.up.set(0, 0, 1);
     this.camera.far = IS_HEPHAESTUS ? 300 : 100;
     this.set_camera('shoulder');
-    this.arrival_handoff={position_m:position.distanceTo(this.camera.position),angle_degrees:THREE.MathUtils.radToDeg(rotation.angleTo(this.camera.quaternion))};
+    if (skipped) this.resize();
+    else this.arrival_handoff={position_m:position.distanceTo(this.camera.position),angle_degrees:THREE.MathUtils.radToDeg(rotation.angleTo(this.camera.quaternion))};
     this.on_arrival_complete();
   }
 
