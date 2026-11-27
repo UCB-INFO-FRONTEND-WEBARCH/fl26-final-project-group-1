@@ -11,13 +11,13 @@ import { Reference } from './fluctlight_policy.js';
 
 export const REST_DEMO = Object.freeze({
   seat: 'sofa_north',
-  // On the lounge rug (|x| < 4.1 m) at the spawn's height, 5 m from the sofa's front edge: the walking policy is
-  // blind and trips on the rug's 3 cm edge.
-  start: [3.7, -1.2, SPAWN[2]],
-  yaw: 0, // facing away from the sofa
-  ask_s: 4, // S2 hands its first sub-task down
+  // On the lounge rug (|x| < 4.1 m) at the spawn's height, 1.1 m beside the staging point: the take is 15 s, and
+  // lining up and sitting down take about 8 s of it. The walking policy is blind and trips on the rug's 3 cm edge.
+  start: [1.6, 1.85, SPAWN[2]],
+  yaw: Math.PI, // along the sofa's front, sideways to it
+  ask_s: 2, // S2 hands its first sub-task down
   walk_speed: 0.4, // m/s along the route (the app's speed slider spans 0.2 to 0.8)
-  hold_s: 3, // seated, before the end
+  video_s: 15, // the take's length; the robot sits about 2 s before it ends
   lead_s: 0.5, // the sit ghost leads the robot along the clip
 });
 
@@ -54,7 +54,7 @@ export class RestDemo {
 
   get time() { return this.simulation.step_count * PHYSICS_DT; }
   get ended() {
-    return this.stage === 'failed' || (this.seated_at !== null && this.time >= this.seated_at + REST_DEMO.hold_s);
+    return this.stage === 'failed' || this.time >= REST_DEMO.video_s;
   }
 
   /** Advance `steps` physics steps; S2 asks for the seat at exactly ask_s. */
@@ -91,7 +91,7 @@ export class RestDemo {
   /** What each scripted level hands down this step, for the overlay. */
   report() {
     const { simulation, stage } = this;
-    const report = { stage, done: this.done, ended: this.ended, time: this.time };
+    const report = { stage, done: this.done, time: this.time };
     if (stage === 'route') {
       report.route = { path: this.path, remaining: simulation.navigation.state.remaining };
     } else if (stage === 'align') {

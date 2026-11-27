@@ -18,8 +18,8 @@ const FPS = 30;
 const PROMPT = 'Take a rest.';
 const ACCENT = '#a9b4e8';
 const GROUND = '#121417';
-const TYPE = [0.3, 1.5]; // s, the prompt types out
-const REPLY = [2, 2.35, 2.7, 3.05]; // s, the S2 header and its three sub-tasks appear
+const TYPE = [0.1, 0.9]; // s, the prompt types out
+const REPLY = [1, 1.25, 1.5, 1.75]; // s, the S2 header and its three sub-tasks appear
 const CASCADE_S = 0.4; // each level lights for this long when a sub-task starts, S2 then S1, before S0
 // The 3/4 camera looks over the robot toward the sofa from the south-east, and closes in as the robot arrives.
 const CAMERA = { azimuth: -0.75, elevation: 0.5, far: 6.3, near: 4.3, seat_weight: 0.4, smooth_s: 0.9 };
@@ -293,6 +293,7 @@ export function RestDemoPage({ seed, record }) {
     // The recorder's hook: advance to video frame `index`, wait for the overlay and the scene to draw it.
     window.rest_demo = {
       fps: FPS,
+      seconds: REST_DEMO.video_s,
       ready: () => running,
       frame: index => new Promise(resolve => {
         frame_waiter = report => {

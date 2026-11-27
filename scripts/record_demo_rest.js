@@ -22,7 +22,7 @@ page.on('pageerror', error => console.error('page error:', error.message));
 await page.goto(url);
 await page.waitForFunction(() => window.rest_demo?.ready(), null, { timeout: 300_000, polling: 250 });
 await page.evaluate(() => document.fonts.ready);
-const fps = await page.evaluate(() => window.rest_demo.fps);
+const { fps, seconds } = await page.evaluate(() => ({ fps: window.rest_demo.fps, seconds: window.rest_demo.seconds }));
 
 let encoder = null;
 if (stills) await mkdir(out, { recursive: true });
@@ -31,9 +31,9 @@ else {
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', out],
   { stdio: ['pipe', 'inherit', 'inherit'] });
 }
-const last = stills ? Math.round(Math.max(...stills) * fps) : Infinity;
-let report;
-for (let index = 0; index <= last; index++) {
+const frames = stills ? Math.round(Math.max(...stills) * fps) + 1 : Math.round(seconds * fps);
+let report, index;
+for (index = 0; index < frames; index++) {
   report = await page.evaluate(frame => window.rest_demo.frame(frame), index);
   const wanted = stills?.find(time => Math.round(time * fps) === index);
   if (encoder) {
@@ -42,12 +42,12 @@ for (let index = 0; index <= last; index++) {
     await writeFile(`${out}/seed${seed}_${wanted.toFixed(1)}s.png`, await page.screenshot({ type: 'png' }));
   }
   if (index % (5 * fps) === 0) console.log(`${(index / fps).toFixed(0)} s · ${report.stage}`);
-  if (report.stage === 'failed' || report.ended) break;
+  if (report.stage === 'failed') break;
 }
-const frames = Math.round(report.time * fps) + 1;
 if (encoder) {
   encoder.stdin.end();
   await new Promise((resolve, reject) => encoder.on('close', code => (code ? reject(new Error(`ffmpeg exited ${code}`)) : resolve())));
 }
-console.log(JSON.stringify({ seed, stage: report.stage, fell: report.stage === 'failed', frames, seconds: +(frames / fps).toFixed(2), out }));
+const written = Math.min(index + 1, frames);
+console.log(JSON.stringify({ seed, stage: report.stage, fell: report.stage === 'failed', frames: written, seconds: +(written / fps).toFixed(3), out }));
 await browser.close();
