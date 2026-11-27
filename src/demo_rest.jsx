@@ -180,9 +180,9 @@ function Overlay({ state }) {
   const level = active_level(time, stage, state.stage_time);
   const values = level_values(state);
   const rows = [
-    ['S2', 'Task planner', 'scripted'],
-    ['S1', 'Trajectory generator', 'scripted'],
-    ['S0', 'Fluctlight tracker', '50 Hz'],
+    ['S2', 'Task planner'],
+    ['S1', 'Trajectory generator'],
+    ['S0', 'Motion tracker', '50 Hz'],
   ];
   return <div className="demo-overlay">
     <section className="demo-chat" aria-label="Request">
@@ -191,7 +191,7 @@ function Overlay({ state }) {
         <p className="chat-bubble">{typed}{time < TYPE[1] + 0.4 && <i className="chat-caret" />}</p>
       </div>
       {time >= REPLY[0] && <div className="chat-reply">
-        <span className="chat-who">S2 · task planner · scripted</span>
+        <span className="chat-who">S2 · task planner</span>
         <ol>
           {SUBTASKS.map((subtask, index) => time >= REPLY[index + 1] && <li key={subtask.label}
             className={index < (report?.done ?? 0) ? 'done' : index === current ? 'active' : ''}>
@@ -205,10 +205,9 @@ function Overlay({ state }) {
     <section className="demo-levels" aria-label="Control levels">
       {rows.map(([name, title, note], index) => <div key={name} className={`level-row ${2 - index === level ? 'current' : ''}`}>
         <span className="level-name">{name}</span>
-        <span className="level-title">{title} <small>{note}</small></span>
+        <span className="level-title">{title}{note && <> <small>{note}</small></>}</span>
         <span className="level-value">{values[2 - index]}</span>
       </div>)}
-      <p className="level-footer">S2 and S1 scripted · S0 learned policies in MuJoCo</p>
     </section>
 
     <section className="demo-legend" aria-label="Legend">

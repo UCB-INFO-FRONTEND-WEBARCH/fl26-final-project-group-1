@@ -30,7 +30,7 @@ body.rest-demo-body { background: #121417; overflow: hidden; }
   border-radius: 0.8em;
   backdrop-filter: blur(10px);
 }
-.chat-who, .level-name, .level-title small, .level-footer, .demo-legend, .subtask-number {
+.chat-who, .level-name, .level-title small, .demo-legend, .subtask-number {
   font-family: var(--mono);
   letter-spacing: 0.04em;
 }
@@ -51,7 +51,7 @@ body.rest-demo-body { background: #121417; overflow: hidden; }
 .chat-reply li.done .subtask-mark path { stroke-width: 2; }
 .chat-reply li.active .subtask-mark { opacity: 1; }
 
-.demo-levels { left: 1.6em; bottom: 1.6em; width: 27em; padding: 0.55em 0.55em 0.7em; }
+.demo-levels { left: 1.6em; bottom: 1.6em; width: 27em; padding: 0.55em; }
 .level-row { display: grid; grid-template-columns: 2.4em 1fr; column-gap: 0.4em; padding: 0.5em 0.6em; border-radius: 0.5em; border-left: 0.16em solid transparent; color: var(--secondary); }
 .level-row + .level-row { margin-top: 0.15em; }
 .level-row.current { background: rgb(169 180 232 / 0.12); border-left-color: var(--accent); }
@@ -60,7 +60,6 @@ body.rest-demo-body { background: #121417; overflow: hidden; }
 .level-title small { margin-left: 0.4em; color: var(--secondary); font-size: 0.68em; font-weight: 400; text-transform: uppercase; }
 .level-value { margin-top: 0.1em; font-size: 0.86em; }
 .level-row.current .level-name, .level-row.current .level-title, .level-row.current .level-value { color: var(--accent); }
-.level-footer { margin: 0.55em 0.6em 0; padding-top: 0.55em; border-top: 1px solid var(--rule); color: var(--secondary); font-size: 0.66em; }
 
 .demo-legend { right: 1.6em; bottom: 1.6em; display: flex; gap: 1.2em; padding: 0.6em 0.9em; color: var(--secondary); font-size: 0.72em; }
 .demo-legend span { display: flex; align-items: center; gap: 0.5em; }
