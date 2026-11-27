@@ -10,16 +10,14 @@ export const DEFAULT_WALK_SPEED = 0.8;
 export function command_from_keys(keys, speed = DEFAULT_WALK_SPEED, boost = false) {
   const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
   const turn = Number(keys.has('KeyA') || keys.has('ArrowLeft')) - Number(keys.has('KeyD') || keys.has('ArrowRight'));
-  const lateral = Number(keys.has('KeyQ')) - Number(keys.has('KeyE'));
   const multiplier = boost ? 2 : 1;
-  return [forward * (forward < 0 ? Math.min(speed, 0.4) : speed), lateral * Math.min(speed, 0.3), turn * 0.7]
+  return [forward * (forward < 0 ? Math.min(speed, 0.4) : speed), 0, turn * 0.7]
     .map(value => value * multiplier);
 }
 
 export function camera_motion_from_keys(keys, heading, speed = DEFAULT_WALK_SPEED, boost = false) {
   const forward = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
-  const left = Number(keys.has('KeyA') || keys.has('KeyQ') || keys.has('ArrowLeft')) -
-    Number(keys.has('KeyD') || keys.has('KeyE') || keys.has('ArrowRight'));
+  const left = Number(keys.has('KeyA') || keys.has('ArrowLeft')) - Number(keys.has('KeyD') || keys.has('ArrowRight'));
   const multiplier = boost ? 2 : 1;
   const scale = speed * multiplier / Math.max(1, Math.hypot(forward, left));
   return [(forward * Math.cos(heading) - left * Math.sin(heading)) * scale,
