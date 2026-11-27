@@ -10,6 +10,7 @@ import { PHYSICS_DT, CONTROL_DECIMATION } from './locomotion.js';
 import { load_robot_files, robot_geometry, character_rig, write_robot_pose, ROBOT_POSE_SIZE } from './robot_assets.js';
 import { Simulation } from './simulation.js';
 import { make_navigation_maps } from './path_planner.js';
+import { RestDemo, seeded_random } from './demo_rest.js';
 
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets/lite_pro/`;
 const FRAME_INTERVAL_MS = PHYSICS_DT * CONTROL_DECIMATION * 1000;
@@ -28,6 +29,11 @@ let force_frame = true;
 let pending_goal = null;
 // Seat actions are applied between physics batches, like navigation goals.
 let pending_seat = null;
+// The "take a rest" demo (demo_rest.js): a seeded simulation, stepped in real time or one video frame at a time.
+let world = null;
+let demo = null;
+let ghost_state = null;
+let stepped = false;
 
 function report_loading(message) {
   self.postMessage({ type: 'loading', message });
@@ -39,6 +45,30 @@ async function fetch_file(path) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+function write_transforms(transforms, state) {
+  const positions = state.geom_xpos;
+  const rotations = state.geom_xmat;
+  for (let index = 0; index < rendered_ids.length; index++) {
+    const id = rendered_ids[index];
+    transforms.set(positions.subarray(id * 3, id * 3 + 3), index * 12);
+    transforms.set(rotations.subarray(id * 9, id * 9 + 9), index * 12 + 3);
+  }
+}
+
+/** The demo's planned pose for its current sub-task, posed by forward kinematics on a scratch state. */
+function ghost_transforms() {
+  const pose = demo?.ghost();
+  if (!pose) return null;
+  const { body } = simulation.controller;
+  ghost_state.qpos.set(simulation.state.qpos);
+  ghost_state.qpos.set(pose.root, body.root_qpos);
+  body.joint_qpos.forEach((address, index) => { ghost_state.qpos[address] = pose.joints[index]; });
+  world.mujoco.mj_kinematics(world.model, ghost_state);
+  const transforms = new Float32Array(rendered_ids.length * 12);
+  write_transforms(transforms, ghost_state);
+  return transforms;
+}
+
 function send_frame() {
   // One pending pose prevents stale frames from accumulating on a slow renderer.
   if (frame_in_flight) return;
@@ -48,19 +78,14 @@ function send_frame() {
     ? new Float32Array(recycled_buffer)
     : new Float32Array(rendered_ids.length * 12 + ROBOT_POSE_SIZE);
   recycled_buffer = null;
-  const positions = state.geom_xpos;
-  const rotations = state.geom_xmat;
-  for (let index = 0; index < rendered_ids.length; index++) {
-    const id = rendered_ids[index];
-    transforms.set(positions.subarray(id * 3, id * 3 + 3), index * 12);
-    transforms.set(rotations.subarray(id * 9, id * 9 + 9), index * 12 + 3);
-  }
+  write_transforms(transforms, state);
   write_robot_pose(transforms.subarray(rendered_ids.length * 12), state, simulation.joint_qpos);
   self.postMessage(
     {
       type: 'frame',
       transforms,
-      telemetry: { ...simulation.telemetry(), simulation_rate },
+      telemetry: { ...simulation.telemetry(), simulation_rate, demo: demo?.report() },
+      ghost: ghost_transforms(),
     },
     [transforms.buffer],
   );
@@ -71,6 +96,7 @@ function send_frame() {
 }
 
 async function pump() {
+  if (stepped) return;
   try {
     const now = performance.now();
     const elapsed = Math.min((now - last_wall_time) / 1000, 0.06);
@@ -108,7 +134,8 @@ async function pump() {
       accumulated = 0;
     } else {
       accumulated = Math.min(accumulated + elapsed, 0.1);
-      const completed = await simulation.advance(Math.floor(accumulated / PHYSICS_DT));
+      const steps = Math.floor(accumulated / PHYSICS_DT);
+      const completed = await (demo ? demo.advance(steps) : simulation.advance(steps));
       accumulated -= completed * PHYSICS_DT;
     }
     if (now - rate_wall_time > 1000) {
@@ -154,6 +181,7 @@ async function initialize() {
     return [name, { session, contract, ...(clips ? { clips } : {}) }];
   })));
   report_loading(HAS_ELEVATOR?'Preparing floor routes and elevator controls':'Preparing Hephaestus floor routes and stairs');
+  world = { mujoco, model, policies };
   simulation = new Simulation(mujoco, model, policies, make_navigation_maps());
   simulation.paused = true;
 
@@ -259,6 +287,28 @@ self.onmessage = (event) => {
     case 'frame_received':
       frame_in_flight = false;
       recycled_buffer = message.buffer;
+      break;
+    case 'demo': {
+      // A fresh simulation with seeded noise; the loaded policies carry over. Stepped runs advance only on 'step'.
+      const { mujoco, model, policies } = world;
+      simulation.dispose();
+      simulation = new Simulation(mujoco, model, policies, make_navigation_maps(), seeded_random(message.seed));
+      demo = new RestDemo(simulation);
+      ghost_state ??= new mujoco.MjData(model);
+      simulation.paused = !message.stepped;
+      stepped = message.stepped;
+      pending_goal = pending_seat = null;
+      force_frame = true;
+      frame_in_flight = false;
+      send_frame();
+      break;
+    }
+    case 'step':
+      // Advance to the video frame's simulation time, then send that frame.
+      demo.advance(Math.round(message.time / PHYSICS_DT) - simulation.step_count).then(() => {
+        frame_in_flight = false;
+        send_frame();
+      }).catch((error) => self.postMessage({ type: 'error', message: error.message || String(error) }));
       break;
   }
 };

@@ -952,4 +952,9 @@ function App() {
   </>;
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+const root = createRoot(document.getElementById('root'));
+const search = new URLSearchParams(window.location.search);
+if (search.get('demo') === 'rest') {
+  import('./demo_rest.jsx').then(({ RestDemoPage }) => root.render(
+    <RestDemoPage seed={Number(search.get('seed') ?? 1)} record={search.has('record')} />));
+} else root.render(<App />);

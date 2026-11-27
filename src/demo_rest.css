@@ -1,0 +1,70 @@
+/* The "take a rest" demo overlay, in the qual deck's Dusk II Night theme: four colours, Inter and Geist Mono.
+   Sizes are in em of a root that is 20 px on a 1080 px tall viewport. */
+.rest-demo {
+  --ground: #121417;
+  --text: #f7f8fa;
+  --secondary: #c3c7ce;
+  --accent: #a9b4e8;
+  --panel: rgb(18 20 23 / 0.8);
+  --rule: rgb(195 199 206 / 0.18);
+  --sans: 'Inter Variable', Inter, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--ground);
+  color: var(--text);
+  font: 400 1.852vh/1.35 var(--sans);
+  font-feature-settings: 'tnum' 1;
+}
+body.rest-demo-body { background: #121417; overflow: hidden; }
+.demo-viewport { position: absolute; inset: 0; }
+.demo-viewport canvas { display: block; width: 100%; height: 100%; outline: none; }
+.demo-overlay { position: absolute; inset: 0; pointer-events: none; }
+.demo-loading { position: absolute; inset: auto 0 45% 0; margin: 0; text-align: center; color: var(--secondary); font-family: var(--mono); font-size: 0.8em; letter-spacing: 0.04em; }
+
+.demo-chat, .demo-levels, .demo-legend {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.8em;
+  backdrop-filter: blur(10px);
+}
+.chat-who, .level-name, .level-title small, .level-footer, .demo-legend, .subtask-number {
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.demo-chat { top: 1.6em; left: 1.6em; width: 21em; padding: 1em 1.1em 1.1em; }
+.chat-who { display: block; margin-bottom: 0.4em; color: var(--secondary); font-size: 0.68em; text-transform: uppercase; }
+.chat-user { display: grid; justify-items: end; }
+.chat-bubble { margin: 0; min-height: 1.35em; padding: 0.5em 0.85em; border-radius: 0.8em 0.8em 0.2em 0.8em; background: var(--text); color: var(--ground); font-size: 1.15em; font-weight: 500; }
+.chat-caret { display: inline-block; width: 0.08em; height: 1.05em; margin-left: 0.08em; vertical-align: -0.15em; background: var(--ground); }
+.chat-reply { margin-top: 0.9em; padding-top: 0.8em; border-top: 1px solid var(--rule); }
+.chat-reply ol { display: grid; gap: 0.3em; margin: 0; padding: 0; list-style: none; }
+.chat-reply li { display: flex; align-items: center; gap: 0.55em; padding: 0.35em 0.5em; border-radius: 0.45em; color: var(--secondary); font-size: 1.05em; }
+.chat-reply li.active { background: rgb(169 180 232 / 0.14); color: var(--accent); }
+.chat-reply li.done { color: var(--secondary); }
+.subtask-number { width: 1.2em; font-size: 0.8em; opacity: 0.8; }
+.subtask-mark { width: 1.05em; height: 1.05em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; opacity: 0.55; }
+.chat-reply li.done .subtask-mark { opacity: 1; }
+.chat-reply li.done .subtask-mark path { stroke-width: 2; }
+.chat-reply li.active .subtask-mark { opacity: 1; }
+
+.demo-levels { left: 1.6em; bottom: 1.6em; width: 27em; padding: 0.55em 0.55em 0.7em; }
+.level-row { display: grid; grid-template-columns: 2.4em 1fr; column-gap: 0.4em; padding: 0.5em 0.6em; border-radius: 0.5em; border-left: 0.16em solid transparent; color: var(--secondary); }
+.level-row + .level-row { margin-top: 0.15em; }
+.level-row.current { background: rgb(169 180 232 / 0.12); border-left-color: var(--accent); }
+.level-name { grid-row: span 2; align-self: start; padding-top: 0.08em; font-size: 0.95em; font-weight: 500; }
+.level-title { color: var(--text); font-weight: 500; }
+.level-title small { margin-left: 0.4em; color: var(--secondary); font-size: 0.68em; font-weight: 400; text-transform: uppercase; }
+.level-value { margin-top: 0.1em; font-size: 0.86em; }
+.level-row.current .level-name, .level-row.current .level-title, .level-row.current .level-value { color: var(--accent); }
+.level-footer { margin: 0.55em 0.6em 0; padding-top: 0.55em; border-top: 1px solid var(--rule); color: var(--secondary); font-size: 0.66em; }
+
+.demo-legend { right: 1.6em; bottom: 1.6em; display: flex; gap: 1.2em; padding: 0.6em 0.9em; color: var(--secondary); font-size: 0.72em; }
+.demo-legend span { display: flex; align-items: center; gap: 0.5em; }
+.demo-legend svg { width: 2.4em; height: 0.8em; }
+.legend-plan { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 5 4; }
+.legend-executed { stroke: var(--text); stroke-width: 3; }
+.demo-failed { position: absolute; top: 1.6em; right: 1.6em; margin: 0; color: var(--secondary); font-family: var(--mono); font-size: 0.8em; }
