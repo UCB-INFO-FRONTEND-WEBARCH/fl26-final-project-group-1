@@ -68,7 +68,7 @@
 .game-key-hint kbd { font-size: 9px; margin-right: 5px; color: #657789; }
 .game-key-hint button { pointer-events: auto; border: 0; padding: 0; background: none; color: inherit; font: inherit; }
 @media (max-width: 560px) {
-  .game-key-hint > span:nth-child(4) { display: none; }
+  .game-key-hint > span:nth-child(n+4) { display: none; }
 }
 .game-shell.playing .game-bar, .game-shell.playing .game-key-hint { animation: game-hud-in 650ms both; }
 @keyframes game-hud-in { from { opacity: 0; } to { opacity: 1; } }

@@ -185,7 +185,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | --- | --- |
 | W / S or ↑ / ↓ | Move along the camera view in Shoulder; forward / backward in other views |
 | A / D or ← / → | Move left / right in Shoulder; turn in other views |
-| Q / E | Strafe left / right |
+| Q / E | Hold to rotate the view left / right |
 | Shift + movement key | Double movement and turning commands while held |
 | M | Expand or close the map; Escape also closes it |
 | Teleport | Drag the robot onto open floor in the map, or click a destination |
@@ -200,7 +200,7 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 Drag in the scene to look around. Select **Look** in the game controls to capture
 the mouse for free look. Press Escape or hold Alt to free it for menus and map clicks.
 Release Alt to resume capture after holding it.
-In Shoulder view, WASD moves relative to the camera; Q/E also move sideways. Diagonal input keeps the
+In Shoulder view, WASD moves relative to the camera. Diagonal input keeps the
 same travel speed. The robot turns toward travel, and the camera keeps its world heading while it follows.
 Drag to look around; scroll to zoom. Near the body, only the figure blurs and fades. It is hidden before
 the lens enters its torso or head. The blur pass runs only within this close range.

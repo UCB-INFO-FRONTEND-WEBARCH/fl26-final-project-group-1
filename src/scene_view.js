@@ -22,6 +22,9 @@ import { SCENE_WALLS, SCENE_FURNITURE, FURNITURE_ASSETS, ROOM_LABELS, SPAWN, SPA
 import { SEATS } from './seat.js';
 import { SEATING_ASSETS } from './seating_assets.js';
 
+const CAMERA_UP = new THREE.Vector3(0, 0, 1);
+const KEY_TURN_RADIANS_PER_SECOND = Math.PI / 2;
+
 function floor_label(text, width, color = '#85858d') {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -96,6 +99,7 @@ export class SceneView {
     this.robot_meshes = [];
     this.follow_delta = new THREE.Vector3();
     this.mode = 'shoulder';
+    this.camera_turn = 0;
     this.trail_count = 0;
     this.trail_positions = new Float32Array(1500 * 3);
     const trail_geometry = new THREE.BufferGeometry();
@@ -777,6 +781,10 @@ export class SceneView {
     return Math.atan2(this.controls.target.y - this.camera.position.y, this.controls.target.x - this.camera.position.x);
   }
 
+  set_camera_turn(direction) {
+    this.camera_turn = direction;
+  }
+
   install_shoulder_orbit() {
     const canvas = this.renderer.domElement;
     let pointer = null;
@@ -963,9 +971,15 @@ export class SceneView {
       if (this.arrival.done) this.finish_arrival();
       camera_changed = true;
     } else {
+      const yaw = this.camera_turn * KEY_TURN_RADIANS_PER_SECOND * seconds;
+      if (yaw) {
+        if (this.mode === 'shoulder') this.shoulder_camera.orbit(yaw, 0);
+        else this.camera.position.sub(this.controls.target).applyAxisAngle(CAMERA_UP, yaw).add(this.controls.target);
+      }
       camera_changed = this.mode === 'shoulder'
         ? this.shoulder_camera.update(this.robot_position, this.robot_heading, seconds)
         : this.controls.update();
+      camera_changed ||= yaw !== 0;
       const heading = this.movement_heading();
       const turn = heading - (this.last_movement_heading ?? heading);
       if (this.last_movement_heading === undefined || this.mode !== 'shoulder' ||

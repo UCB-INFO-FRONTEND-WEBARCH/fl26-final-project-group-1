@@ -44,11 +44,12 @@ const SEAT_MESSAGES = {
   stand_up: 'Standing up. Walking resumes once it stands still.',
 };
 const CONTROL_KEYS = [
-  [['KeyQ', 'Strafe left'], ['KeyW', 'Walk forward'], ['KeyE', 'Strafe right']],
+  [['KeyQ', 'Rotate view left'], ['KeyW', 'Walk forward'], ['KeyE', 'Rotate view right']],
   [['KeyA', 'Turn left'], ['KeyS', 'Walk backward'], ['KeyD', 'Turn right']],
 ];
+const LOOK_KEYS = new Set(['KeyQ', 'KeyE']);
 const MOVEMENT_KEYS = new Set([
-  ...CONTROL_KEYS.flat().map(([code]) => code),
+  ...CONTROL_KEYS.flat().map(([code]) => code).filter(code => !LOOK_KEYS.has(code)),
   'ArrowUp',
   'ArrowDown',
   'ArrowLeft',
@@ -140,21 +141,37 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       type: 'command',
       command: command_from_keys(keys_ref.current, speed_ref.current, shift_ref.current),
     });
-    set_pressed(new Set(keys_ref.current));
+  }
+
+  function movement_held() {
+    for (const code of keys_ref.current) if (MOVEMENT_KEYS.has(code)) return true;
+    return false;
+  }
+
+  function set_control_key(code, down) {
+    const keys = keys_ref.current;
+    if (keys.has(code) === down) return;
+    if (down) keys.add(code);
+    else keys.delete(code);
+    if (LOOK_KEYS.has(code)) {
+      view_ref.current?.set_camera_turn(Number(keys.has('KeyQ')) - Number(keys.has('KeyE')));
+    } else send_command();
+    set_pressed(new Set(keys));
   }
 
   function release_keys() {
-    const held = keys_ref.current.size > 0;
+    const held = movement_held();
     keys_ref.current.clear();
     shift_ref.current = false;
+    view_ref.current?.set_camera_turn(0);
     if (held) send_command();
-    else set_pressed(new Set());
+    set_pressed(new Set());
   }
 
   function change_shift(held) {
     if (shift_ref.current === held) return;
     shift_ref.current = held;
-    if (keys_ref.current.size) send_command();
+    if (movement_held()) send_command();
   }
 
   function resume_cursor() {
@@ -258,7 +275,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     }
     view_ref.current?.set_camera(mode);
     set_camera(mode);
-    if (keys_ref.current.size) send_command();
+    if (movement_held()) send_command();
   }
 
   function cycle_camera() {
@@ -354,7 +371,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         if (!active) return;
         const arrival = preview.release();
         view = new SceneView(viewport_ref.current, set_performance_stats, navigate, arrival.renderer, () => {
-          if (keys_ref.current.size) send_command();
+          if (movement_held()) send_command();
         });
         view.on_seat = id => toggle_seat(id);
         view.on_tower_context = set_tower_context_status;
@@ -501,12 +518,14 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         change_shift(event.shiftKey);
         return;
       }
-      if (MOVEMENT_KEYS.has(event.code)) {
+      if (LOOK_KEYS.has(event.code)) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
         event.preventDefault();
-        if (keys_ref.current.has(event.code)) return;
+        set_control_key(event.code, true);
+      } else if (MOVEMENT_KEYS.has(event.code)) {
+        event.preventDefault();
         shift_ref.current = event.shiftKey;
-        keys_ref.current.add(event.code);
-        send_command();
+        set_control_key(event.code, true);
       }
       if (event.repeat) return;
       if (event.code === 'Escape') cancel_navigation();
@@ -529,10 +548,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         change_shift(event.shiftKey);
         return;
       }
-      if (MOVEMENT_KEYS.has(event.code) && keys_ref.current.delete(event.code)) {
+      if ((LOOK_KEYS.has(event.code) || MOVEMENT_KEYS.has(event.code)) && keys_ref.current.has(event.code)) {
         event.preventDefault();
         shift_ref.current = event.shiftKey;
-        send_command();
+        set_control_key(event.code, false);
       }
     };
     const lose_focus = () => { alt_held_ref.current = false; release_keys(); };
@@ -577,9 +596,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     if (down) {
       shift_ref.current = event.shiftKey;
       event.currentTarget.setPointerCapture(event.pointerId);
-      keys_ref.current.add(code);
-    } else keys_ref.current.delete(code);
-    send_command();
+    }
+    set_control_key(code, down);
   }
 
   const status = error
@@ -815,7 +833,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
               </span>
               <span>
                 <kbd>Q</kbd>
-                <kbd>E</kbd> Strafe
+                <kbd>E</kbd> Rotate view
               </span>
             </div>
             <div className="speed-label">
@@ -836,7 +854,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
                 speed_ref.current = value;
                 set_speed(value);
                 worker_ref.current?.postMessage({ type: 'speed', speed: value });
-                if (keys_ref.current.size) send_command();
+                if (movement_held()) send_command();
               }}
             />
           </section>
@@ -947,8 +965,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           </button>
         </div>}
         <div className="game-key-hint">
-          {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span>
-            <span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></>}
+          {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>Q/E</kbd> Rotate view</span>
+            <span><kbd>SHIFT</kbd> 2× speed</span><span><kbd>SPACE</kbd> Pause</span><span><kbd>V</kbd> View</span></>}
           <button onClick={toggle_cursor} aria-pressed={cursor_locked} title={cursor_locked
             ? 'Hold Alt for the cursor; release to look' : 'Capture the mouse to look around'}>
             {cursor_locked ? <><kbd>ALT</kbd> Hold for cursor</> : 'Look'}</button>
