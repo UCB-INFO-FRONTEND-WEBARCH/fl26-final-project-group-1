@@ -33,6 +33,9 @@ file from its host and does not include a copy in the Pages artifact.
 
 ## Run locally
 
+The [public demo](https://ucb-info-frontend-webarch.github.io/fl26-final-project-group-1/)
+is deployed to GitHub Pages from `dev`.
+
 Use Node.js 24+ and npm. Use a recent desktop browser with WebGL 2 and
 WebAssembly SIMD support, such as Chrome, Edge, or Firefox.
 
@@ -58,6 +61,17 @@ Use the recorded 3D motion player, command sliders, and diagrams to explore each
 The player shows physical policy recordings with the synchronized elevation map.
 It does not load MuJoCo or ONNX Runtime. Playback starts paused and stops outside the viewport.
 The **Motion** control stops diagram animations. The page also respects the system preference for reduced motion.
+
+### External API
+
+On **How it works**, choose **Browse policies**. The React policy explorer calls
+the public [Hugging Face Hub Models API](https://huggingface.co/docs/hub/en/api)
+from the browser (`GET /api/models`), without an API key. It searches for humanoid
+reinforcement learning models and shows their names, publishers, update dates,
+and links to the model cards and file lists. These models are examples from the Hub.
+The playground runs its bundled Lite Pro policies separately.
+
+### Regenerate explainer recordings
 
 To regenerate the three seeded recordings (a stair descent, a get-up, and sitting down and standing up), run:
 

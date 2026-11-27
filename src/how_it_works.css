@@ -175,6 +175,13 @@
 .ex-reference-row { display: flex; align-items: center; gap: 35px; padding: 27px 3px 0; flex-wrap: wrap; }
 .ex-reference-row > span { font: 8px var(--mono); letter-spacing: 1px; color: #a3acb9; }
 .ex-reference-row a { display: flex; align-items: center; gap: 7px; text-decoration: none; color: #0071e3; font-size: 11px; }
+.ex-policy-link { margin-left: 24px; }
+.ex-policy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.ex-policy-grid li { padding: 18px; border: 1px solid #e6ebf2; border-radius: 16px; }
+.ex-policy-grid a { color: var(--ex-blue); font-size: 14px; overflow-wrap: anywhere; }
+.ex-policy-grid p, .ex-policy-status { color: #657284; font-size: 13px; }
+.ex-policy-grid p { margin: 8px 0; }
+.ex-policy-grid .ex-policy-files { font-size: 12px; }
 .ex-controls { border-bottom: 1px solid #e8edf3; }
 .ex-controls summary { display: flex; justify-content: space-between; padding: 25px 3px; cursor: pointer; font-size: 14px; list-style: none; }
 .ex-controls summary::-webkit-details-marker { display: none; }
