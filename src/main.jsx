@@ -55,6 +55,9 @@ const MOVEMENT_KEYS = new Set([
   'ArrowRight',
 ]);
 const CAMERA_MODES = ['shoulder', 'follow', 'orbit', 'top'];
+const OVERVIEW_WAIT_MS = 8000;
+const ARRIVAL_FINISH_WAIT_MS = 5000;
+const LOAD_STALL_MS = 90000;
 
 function capture_cursor() {
   if (document.pointerLockElement) return;
@@ -78,11 +81,14 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const transfer_ref = useRef(DEFAULT_TRANSFER);
   const ready_ref = useRef(false);
   const phase_ref = useRef('intro');
+  const skip_arrival_ref = useRef(null);
   const entry_complete_ref = useRef(entry_complete);
   const figure_request = useRef(0);
   const [telemetry, set_telemetry] = useState(INITIAL_TELEMETRY);
   const [ready, set_ready] = useState(false);
   const [error, set_error] = useState('');
+  const [loading_stage, set_loading_stage] = useState('Preparing the playground…');
+  const [skipping_arrival, set_skipping_arrival] = useState(false);
   const [performance_stats, set_performance_stats] = useState(null);
   const [camera, set_camera] = useState('shoulder');
   const [render_quality, set_render_quality] = useState('performance');
@@ -156,6 +162,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     capture_cursor();
   }
 
+  function toggle_cursor() {
+    if (document.pointerLockElement) document.exitPointerLock();
+    else resume_cursor();
+  }
+
   function navigate(goal) {
     if (!ready_ref.current || telemetry_ref.current.fallen || telemetry_ref.current.mode !== 'walk') return;
     release_keys();
@@ -188,7 +199,6 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   function close_map() {
     set_map_open(false);
     set_teleport_open(false);
-    resume_cursor();
     viewport_ref.current?.querySelector('canvas')?.focus({ preventScroll: true });
   }
 
@@ -271,26 +281,62 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     let robot_ready = false;
     let furniture_ready = false;
     let world_ready = false;
+    let world_started = false;
+    let skip_requested = false;
+    let loading_timer;
+    let overview_timer;
+    let arrival_timer;
     const previous_overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
     function report_error(message) {
       if (!active) return;
       active = false;
+      clearTimeout(loading_timer);
+      clearTimeout(overview_timer);
+      clearTimeout(arrival_timer);
       worker?.terminate();
-      if (view) view.paused = true;
+      view?.dispose();
+      view = null;
+      view_ref.current = null;
+      preview?.dispose();
+      if (document.pointerLockElement) document.exitPointerLock();
       set_error(message);
       ready_ref.current = false;
       set_ready(false);
     }
 
+    function progress(message) {
+      set_loading_stage(message);
+      clearTimeout(loading_timer);
+      loading_timer = setTimeout(() => report_error('Loading stalled. Return to the home page and try again.'), LOAD_STALL_MS);
+    }
+
+    function skip_arrival() {
+      if (!active || phase_ref.current === 'playing' || skip_requested) return;
+      skip_requested = true;
+      set_skipping_arrival(true);
+      if (world_ready) view.skip_arrival();
+      else if (preview) initialize_world();
+    }
+    skip_arrival_ref.current = skip_arrival;
+
     function finish_loading() {
-      if (!active || !robot_ready || !furniture_ready || world_ready) return;
+      if (!active || !robot_ready || !furniture_ready || !view.has_robot_pose || world_ready) return;
       world_ready = true;
+      clearTimeout(loading_timer);
       set_ready(true);
-      view.set_arrival_ready().catch(exception=>report_error(`Could not prepare the room. ${exception.message}`));
       worker.postMessage({ type: 'speed', speed: speed_ref.current });
       worker.postMessage({ type: 'transfer', transfer: transfer_ref.current });
+      if (skip_requested) {
+        view.skip_arrival();
+      } else {
+        set_loading_stage('Opening the apartment…');
+        arrival_timer = setTimeout(() => {
+          if (!view.arrival?.ready || view.arrival_opening?.phase !== 'complete') skip_arrival();
+        }, ARRIVAL_FINISH_WAIT_MS);
+        view.set_arrival_ready().catch(skip_arrival);
+      }
     }
 
     function reveal_arrival(opacity) {
@@ -298,6 +344,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     }
 
     async function initialize_world() {
+      if (!active || world_started) return;
+      world_started = true;
+      clearTimeout(overview_timer);
+      progress('Loading the apartment and robot…');
       try {
         const { SceneView } = await import('./scene_view.js');
         if (!active) return;
@@ -309,6 +359,8 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         view_ref.current = view;
         view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
+          clearTimeout(loading_timer);
+          clearTimeout(arrival_timer);
           phase_ref.current = 'playing';
           ready_ref.current = true;
           set_phase('playing');
@@ -318,9 +370,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           });
         }, reveal_arrival);
         view.arrival_opening.entry_complete = entry_complete_ref.current;
-        view.load_arrival_assets().catch(exception => report_error(`Could not load the satellite arrival. ${exception.message}`));
+        if (!skip_requested) view.load_arrival_assets().catch(skip_arrival);
         view.load_furniture().then(() => {
+          if (!active) return;
           furniture_ready = true;
+          if (!robot_ready || !view.has_robot_pose) progress('Waiting for the robot…');
           finish_loading();
         }).catch((exception) => report_error(`Could not load the IKEA furniture. ${exception.message}`));
         worker = new Worker(new URL('./simulation.worker.js', import.meta.url), { type: 'module' });
@@ -329,6 +383,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           if (!active) return;
           const message = event.data;
           switch (message.type) {
+            case 'loading':
+              progress(`${message.message}…`);
+              break;
             case 'teleport_result':
               if (message.ok) {
                 close_map();
@@ -345,10 +402,11 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             case 'ready':
               view.load_robot(message.geometries, message.character_rig);
               robot_ready = true;
-              finish_loading();
+              progress(furniture_ready ? 'Waiting for the first robot pose…' : 'Waiting for the apartment and furniture…');
               break;
             case 'frame': {
               view.update_frame(message.transforms, message.telemetry);
+              if (!world_ready) finish_loading();
               worker.postMessage({ type: 'frame_received', buffer: message.transforms.buffer }, [
                 message.transforms.buffer,
               ]);
@@ -392,12 +450,16 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         if (!active) { preview.dispose(); return; }
         preview_ref.current = preview;
         preview.opening.entry_complete = entry_complete_ref.current;
-        preview.start(viewport_ref.current, reveal_arrival, () => { if (active) initialize_world(); });
+        preview.start(viewport_ref.current, reveal_arrival, initialize_world);
+        if (skip_requested) initialize_world();
+        else overview_timer = setTimeout(skip_arrival, OVERVIEW_WAIT_MS);
         await preview.loaded;
       } catch (exception) {
-        report_error(`Could not load the satellite arrival. ${exception.message}`);
+        if (preview) skip_arrival();
+        else report_error(`Could not start the 3D view. ${exception.message}`);
       }
     }
+    progress('Preparing the playground…');
     initialize_preview();
 
     const key_down = (event) => {
@@ -406,7 +468,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         on_exit();
         return;
       }
-      if (event.key === 'Alt') {
+      if (event.key === 'Alt' && (document.pointerLockElement || alt_held_ref.current)) {
         event.preventDefault();
         if (!alt_held_ref.current) {
           alt_held_ref.current = true;
@@ -455,12 +517,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       if (event.code === 'KeyV' || event.code === 'KeyC') cycle_camera();
     };
     const key_up = (event) => {
-      if (event.key === 'Alt') {
+      if (event.key === 'Alt' && alt_held_ref.current) {
         event.preventDefault();
-        if (alt_held_ref.current) {
-          alt_held_ref.current = false;
-          if (!document.hidden && !expanded_map_ref.current) capture_cursor();
-        }
+        alt_held_ref.current = false;
+        if (!document.hidden && !expanded_map_ref.current) capture_cursor();
         return;
       }
       if (event.key === 'Shift') {
@@ -491,6 +551,10 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
     document.addEventListener('pointerlockchange', cursor_change);
     return () => {
       active = false;
+      clearTimeout(loading_timer);
+      clearTimeout(overview_timer);
+      clearTimeout(arrival_timer);
+      skip_arrival_ref.current = null;
       ready_ref.current = false;
       document.body.style.overflow = previous_overflow;
       figure_request.current++;
@@ -827,11 +891,16 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
       </div>
       {phase === 'intro' ? <>
         <span className="arrival-announcement" role="status" aria-live="polite">{arrival_level.label}</span>
-        {error && <div className="arrival-status has-error" role="alert">
-          <h1>We could not open the world.</h1>
-          <p>{error}</p>
-          <button onClick={on_exit}>Back to site <span>↗</span></button>
-        </div>}
+        <div className={`arrival-status ${error ? 'has-error' : 'is-loading'}`}>
+          {error ? <div role="alert"><h1>We could not open the world.</h1><p>{error}</p></div>
+            : <p role="status">{loading_stage}</p>}
+          <div className="arrival-actions">
+            {!error && !skipping_arrival && <button onClick={() => skip_arrival_ref.current?.()}>
+              Skip aerial view
+            </button>}
+            <button onClick={on_exit}>Back to site</button>
+          </div>
+        </div>
         <div className="arrival-credit">
           <a href="https://s2maps.eu" target="_blank" rel="noreferrer">Sentinel-2 cloudless</a><span> by </span>
           <a href="https://eox.at" target="_blank" rel="noreferrer">EOX</a><span> · modified Copernicus Sentinel 2016 &amp; 2017</span>
@@ -876,8 +945,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
         <div className="game-key-hint">
           {!controls_open && <><span><kbd>WASD</kbd> Move</span><span><kbd>SHIFT</kbd> 2× speed</span>
             <span><kbd>V</kbd> View</span><span><kbd>SPACE</kbd> Pause</span></>}
-          <button onClick={resume_cursor} aria-pressed={cursor_locked} title="Hold Alt for the cursor; release to look">
-            <kbd>ALT</kbd> {cursor_locked ? 'Hold for cursor' : 'Look'}</button>
+          <button onClick={toggle_cursor} aria-pressed={cursor_locked} title={cursor_locked
+            ? 'Hold Alt for the cursor; release to look' : 'Capture the mouse to look around'}>
+            {cursor_locked ? <><kbd>ALT</kbd> Hold for cursor</> : 'Look'}</button>
         </div>
       </>}
     </div>
@@ -942,7 +1012,6 @@ function App() {
     preload_arrival();
   }
   function play() {
-    capture_cursor();
     preload_arrival();
     set_entered(true);
   }

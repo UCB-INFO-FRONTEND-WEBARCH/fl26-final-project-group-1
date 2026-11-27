@@ -152,7 +152,9 @@ Clouds share the map's world coordinates, so they pan and zoom together. Layered
 wind curls their edges and makes them billow between dives. Santa Clara frames
 the fully lit side-street area. Building K shows a
 wider campus view and has no cloud overlay.
-The loading screen shows only imagery and source credits. Escape cancels arrival.
+The loading screen shows the current loading step. Use **Skip aerial view** to
+enter once the indoor scene is ready or **Back to site** (Escape) to cancel.
+If the aerial map or shader preparation stalls, the app enters the ready room directly.
 Each aerial stop holds for at least 0.85 seconds. The first hold starts after the
 reveal completes and extends until the closer maps, full road lights, furniture,
 robot, policy, and compiled room shaders are ready. Loading time counts toward
@@ -194,8 +196,9 @@ See [navigation](docs/NAVIGATION.md) for the planner, transfer stages, and limit
 | Mouse drag / right-drag / scroll | Look around / look around / zoom in Shoulder; orbit / pan / zoom in Follow and Orbit |
 | Onscreen movement buttons | Hold for the same movement commands (also touch compatible) |
 
-Play requests mouse capture. Move it to look around; hold Alt for menus and map clicks.
-Release Alt to resume looking. Drag also works if the browser does not permit capture.
+Drag in the scene to look around. Select **Look** in the game controls to capture
+the mouse for free look. Press Escape or hold Alt to free it for menus and map clicks.
+Release Alt to resume capture after holding it.
 In Shoulder view, WASD moves relative to the camera; Q/E also move sideways. Diagonal input keeps the
 same travel speed. The robot turns toward travel, and the camera keeps its world heading while it follows.
 Drag to look around; scroll to zoom. Near the body, only the figure blurs and fades. It is hidden before
