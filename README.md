@@ -174,7 +174,8 @@ Click open floor to walk there automatically. Select **Mezzanine** to choose an
 upstairs destination. **Stairs · experimental** follows the original L stair;
 this apartment has no elevator. Clicking a step selects a stair destination.
 **Building** frames the full tower exterior. Orbit and Top-down cut away the
-selected floor's walls for inspection. WASD or **Escape** cancels automatic navigation. Pause preserves the
+selected floor's walls for inspection. The lower tower exterior downloads when you first select **Building**.
+WASD or **Escape** cancels automatic navigation. Pause preserves the
 route. A blue route with a white outline and destination ring stays visible
 over carpets and glazing in every camera view. Stair routes are enabled with the
 current policies: descents usually work, climbs stop at the first tall step, and a fall starts a get-up; press R to reset. Closed doors and solid furniture remain obstacles.
