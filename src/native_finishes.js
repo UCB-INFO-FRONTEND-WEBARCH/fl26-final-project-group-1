@@ -5,19 +5,23 @@ import { MAP } from './world.js';
 // These images are baked from V20's original procedural material graphs.
 // World-space UVs keep the authored 180mm boards and 240x75mm brick courses.
 export async function load_native_finishes(signal) {
-  const loader=new THREE.TextureLoader(),textures={};
-  try {
-  for(const name of ['oak_color','oak_height','brick_color','brick_height']){
-    const t=await loader.loadAsync(`${SITE_BASE}assets/hephaestus/${name}.png`);
-    if(signal.aborted){t.dispose();signal.throwIfAborted();}
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;
-    t.colorSpace=name.endsWith('color')?THREE.SRGBColorSpace:THREE.NoColorSpace;textures[name]=t;
+  const loader = new THREE.TextureLoader();
+  const names = ['oak_color', 'oak_height', 'brick_color', 'brick_height'];
+  const results = await Promise.allSettled(names.map(async name => {
+    const texture = await loader.loadAsync(`${SITE_BASE}assets/hephaestus/${name}.png`);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 4;
+    texture.colorSpace = name.endsWith('color') ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    return [name, texture];
+  }));
+  const textures = Object.fromEntries(results.filter(result => result.status === 'fulfilled').map(result => result.value));
+  const failure = results.find(result => result.status === 'rejected');
+  if (failure || signal.aborted) {
+    for (const texture of Object.values(textures)) texture.dispose();
+    signal.throwIfAborted();
+    throw failure.reason;
   }
   return textures;
-  } catch(error) {
-    for(const texture of Object.values(textures))texture.dispose();
-    throw error;
-  }
 }
 export function apply_native_finishes(root,textures){
   root.updateMatrixWorld(true);

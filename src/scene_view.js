@@ -392,13 +392,17 @@ export class SceneView {
   async load_native_map() {
     const {loader,draco}=create_model_loader(),signal=this.furniture_abort.signal;
     try {
-      const finishes=await load_native_finishes(signal);
+      const finishes_pending = load_native_finishes(signal);
       const files=[{file:'lower.glb',layer:'lower'},{file:'upper.glb',layer:'upper'},{file:'roof.glb',layer:'roof'},{file:'context.glb',layer:'context'}];
       const loaded=await Promise.allSettled(files.map(async file=>{
         const version = MAP.files.find(entry => entry.file === file.file).sha256;
-        const response=await fetch(`${SITE_BASE}assets/hephaestus/${file.file}?v=${version}`,{signal});
-        if(!response.ok)throw new Error(`Could not load Hephaestus ${file.layer} (HTTP ${response.status}).`);
-        const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
+        const bytes_pending = fetch(`${SITE_BASE}assets/hephaestus/${file.file}?v=${version}`, { signal }).then(response => {
+          if (!response.ok) throw new Error(`Could not load Hephaestus ${file.layer} (HTTP ${response.status}).`);
+          return response.arrayBuffer();
+        });
+        const [bytes, finishes] = await Promise.all([bytes_pending, finishes_pending]);
+        signal.throwIfAborted();
+        const gltf = await loader.parseAsync(bytes, '');
         if(signal.aborted){dispose_model(gltf.scene);return;}
         const upright=new THREE.Group();upright.rotation.x=Math.PI/2;upright.add(gltf.scene);apply_native_finishes(upright,finishes);
         stabilize_native_surfaces(gltf.scene);
