@@ -1,5 +1,5 @@
 // The "take a rest" qual demo page, /?demo=rest[&seed=N][&record]: the playground scene with the game HUD replaced by
-// the three-level overlay. `record` steps the simulation one video frame at a time through window.rest_demo, for
+// the prompt panel. `record` steps the simulation one video frame at a time through window.rest_demo, for
 // scripts/record_demo_rest.js. See demo_rest.js for the scripted levels.
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -20,7 +20,6 @@ const ACCENT = '#a9b4e8';
 const GROUND = '#121417';
 const TYPE = [0.1, 0.9]; // s, the prompt types out
 const REPLY = [1, 1.25, 1.5, 1.75]; // s, the S2 header and its three sub-tasks appear
-const CASCADE_S = 0.4; // each level lights for this long when a sub-task starts, S2 then S1, before S0
 // The 3/4 camera looks over the robot toward the sofa from the south-east, and closes in as the robot arrives.
 const CAMERA = { azimuth: -0.75, elevation: 0.5, far: 6.3, near: 4.3, seat_weight: 0.4, smooth_s: 0.9 };
 const STAGES = { route: 0, align: 1, sit_down: 2, seated: 2 };
@@ -133,38 +132,6 @@ class DemoCamera {
   }
 }
 
-/** The level that just acted: the request flows S2 → S1 → S0 when each sub-task starts, then S0 tracks. */
-function active_level(time, stage, stage_time) {
-  if (time < REPLY[0]) return null;
-  if (stage === 'ask') return 2;
-  if (stage === 'failed') return null;
-  const since = time - stage_time;
-  if (stage === 'seated') return 0;
-  if (since < (stage === 'route' ? 0 : CASCADE_S)) return 2;
-  if (since < (stage === 'route' ? CASCADE_S : 2 * CASCADE_S)) return 1;
-  return 0;
-}
-
-const number = (value, digits = 2) => value.toFixed(digits).replace(/^-/, '−').replace(/^−(0\.0*)$/, '$1');
-
-function level_values(state) {
-  const { report, telemetry, path_length } = state;
-  const stage = report?.stage ?? 'ask';
-  const subtask = STAGES[stage];
-  const s2 = subtask === undefined ? (state.time < REPLY[0] ? 'Listening' : 'Splitting the request')
-    : `${subtask + 1} / 3 · ${SUBTASKS[subtask].label}`;
-  let s1 = 'Waiting for a sub-task';
-  if (stage === 'route') s1 = `Route · ${number(path_length, 1)} m to the staging pose`;
-  if (stage === 'align') s1 = `Pose target · back to the seat · ${number(report.target.distance)} m`;
-  if (stage === 'sit_down') s1 = `Pose trajectory · sit-down clip · frame ${report.clip.lead} / ${report.clip.last_frame}`;
-  if (stage === 'seated') s1 = `Pose trajectory · holding frame ${report.clip.last_frame}`;
-  const [vx, vy, wz] = telemetry?.command ?? [0, 0, 0];
-  const s0 = telemetry?.policy === 'sit'
-    ? `Sit policy · tracking frame ${report?.clip?.frame ?? 0}`
-    : `Walk policy · v ${number(Math.hypot(vx, vy))} m/s · ω ${number(wz)} rad/s`;
-  return [s0, s1, s2];
-}
-
 function Check({ done }) {
   return <svg className="subtask-mark" viewBox="0 0 20 20" aria-hidden="true">
     <circle cx="10" cy="10" r="8.5" />
@@ -177,13 +144,6 @@ function Overlay({ state }) {
   const stage = report?.stage ?? 'ask';
   const typed = PROMPT.slice(0, Math.round(PROMPT.length * ease(TYPE[0], TYPE[1], time)));
   const current = STAGES[stage];
-  const level = active_level(time, stage, state.stage_time);
-  const values = level_values(state);
-  const rows = [
-    ['S2', 'Task planner'],
-    ['S1', 'Trajectory generator'],
-    ['S0', 'Motion tracker', '50 Hz'],
-  ];
   return <div className="demo-overlay">
     <section className="demo-chat" aria-label="Request">
       <div className="chat-user">
@@ -201,30 +161,17 @@ function Overlay({ state }) {
         </ol>
       </div>}
     </section>
-
-    <section className="demo-levels" aria-label="Control levels">
-      {rows.map(([name, title, note], index) => <div key={name} className={`level-row ${2 - index === level ? 'current' : ''}`}>
-        <span className="level-name">{name}</span>
-        <span className="level-title">{title}{note && <> <small>{note}</small></>}</span>
-        <span className="level-value">{values[2 - index]}</span>
-      </div>)}
-    </section>
-
-    <section className="demo-legend" aria-label="Legend">
-      <span><svg viewBox="0 0 40 12" aria-hidden="true"><path className="legend-plan" d="M2 6h36" /></svg>Plan · S1</span>
-      <span><svg viewBox="0 0 40 12" aria-hidden="true"><path className="legend-executed" d="M2 6h36" /></svg>Executed · S0</span>
-    </section>
     {stage === 'failed' && <p className="demo-failed">The robot fell. Reload for another take.</p>}
   </div>;
 }
 
 export function RestDemoPage({ seed, record }) {
   const viewport_ref = useRef(null);
-  const [state, set_state] = useState({ time: 0, report: null, telemetry: null, stage_time: 0, path_length: 0 });
+  const [state, set_state] = useState({ time: 0, report: null });
   const [error, set_error] = useState('');
 
   useEffect(() => {
-    let active = true, view, worker, plan, camera, frame_waiter = null, stage = 'ask', stage_time = 0, path_length = 0;
+    let active = true, view, worker, plan, camera, frame_waiter = null, stage = 'ask', stage_time = 0;
     let robot_ready = false, scene_ready = false, running = false;
     document.documentElement.dataset.theme = 'dark';
     window.dispatchEvent(new Event(THEME_EVENT));
@@ -279,13 +226,11 @@ export function RestDemoPage({ seed, record }) {
         if (!report || !plan) return;
         running = true;
         if (report.stage !== stage) [stage, stage_time] = [report.stage, report.time];
-        const path = report.route?.path;
-        if (path && !path_length) path_length = path.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - path[i][0], p[1] - path[i][1]), 0);
         const route_opacity = stage === 'route' ? 1 : stage === 'align' ? 1 - ease(0, 0.8, report.time - stage_time) : 0;
         plan.update(report, message.ghost, route_opacity, telemetry.position);
         plan.material.uniforms.opacity.value = stage === 'seated' ? 1 - ease(0.3, 1.3, report.time - stage_time) : 1;
         camera.update(telemetry.position, report.time);
-        set_state({ time: report.time, report, telemetry, stage_time, path_length });
+        set_state({ time: report.time, report });
         frame_waiter?.(report);
       };
     }

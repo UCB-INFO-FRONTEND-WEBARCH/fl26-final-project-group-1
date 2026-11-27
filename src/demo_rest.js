@@ -88,20 +88,11 @@ export class RestDemo {
     this.stage = stage;
   }
 
-  /** What each scripted level hands down this step, for the overlay. */
+  /** The sub-task and, while walking, the route S1 planned, for the overlay. */
   report() {
-    const { simulation, stage } = this;
+    const { stage } = this;
     const report = { stage, done: this.done, time: this.time };
-    if (stage === 'route') {
-      report.route = { path: this.path, remaining: simulation.navigation.state.remaining };
-    } else if (stage === 'align') {
-      const { target } = simulation.approach;
-      const [x, y] = simulation.state.qpos;
-      report.target = { distance: Math.hypot(target[0] - x, target[1] - y), heading: target[2] };
-    } else if (stage === 'sit_down' || stage === 'seated') {
-      const { frame, last_frame } = simulation.controller.reference;
-      report.clip = { frame, last_frame, lead: Math.min(frame + this.lead_frames, last_frame) };
-    }
+    if (stage === 'route') report.route = { path: this.path };
     return report;
   }
 
