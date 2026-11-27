@@ -33,9 +33,14 @@
       "sha256": "686d7add6bac364419fe10f445ff691195800e7ad5e0e31b89c610e0377ce825"
     },
     {
-      "file": "context.glb",
-      "bytes": 9978148,
-      "sha256": "aa635f77fd9def89796f91d3f133d6464cada7c3e77352f7fd5237038f9991b3"
+      "file": "context-roof.glb",
+      "bytes": 7633200,
+      "sha256": "5d97e3915643851d8be8f71d7500c3b07cd538a0744435afc26ea1beaedcfe64"
+    },
+    {
+      "file": "context-tower.glb",
+      "bytes": 2357360,
+      "sha256": "bfcfff2e106c460d309e3972c23a07acc9d1466baa8f0b430b7e58a2f7256c19"
     },
     {
       "file": "lower.glb",
@@ -97,7 +102,7 @@
     ]
   },
   "render_detail": {
-    "context_bands": "Roof context always available; lower tower facade shown in Building view",
+    "context_bands": "Roof context loads on entry; lower tower facade loads on first Building view",
     "triangle_partition": "Source attributes preserved; no additional simplification",
     "plants": "330 authored placements in 8m culling cells; shared overview batches in Building view",
     "lounge": "Two sofas and two coffee tables; matching visuals, contacts, navigation and camera blockers."

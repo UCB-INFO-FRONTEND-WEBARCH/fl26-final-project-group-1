@@ -95,6 +95,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
   const [speed, set_speed] = useState(DEFAULT_WALK_SPEED);
   const [pressed, set_pressed] = useState(new Set());
   const [viewed_floor, set_viewed_floor] = useState(0);
+  const [tower_context_status, set_tower_context_status] = useState('');
   const [transfer, set_transfer] = useState(DEFAULT_TRANSFER);
   const [figure, set_figure] = useState('robot');
   const [character_loading, set_character_loading] = useState(false);
@@ -356,6 +357,7 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
           if (keys_ref.current.size) send_command();
         });
         view.on_seat = id => toggle_seat(id);
+        view.on_tower_context = set_tower_context_status;
         view_ref.current = view;
         view.start_arrival(arrival, set_arrival_level, () => {
           if (!active) return;
@@ -913,7 +915,9 @@ function Playground({ on_exit, entry_complete, arrival_promise }) {
             <kbd>V</kbd> {camera === 'top' ? 'Top-down' : camera[0].toUpperCase() + camera.slice(1)}
           </button>
           <div className="game-menu">
-            <span className="game-status">{status}</span>
+            <span className="game-status" aria-live={viewed_floor === 'all' ? 'polite' : undefined}>
+              {(viewed_floor === 'all' && tower_context_status) || status}
+            </span>
             <ThemeToggle />
             <button aria-label={telemetry.paused ? 'Resume simulation' : 'Pause simulation'} title="Space · Pause"
               disabled={!ready || telemetry.fallen} onClick={toggle_pause}>

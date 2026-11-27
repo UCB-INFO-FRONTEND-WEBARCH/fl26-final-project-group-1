@@ -34,14 +34,14 @@ kitchen, and perimeter placements remain from V20. See [seating](SEATING.md) and
 
 ## Runtime representation
 
-- `lower.glb`, `upper.glb`, `roof.glb`, and `context.glb` separate playable floors,
-  roof visibility, and exterior context. Three small plant prototypes reproduce
+- `lower.glb`, `upper.glb`, `roof.glb`, `context-roof.glb`, and `context-tower.glb`
+  separate playable floors, roof visibility, and exterior context. Three small plant prototypes reproduce
   330 authored instances with instanced rendering.
 - The large scene GLBs use meshopt compression, 16-bit position quantization,
   static role batching, render LODs, and embedded image maps capped at 1024 pixels.
-  Native models plus four finish tiles total 40,022,742 bytes (38.17 MiB), excluding external catalog seating.
-  The complete lower facade is a separate context band, visible in Building
-  view. Plants use 8 m culling batches indoors and shared overview batches in
+  The roof context loads with the playable floors. The 2.36 MB lower facade
+  loads on the first selection of Building view and is reused for the rest of the session.
+  Plants use 8 m culling batches indoors and shared overview batches in
   Building view. Fast Building view omits interior furniture; Quality restores it.
   No additional mesh simplification is used in this pass.
 - Oak albedo/height tiles cover 3.60 × 1.80 m; brick tiles cover 0.96 × 1.20 m.
@@ -105,10 +105,11 @@ python scripts/hephaestus/prepare_centoria_map_v21.py
 
 Run `compact_centoria_glb_v21.py INPUT OUTPUT` on each raw lower/upper/context GLB,
 then `python scripts/hephaestus/split_context_glb.py COMPACTED_CONTEXT CONTEXT_BANDS`
-on the compacted context only. Run gltfpack 1.3.0 on the compacted lower/upper
-and split context with `-cc -ke -kn -vp 16`, writing the
-final files into `public/assets/hephaestus/`. Compress the raw roof GLB with the
-same gltfpack settings as well, then run
+on the compacted context only. Run gltfpack 1.3.0 with `-cc -ke -kn -vp 16`
+on the compacted lower/upper, banded context and raw roof. Write the packed
+lower/upper and roof into `public/assets/hephaestus/`; keep the packed combined
+context outside that directory. Run `node scripts/hephaestus/pack_context_bands.js PACKED_CONTEXT.glb public/assets/hephaestus`
+to emit the two context GLBs, then run
 `python scripts/hephaestus/finalize_centoria_map_v21.py` to update the source-derived
 masks, physics module, plant prototypes, and checksummed manifest together.
 Compaction promotes converted WebP textures to standard JPEG/PNG bindings and

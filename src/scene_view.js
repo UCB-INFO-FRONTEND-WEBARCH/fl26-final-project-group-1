@@ -39,6 +39,13 @@ function floor_label(text, width, color = '#85858d') {
     new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false }));
 }
 
+async function fetch_native_glb(file, signal) {
+  const version = MAP.files.find(entry => entry.file === file).sha256;
+  const response = await fetch(`${SITE_BASE}assets/hephaestus/${file}?v=${version}`, { signal });
+  if (!response.ok) throw new Error(`Could not load Hephaestus ${file} (HTTP ${response.status}).`);
+  return response.arrayBuffer();
+}
+
 export class SceneView {
   constructor(container, on_metrics, on_destination, renderer, on_camera_change) {
     this.container = container;
@@ -367,7 +374,7 @@ export class SceneView {
   build_native_room() {
     this.floor_groups=[new THREE.Group(),new THREE.Group()];this.scene.add(...this.floor_groups);
     this.map_context=new THREE.Group();this.map_roof=new THREE.Group();this.scene.add(this.map_context,this.map_roof);
-    this.floor_surfaces=[];this.furniture_shadows=[];this.viewed_floor=0;this.native_clip_materials=[];this.native_context_bands=[];this.native_furniture_groups=[];
+    this.floor_surfaces=[];this.furniture_shadows=[];this.viewed_floor=0;this.native_clip_materials=[];this.native_furniture_groups=[];
     this.plant_cells=new THREE.Group();this.plant_overview=new THREE.Group();this.map_context.add(this.plant_cells,this.plant_overview);
     this.ambient_light=new THREE.HemisphereLight('#fff8ed','#aeb8bb',2);this.scene.add(this.ambient_light);
     this.sunlight=new THREE.DirectionalLight('#fff7e8',2);this.sunlight.position.set(0,-10,20);this.sunlight.castShadow=true;
@@ -392,19 +399,17 @@ export class SceneView {
   async load_native_map() {
     const {loader,draco}=create_model_loader(),signal=this.furniture_abort.signal;
     try {
-      const finishes=await load_native_finishes(signal);
-      const files=[{file:'lower.glb',layer:'lower'},{file:'upper.glb',layer:'upper'},{file:'roof.glb',layer:'roof'},{file:'context.glb',layer:'context'}];
+      const finishes_pending = load_native_finishes(signal);
+      const files=[{file:'lower.glb',layer:'lower'},{file:'upper.glb',layer:'upper'},{file:'roof.glb',layer:'roof'},{file:'context-roof.glb',layer:'context'}];
       const loaded=await Promise.allSettled(files.map(async file=>{
-        const version = MAP.files.find(entry => entry.file === file.file).sha256;
-        const response=await fetch(`${SITE_BASE}assets/hephaestus/${file.file}?v=${version}`,{signal});
-        if(!response.ok)throw new Error(`Could not load Hephaestus ${file.layer} (HTTP ${response.status}).`);
-        const gltf=await loader.parseAsync(await response.arrayBuffer(),'');
+        const [bytes, finishes] = await Promise.all([fetch_native_glb(file.file, signal), finishes_pending]);
+        signal.throwIfAborted();
+        const gltf = await loader.parseAsync(bytes, '');
         if(signal.aborted){dispose_model(gltf.scene);return;}
         const upright=new THREE.Group();upright.rotation.x=Math.PI/2;upright.add(gltf.scene);apply_native_finishes(upright,finishes);
         stabilize_native_surfaces(gltf.scene);
         const clipped = new Map();
         gltf.scene.traverse(o=>{
-          if(o.userData.context_band)this.native_context_bands.push(o);
           if(o.userData.map_role==='furniture')this.native_furniture_groups.push(o);
           if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;
           // Only architectural cutaways are clipped; source furniture stays whole.
@@ -424,6 +429,7 @@ export class SceneView {
         freeze_native_transforms(upright);
       }));
       const failed=loaded.find(r=>r.status==='rejected');if(failed)throw failed.reason;
+      this.native_finishes = await finishes_pending;
       // Lightweight procedural-plant exports retain their authored placements.
       for(const key of [...new Set(MAP.plants.map(p=>p.key))]) {
         const response=await fetch(`${SITE_BASE}assets/hephaestus/${key}.glb`,{signal});if(!response.ok)throw new Error(`Could not load plant ${key}.`);
@@ -445,11 +451,43 @@ export class SceneView {
       }
       if(signal.aborted)return;
       const room=new RoomEnvironment(),generator=new THREE.PMREMGenerator(this.renderer);this.environment=generator.fromScene(room,.04);this.scene.environment=this.environment.texture;this.scene.environmentIntensity=this.theme==='dark'?.25:.55;room.dispose();generator.dispose();
-      this.map_context_low=new THREE.Box3().setFromObject(this.map_context).min.z;
       configure_native_materials(this.map_context,this.quality==='performance');
       freeze_native_transforms(this.map_context);
       this.apply_native_view();this.renderer.shadowMap.needsUpdate=true;this.needs_render=true;
     } finally {draco.dispose();}
+  }
+
+  async load_tower_context() {
+    if (this.tower_context || this.tower_context_loading) return;
+    this.tower_context_loading = true;
+    this.on_tower_context?.('Loading building exterior…');
+    const { loader, draco } = create_model_loader();
+    const signal = this.furniture_abort.signal;
+    try {
+      const bytes = await fetch_native_glb('context-tower.glb', signal);
+      signal.throwIfAborted();
+      const { scene } = await loader.parseAsync(bytes, '');
+      if (signal.aborted) { dispose_model(scene); return; }
+      const group = new THREE.Group();
+      group.rotation.x = Math.PI / 2;
+      group.add(scene);
+      apply_native_finishes(group, this.native_finishes);
+      stabilize_native_surfaces(scene);
+      scene.traverse(object => { if (object.isMesh) object.castShadow = object.receiveShadow = true; });
+      configure_native_materials(group, this.quality === 'performance');
+      this.map_context.add(group);
+      this.tower_context = group;
+      freeze_native_transforms(group);
+      this.apply_native_view();
+      this.renderer.shadowMap.needsUpdate = this.renderer.shadowMap.enabled;
+      this.needs_render = true;
+      this.on_tower_context?.('');
+    } catch (error) {
+      if (!signal.aborted) this.on_tower_context?.('Exterior unavailable. Select Building to retry.');
+    } finally {
+      this.tower_context_loading = false;
+      draco.dispose();
+    }
   }
 
   apply_native_view() {
@@ -458,7 +496,7 @@ export class SceneView {
     const building=this.viewed_floor==='all';
     this.plant_cells.visible=!building;this.plant_overview.visible=building;
     for(const detail of this.native_furniture_groups)detail.visible=!building||this.quality==='quality';
-    for(const cell of this.native_context_bands)cell.visible=cell.userData.context_band==='roof'||this.viewed_floor==='all';
+    if (this.tower_context) this.tower_context.visible = building;
     for(let floor=0;floor<2;floor++)this.floor_groups[floor].visible=interior||this.viewed_floor==='all'||this.viewed_floor===floor;
     this.map_roof.visible=interior||this.viewed_floor==='all';
     for(const {material,floor} of this.native_clip_materials){
@@ -616,7 +654,7 @@ export class SceneView {
       const building=this.viewed_floor==='all'&&!['shoulder','follow'].includes(mode);
       this.controls.maxDistance=building?500:70;this.camera.far=building?700:300;
       this.scene.fog.near=building?400:60;this.scene.fog.far=building?1500:180;
-      if(building){const middle=(this.map_context_low??-146)*.45;this.controls.target.set(-5,0,middle);this.camera.position.set(180,-220,100);}
+      if(building){const middle=MAP.context_bounds[0][2]*.45;this.controls.target.set(-5,0,middle);this.camera.position.set(180,-220,100);}
       this.camera.updateProjectionMatrix();
     }
     this.last_follow_position.copy(this.robot_position);
@@ -715,7 +753,10 @@ export class SceneView {
   set_floor(floor) {
     this.viewed_floor = floor;
     this.update_figure_visibility();
-    if(IS_HEPHAESTUS)this.apply_native_view();
+    if (IS_HEPHAESTUS) {
+      this.apply_native_view();
+      if (floor === 'all') void this.load_tower_context();
+    }
     for (let level = 0; !IS_HEPHAESTUS && level < 2; level++) {
       this.floor_groups[level].visible = floor === 'all' || floor === level;
       const material = this.floor_surfaces[level].material;
