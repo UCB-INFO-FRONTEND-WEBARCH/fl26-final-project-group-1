@@ -17,13 +17,17 @@ pose corrections.
 ## Take
 
 - Seed: 6
-- Code: commit `b6d1d74` on `demo/qual-take-a-rest`
+- Code: commit `22ffd44` on `demo/qual-take-a-rest`
 - Duration: 15.000 s (450 frames), 1920×1080, 30 fps, H.264 (`libx264 -crf 18 -pix_fmt yuv420p
   -movflags +faststart`), no audio
 - Start: on the lounge rug at (1.6, 1.85) m, 1.1 m beside the staging point and 1.4 m from
   the sofa's front edge, facing along the sofa (sideways to it)
+- On screen: the prompt panel at the bottom right (the prompt and S2's three sub-tasks), and
+  S1's dashed route and plan ghost in the scene. The top center is clear for the deck's slide
+  title.
 - Takes: 2 recorded (seeds 6 and 11), none fell. Seed 6 had the least foot slip while it sat
-  down. In Node, 12 of 12 screened seeds sat without a fall, at 12.6–13.2 s.
+  down. In Node, 12 of 12 screened seeds sat without a fall, at 12.6–13.2 s. The current file
+  is seed 6 re-rendered with this overlay; the motion is the same as in the take at `ff2d16d`.
 
 ## What happens
 
