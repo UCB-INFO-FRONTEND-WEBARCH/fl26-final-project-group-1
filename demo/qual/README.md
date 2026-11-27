@@ -8,16 +8,17 @@ around, and sits down.
 | --- | --- | --- |
 | S2 · task planner | Scripted | User prompt → three sub-task labels |
 | S1 · trajectory generator | Scripted | Sub-task label → route or pose trajectory |
-| S0 · Fluctlight tracker | Learned walk and sit policies in MuJoCo | Pose targets → joint setpoints at 50 Hz |
+| S0 · motion tracker | Learned Fluctlight walk and sit policies in MuJoCo | Pose targets → joint setpoints at 50 Hz |
 
-S2 and S1 are not trained models. The video says so on screen. S0 is the unchanged
-Fluctlight walk and sit policies. The robot's motion is the physical simulation, with no
+S2 and S1 are scripted, not trained models. The video does not say this on screen. S0 is
+the unchanged Fluctlight walk and sit policies. The robot's motion is the physical simulation, with no
 pose corrections.
 
 ## Take
 
 - Seed: 11
-- Code: commit `d4acf5c` on `demo/qual-take-a-rest`
+- Code: commit `b2476d5` on `demo/qual-take-a-rest`. It differs from the first take
+  (`d4acf5c`) only in the overlay labels; the motion is the same.
 - Duration: 30.33 s (910 frames), 1920×1080, 30 fps, H.264 (`libx264 -crf 18 -pix_fmt yuv420p
   -movflags +faststart`), no audio
 - Takes: 4 recorded (seeds 3, 5, 11 and 12), none fell. Seed 11 had the least foot slip
