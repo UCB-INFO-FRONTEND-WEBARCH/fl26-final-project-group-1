@@ -1,0 +1,141 @@
+{
+  "date": "2026-11-24",
+  "map": "Hephaestus Tower",
+  "camera": "Shoulder at reset",
+  "graphics": "Fast",
+  "measurement": "Production preview in the in-app browser; short CPU submission samples, not GPU timings. Same proposed M-map UI before and after render suspension.",
+  "before": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "playing": {
+      "fps": 60,
+      "render_ms": 2.397619048754374,
+      "p95_ms": 2.899999976158142,
+      "triangles": 2538615,
+      "draw_calls": 331,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "rtf": 0.9963136395455584,
+      "inference_ms": 0.3999999761581421
+    },
+    "map": {
+      "fps": 60,
+      "render_ms": 2.5720930224241214,
+      "p95_ms": 3.300000011920929,
+      "triangles": 2538615,
+      "draw_calls": 331,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "rtf": 1.0027938535341792,
+      "inference_ms": 0.3999999761581421
+    }
+  },
+  "after": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "playing": {
+      "fps": 60,
+      "render_ms": 2.323255814785181,
+      "p95_ms": 2.799999952316284,
+      "triangles": 2538615,
+      "draw_calls": 331,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "render_count": 5531,
+      "render_suspended": false,
+      "rtf": 1.0018941281787588,
+      "inference_ms": 0.5
+    },
+    "map_start": {
+      "fps": 0,
+      "render_ms": 0,
+      "p95_ms": 0,
+      "triangles": 0,
+      "draw_calls": 0,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "render_count": 5537,
+      "render_suspended": true,
+      "rtf": 1.0018941281787588,
+      "inference_ms": 0.30000001192092896
+    },
+    "map_held": {
+      "fps": 0,
+      "render_ms": 0,
+      "p95_ms": 0,
+      "triangles": 0,
+      "draw_calls": 0,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "render_count": 5537,
+      "render_suspended": true,
+      "rtf": 1.0015945784571256,
+      "inference_ms": 0.40000003576278687
+    },
+    "map_close": {
+      "fps": 60,
+      "render_ms": 2.323255814785181,
+      "p95_ms": 2.799999952316284,
+      "triangles": 2538615,
+      "draw_calls": 331,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "render_count": 5537,
+      "render_suspended": false,
+      "rtf": 0.998003992015968,
+      "inference_ms": 0.5
+    },
+    "resumed": {
+      "fps": 60,
+      "render_ms": 2.4488372123518656,
+      "p95_ms": 3,
+      "triangles": 2538615,
+      "draw_calls": 331,
+      "pixel_ratio": 1,
+      "arrival_handoff": {
+        "position_m": 2.482534153247273e-16,
+        "angle_degrees": 2.4148365394514667e-06
+      },
+      "camera_heading": -2.9739502157585775,
+      "figure_opacity": 1,
+      "render_count": 10722,
+      "render_suspended": false,
+      "rtf": 0.9963679199095689,
+      "inference_ms": 0.3999999761581421
+    }
+  }
+}

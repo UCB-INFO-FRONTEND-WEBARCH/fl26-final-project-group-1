@@ -1,0 +1,58 @@
+.theme-toggle { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; padding: 0; border-radius: 50%; border: 1px solid #dce2e8; background: #ffffffb8; color: #657482; }
+.theme-toggle:hover { color: #0071e3; background: #fff; }
+html[data-theme='dark'] { color-scheme: dark; background: #10151e; color: #e4eaf1; --muted: #98a6b6; --line: #29333f; }
+html[data-theme='dark'] body { background: #10151e; color: #e4eaf1; }
+html[data-theme='dark'] .app-header { background: #161e28dc; border-color: #2b3643; }
+html[data-theme='dark'] .brand-symbol { color: #dbe6f1; }
+html[data-theme='dark'] .header-nav a { color: #a2b1c1; }
+html[data-theme='dark'] .header-nav a:hover, html[data-theme='dark'] .header-nav a[aria-current='page'] { color: #7bb7fb; }
+html[data-theme='dark'] .theme-toggle { color: #e4bd79; background: #1a2531; border-color: #354454; }
+html[data-theme='dark'] .entry-page { background: #10151e; }
+html[data-theme='dark'] .game-shell { background: #10151e; }
+html[data-theme='dark'] .entry-copy h1 { color: #e6edf4; }
+html[data-theme='dark'] .entry-copy h1 span { color: #71869e; }
+html[data-theme='dark'] .entry-copy > p, html[data-theme='dark'] .entry-copy .eyebrow { color: #94a5b9; }
+html[data-theme='dark'] .entry-footer, html[data-theme='dark'] .entry-footer a { color: #8a9bad; }
+html[data-theme='dark'] .teleport-grab { background: #2d3540; border-color: #726449; color: #efc46c; }
+html[data-theme='dark'] .teleport-floor-switch button { border-color: #3a4a60; color: #b2c4d8; }
+html[data-theme='dark'] .teleport-floor-switch button[aria-pressed='true'] { background: #30465e; color: #b2d7ff; }
+html[data-theme='dark'] .game-bar button { color: #d3dce6; background: #16212ee8; border-color: #354454; }
+html[data-theme='dark'] .game-status, html[data-theme='dark'] .game-key-hint, html[data-theme='dark'] .game-key-hint kbd { color: #a2b3c6; }
+html[data-theme='dark'] .game-shell.controls-open .sidebar,
+html[data-theme='dark'] .game-shell.controls-open .session-toolbar,
+html[data-theme='dark'] .game-shell.controls-open .render-quality,
+html[data-theme='dark'] .minimap { background: #17212fee; border-color: #364456; color: #c8d5e3; }
+html[data-theme='dark'] .camera-switch, html[data-theme='dark'] .floor-switch, html[data-theme='dark'] .scene-zoom { background: #1c2a3be8; border-color: #3a4a60; }
+html[data-theme='dark'] .camera-switch button.selected,
+html[data-theme='dark'] .floor-switch button.selected { background: #30465e; color: #b2d7ff; }
+html[data-theme='dark'] .secondary-button, html[data-theme='dark'] .figure-switch,
+html[data-theme='dark'] .navigation-status, html[data-theme='dark'] .stop-navigation,
+html[data-theme='dark'] .render-quality select, html[data-theme='dark'] .transfer-choice select { background: #243346; border-color: #40516a; color: #c4d8ee; }
+html[data-theme='dark'] .figure-switch button[aria-pressed='true'] { background: #405a78; color: #e2efff; }
+html[data-theme='dark'] .control-key { background: #243346; border-color: #40516a; color: #d8e5f2; }
+html[data-theme='dark'] .navigation-section, html[data-theme='dark'] .control-section,
+html[data-theme='dark'] .telemetry-section, html[data-theme='dark'] .text-button { border-color: #344256; }
+html[data-theme='dark'] .section-title h3,
+html[data-theme='dark'] .telemetry-rows output { color: #d8e5f2; }
+html[data-theme='dark'] .command-readout { background: #243346; border-color: #40516a; }
+html[data-theme='dark'] .command-readout > div { border-color: #40516a; }
+html[data-theme='dark'] .command-readout output { color: #d8e5f2; }
+html[data-theme='dark'] .catalog-sidebar, html[data-theme='dark'] .asset-card,
+html[data-theme='dark'] .asset-dialog, html[data-theme='dark'] .catalog-loading,
+html[data-theme='dark'] .catalog-empty { background: #17212f; border-color: #334255; color: #d4e0ed; }
+html[data-theme='dark'] .catalog-search, html[data-theme='dark'] .library-tabs,
+html[data-theme='dark'] .library-note, html[data-theme='dark'] .catalog-sort select,
+html[data-theme='dark'] .filter-limits select, html[data-theme='dark'] .subcategory-list button,
+html[data-theme='dark'] .active-filters button { background: #243346; border-color: #3a4b63; color: #aabed4; }
+html[data-theme='dark'] .catalog-search input, html[data-theme='dark'] .collection-stats strong,
+html[data-theme='dark'] .asset-heading button, html[data-theme='dark'] .catalog-empty h3 { color: #d4e0ed; }
+html[data-theme='dark'] .library-tabs button[aria-pressed='true'] { background: #38506b; color: #dbeaff; }
+html[data-theme='dark'] .ex-chapter-nav, html[data-theme='dark'] .ex-command-lab,
+html[data-theme='dark'] .ex-learning-panel, html[data-theme='dark'] .ex-terrain-demo,
+html[data-theme='dark'] .ex-report-card { background: #17212f; border-color: #334255; }
+html[data-theme='dark'] .ex-segmented { background: #243346; }
+html[data-theme='dark'] .ex-segmented button[aria-pressed='true'],
+html[data-theme='dark'] .ex-training-tabs button[aria-pressed='true'],
+html[data-theme='dark'] .ex-loop > button.active { background: #30465e; color: #9acbff; }
+html[data-theme='dark'] .ex-section-heading > p, html[data-theme='dark'] .ex-loop-detail p,
+html[data-theme='dark'] .ex-lab-copy p { color: #9badc2; }

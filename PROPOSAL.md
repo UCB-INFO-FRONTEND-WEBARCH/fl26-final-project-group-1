@@ -6,7 +6,7 @@
 
 # 2. Project Idea
 
-**RoboPlay** is an interactive, browser-based robotics playground inspired by the MicroDuck simulator. Visitors will guide a robot through a short challenge course and interact with obstacles or objects. A React results screen will show performance based on task completion and elapsed time, while `localStorage` will preserve past results and personal bests. A policy-explorer section will introduce visitors to real robotics policies alongside the challenge. We will focus the initial experience on one robot and one well-designed challenge so that it is engaging and reliable to demo.
+**Centoria** is an interactive, browser-based robotics playground inspired by the MicroDuck simulator. Visitors will guide a robot through a short challenge course and interact with obstacles or objects. A React results screen will show performance based on task completion and elapsed time, while `localStorage` will preserve past results and personal bests. A policy-explorer section will introduce visitors to real robotics policies alongside the challenge. We will focus the initial experience on one robot and one well-designed challenge so that it is engaging and reliable to demo.
 
 # 3. External API and Why
 
